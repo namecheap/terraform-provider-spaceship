@@ -19,7 +19,9 @@ import (
 const defaultBaseURL = "https://spaceship.dev/api/v1"
 
 // ensure spaceship provider satisfies expected interfaces
-var _ provider.Provider = &spaceshipProvider{}
+var (
+	_ provider.Provider = &spaceshipProvider{}
+)
 
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {

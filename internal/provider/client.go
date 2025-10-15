@@ -21,15 +21,87 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// TODO
-// need to be changed not all dns records has these fields
-// would work only for A and AAAA records
-// need something where all these are defined maybe?
+// DNSRecord represents a DNS record managed through the Spaceship API.
 type DNSRecord struct {
-	Type    string `json:"type"`
-	Name    string `json:"name"`
-	TTL     int    `json:"ttl"`
-	Address string `json:"address"`
+	Type            string       `json:"type"`
+	Name            string       `json:"name"`
+	TTL             int          `json:"ttl,omitempty"`
+	Address         string       `json:"address,omitempty"`
+	AliasName       string       `json:"aliasName,omitempty"`
+	CName           string       `json:"cname,omitempty"`
+	Flag            *int         `json:"flag,omitempty"`
+	Tag             string       `json:"tag,omitempty"`
+	Value           string       `json:"value,omitempty"`
+	Port            *PortValue   `json:"port,omitempty"`
+	Scheme          string       `json:"scheme,omitempty"`
+	SvcPriority     *int         `json:"svcPriority,omitempty"`
+	TargetName      string       `json:"targetName,omitempty"`
+	SvcParams       string       `json:"svcParams,omitempty"`
+	Exchange        string       `json:"exchange,omitempty"`
+	Preference      *int         `json:"preference,omitempty"`
+	Nameserver      string       `json:"nameserver,omitempty"`
+	Pointer         string       `json:"pointer,omitempty"`
+	Service         string       `json:"service,omitempty"`
+	Protocol        string       `json:"protocol,omitempty"`
+	Priority        *int         `json:"priority,omitempty"`
+	Weight          *int         `json:"weight,omitempty"`
+	Target          string       `json:"target,omitempty"`
+	Usage           *int         `json:"usage,omitempty"`
+	Selector        *int         `json:"selector,omitempty"`
+	Matching        *int         `json:"matching,omitempty"`
+	AssociationData string       `json:"associationData,omitempty"`
+	Group           *RecordGroup `json:"group,omitempty"`
+}
+
+type RecordGroup struct {
+	Type string `json:"type"`
+}
+
+type PortValue struct {
+	String *string
+	Int    *int
+}
+
+func NewStringPortValue(value string) *PortValue {
+	return &PortValue{String: &value}
+}
+
+func NewIntPortValue(value int) *PortValue {
+	return &PortValue{Int: &value}
+}
+
+func (p *PortValue) MarshallJSON() ([]byte, error) {
+	if p == nil {
+		return []byte("null"), nil
+	}
+	if p.Int != nil {
+		return json.Marshal(*p.Int)
+	}
+	if p.String != nil {
+		return json.Marshal(*p.String)
+	}
+	return []byte("null"), nil
+}
+
+func (p *PortValue) UnmarshallJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	var intValue int
+	if err := json.Unmarshal(data, &intValue); err == nil {
+		p.Int = &intValue
+		p.String = nil
+		return nil
+	}
+
+	var stringValue string
+	if err := json.Unmarshal(data, &stringValue); err == nil {
+		p.String = &stringValue
+		p.Int = nil
+		return nil
+	}
+
+	return fmt.Errorf("invalid port value: %s", string(data))
 }
 
 // represents an error response from the spaceship api
