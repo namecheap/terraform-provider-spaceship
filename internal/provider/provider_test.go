@@ -43,7 +43,7 @@ func testAccClient() *Client {
 	)
 }
 
-func testAccCheckDNSRecordAbsent(domain, recortType, name string) resource.TestCheckFunc {
+func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
 		client := testAccClient()
 		records, err := client.GetDNSRecords(context.Background(), domain)
@@ -56,7 +56,7 @@ func testAccCheckDNSRecordAbsent(domain, recortType, name string) resource.TestC
 
 		for _, record := range records {
 			if strings.EqualFold(record.Type, recordType) && strings.EqualFold(record.Name, name) {
-				return fmt.Errrof("DNS record %s %s still present in domain %s", record.Type, record.Name, domain)
+				return fmt.Errorf("DNS record %s %s still present in domain %s", record.Type, record.Name, domain)
 			}
 		}
 		return nil
