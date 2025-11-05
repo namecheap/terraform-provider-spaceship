@@ -302,23 +302,29 @@ func TestDiffDNSRecords_RecordRemoval(t *testing.T) {
 	}
 }
 
-func TestSortDNSRecords(t *testing.T) {
-	records := []DNSRecord{
-		{Type: "A", Name: "b", Address: "198.51.100.20", TTL: 600},
-		{Type: "a", Name: "A", Address: "198.51.100.10", TTL: 3600},
-		{Type: "A", Name: "A", Address: "198.51.100.11", TTL: 3600},
+func TestOrderDNSRecordsLike(t *testing.T) {
+	reference := []DNSRecord{
+		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
+		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
+		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
 	}
 
-	sortDNSRecords(records)
+	records := []DNSRecord{
+		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
+		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
+		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
+	}
+
+	ordered := orderDNSRecordsLike(reference, records)
 
 	expected := []DNSRecord{
-		{Type: "a", Name: "A", Address: "198.51.100.10", TTL: 3600},
-		{Type: "A", Name: "A", Address: "198.51.100.11", TTL: 3600},
-		{Type: "A", Name: "b", Address: "198.51.100.20", TTL: 600},
+		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
+		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
+		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
 	}
 
-	if !reflect.DeepEqual(records, expected) {
-		t.Fatalf("expected sorted records %#v, got %#v", expected, records)
+	if !reflect.DeepEqual(ordered, expected) {
+		t.Fatalf("expected ordered records %#v, got %#v", expected, ordered)
 	}
 }
 

@@ -35,8 +35,8 @@ or via the environment variables `SPACESHIP_API_KEY` and `SPACESHIP_API_SECRET`.
 terraform {
   required_providers {
     spaceship = {
-      source  = "registry.terraform.io/dmitriyvovk/spaceship"
-      version = "0.0.1"
+      source  = "registry.terraform.io/namecheap/spaceship"
+      version = "0.0.2"
     }
   }
 }

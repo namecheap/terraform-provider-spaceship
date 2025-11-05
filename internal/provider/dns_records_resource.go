@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -80,6 +79,39 @@ type dnsRecordModel struct {
 	Selector        types.Int64  `tfsdk:"selector"`
 	Matching        types.Int64  `tfsdk:"matching"`
 	AssociationData types.String `tfsdk:"association_data"`
+}
+
+var dnsRecordObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"type":             types.StringType,
+		"name":             types.StringType,
+		"ttl":              types.Int64Type,
+		"address":          types.StringType,
+		"alias_name":       types.StringType,
+		"cname":            types.StringType,
+		"flag":             types.Int64Type,
+		"tag":              types.StringType,
+		"value":            types.StringType,
+		"port":             types.StringType,
+		"scheme":           types.StringType,
+		"svc_priority":     types.Int64Type,
+		"target_name":      types.StringType,
+		"svc_params":       types.StringType,
+		"exchange":         types.StringType,
+		"preference":       types.Int64Type,
+		"nameserver":       types.StringType,
+		"pointer":          types.StringType,
+		"service":          types.StringType,
+		"protocol":         types.StringType,
+		"priority":         types.Int64Type,
+		"weight":           types.Int64Type,
+		"port_number":      types.Int64Type,
+		"target":           types.StringType,
+		"usage":            types.Int64Type,
+		"selector":         types.Int64Type,
+		"matching":         types.Int64Type,
+		"association_data": types.StringType,
+	},
 }
 
 func (r *dnsRecordsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -313,19 +345,19 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	force := boolOrDefault(plan.Force, true)
-	records, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
+	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	existing, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	existingRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("failed to read existing DNS records: %s", err))
 		return
 	}
 
-	toDelete, toUpsert := diffDNSRecords(existing, records)
+	toDelete, toUpsert := diffDNSRecords(existingRecords, desiredRecords)
 	if err := r.client.DeleteDNSRecords(ctx, plan.Domain.ValueString(), toDelete); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS records: %s", err))
 		return
@@ -338,13 +370,15 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 		}
 	}
 
-	updateRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	updatedRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to refresh DNS records: %s", err))
 		return
 	}
 
-	flattened, diags := flattenDNSRecords(ctx, updateRecords)
+	orderedRecords := orderDNSRecordsLike(desiredRecords, updatedRecords)
+
+	flattened, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -370,6 +404,12 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
+	stateRecords, diags := expandDNSRecords(ctx, state.Records, path.Root("records"))
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	apiRecords, err := r.client.GetDNSRecords(ctx, state.Domain.ValueString())
 	if err != nil {
 		if IsNotFoundError(err) {
@@ -381,7 +421,9 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	flattenedRecords, diags := flattenDNSRecords(ctx, apiRecords)
+	orderedRecords := orderDNSRecordsLike(stateRecords, apiRecords)
+
+	flattenedRecords, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -404,19 +446,19 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	force := boolOrDefault(plan.Force, true)
-	records, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
+	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	existing, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	existingRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("failed to read existing DNS Records: %s", err))
 		return
 	}
 
-	toDelete, toUpsert := diffDNSRecords(existing, records)
+	toDelete, toUpsert := diffDNSRecords(existingRecords, desiredRecords)
 
 	if err := r.client.DeleteDNSRecords(ctx, plan.Domain.ValueString(), toDelete); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS records: %s", err))
@@ -436,7 +478,9 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	flattened, diags := flattenDNSRecords(ctx, updatedRecords)
+	orderedRecords := orderDNSRecordsLike(desiredRecords, updatedRecords)
+
+	flattened, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -750,8 +794,6 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 }
 
 func flattenDNSRecords(ctx context.Context, records []DNSRecord) (types.List, diag.Diagnostics) {
-	sortDNSRecords(records)
-
 	elements := make([]dnsRecordModel, 0, len(records))
 	for _, record := range records {
 		model := dnsRecordModel{
@@ -817,40 +859,7 @@ func flattenDNSRecords(ctx context.Context, records []DNSRecord) (types.List, di
 		elements = append(elements, model)
 	}
 
-	objectType := types.ObjectType{
-		AttrTypes: map[string]attr.Type{
-			"type":             types.StringType,
-			"name":             types.StringType,
-			"ttl":              types.Int64Type,
-			"address":          types.StringType,
-			"alias_name":       types.StringType,
-			"cname":            types.StringType,
-			"flag":             types.Int64Type,
-			"tag":              types.StringType,
-			"value":            types.StringType,
-			"port":             types.StringType,
-			"scheme":           types.StringType,
-			"svc_priority":     types.Int64Type,
-			"target_name":      types.StringType,
-			"svc_params":       types.StringType,
-			"exchange":         types.StringType,
-			"preference":       types.Int64Type,
-			"nameserver":       types.StringType,
-			"pointer":          types.StringType,
-			"service":          types.StringType,
-			"protocol":         types.StringType,
-			"priority":         types.Int64Type,
-			"weight":           types.Int64Type,
-			"port_number":      types.Int64Type,
-			"target":           types.StringType,
-			"usage":            types.Int64Type,
-			"selector":         types.Int64Type,
-			"matching":         types.Int64Type,
-			"association_data": types.StringType,
-		},
-	}
-
-	return types.ListValueFrom(ctx, objectType, elements)
+	return types.ListValueFrom(ctx, dnsRecordObjectType, elements)
 }
 
 func diffDNSRecords(existing, desired []DNSRecord) (toDelete, toUpsert []DNSRecord) {
@@ -891,28 +900,48 @@ func recordKey(record DNSRecord) string {
 	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name) + "|" + recordValueSignature(record)
 }
 
-func sortDNSRecords(records []DNSRecord) {
-	sort.SliceStable(records, func(i, j int) bool {
-		aType := strings.ToUpper(records[i].Type)
-		bType := strings.ToUpper(records[j].Type)
-		if aType != bType {
-			return aType < bType
-		}
+func orderDNSRecordsLike(reference, records []DNSRecord) []DNSRecord {
+	if len(records) <= 1 || len(reference) == 0 {
+		return records
+	}
 
-		aName := strings.ToLower(records[i].Name)
-		bName := strings.ToLower(records[j].Name)
-		if aName != bName {
-			return aName < bName
-		}
+	type keyedRecord struct {
+		key    string
+		record DNSRecord
+		used   bool
+	}
 
-		aPayload := recordValueSignature(records[i])
-		bPayload := recordValueSignature(records[j])
-		if aPayload != bPayload {
-			return aPayload < bPayload
+	keyed := make([]keyedRecord, len(records))
+	for i, record := range records {
+		keyed[i] = keyedRecord{
+			key:    recordKey(record),
+			record: record,
 		}
+	}
 
-		return records[i].TTL < records[j].TTL
-	})
+	ordered := make([]DNSRecord, 0, len(records))
+
+	for _, ref := range reference {
+		key := recordKey(ref)
+		for i := range keyed {
+			if keyed[i].used {
+				continue
+			}
+			if keyed[i].key == key {
+				ordered = append(ordered, keyed[i].record)
+				keyed[i].used = true
+				break
+			}
+		}
+	}
+
+	for i := range keyed {
+		if !keyed[i].used {
+			ordered = append(ordered, keyed[i].record)
+		}
+	}
+
+	return ordered
 }
 
 func recordValueSignature(record DNSRecord) string {
