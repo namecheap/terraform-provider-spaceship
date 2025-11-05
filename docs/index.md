@@ -7,6 +7,8 @@ description: |-
 
 # Spaceship Provider
 
+> 🚧 **Active Development:** This provider is still evolving and is not intended for production deployments. Expect breaking changes between releases and test in non-critical environments first.
+
 Use the Spaceship provider to manage DNS records for domains registered with Spaceship. The provider talks to the Spaceship DNS API (`https://spaceship.dev/api/v1`) and supports replacing the full record set for a domain in a single Terraform operation.
 
 ## Example Usage

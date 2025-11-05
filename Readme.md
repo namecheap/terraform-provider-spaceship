@@ -1,3 +1,5 @@
+> 🚧 **Active Development:** This provider is experimental, under active development, and not yet recommended for production workloads. Expect breaking changes and use only with disposable test domains.
+
 # Spaceship Terraform Provider
 
 This repository contains a Terraform provider that manages DNS records for domains hosted with [Spaceship](https://spaceship.com/).
@@ -36,7 +38,7 @@ terraform {
   required_providers {
     spaceship = {
       source  = "registry.terraform.io/namecheap/spaceship"
-      version = "0.0.2"
+      version = ">= 0.0.1"
     }
   }
 }
