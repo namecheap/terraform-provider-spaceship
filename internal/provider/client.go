@@ -172,7 +172,7 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 			}
 
 			if decodeErr := json.NewDecoder(resp.Body).Decode(&payload); decodeErr != nil {
-				err = fmt.Errorf("decode response %w", &decodeErr)
+				err = fmt.Errorf("decode response: %w", decodeErr)
 				return
 			}
 		}()

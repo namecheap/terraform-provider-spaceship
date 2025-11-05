@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-var testRecortAttrTypes = map[string]attr.Type{
+var testRecordAttrTypes = map[string]attr.Type{
 	"type":             types.StringType,
 	"name":             types.StringType,
 	"ttl":              types.Int64Type,
@@ -44,7 +44,7 @@ var testRecortAttrTypes = map[string]attr.Type{
 func buildRecordList(t *testing.T, models ...dnsRecordModel) types.List {
 	t.Helper()
 	ctx := context.Background()
-	list, diag := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: testRecortAttrTypes}, models)
+	list, diag := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: testRecordAttrTypes}, models)
 	if diag.HasError() {
 		t.Fatalf("failed to build record list: %s", diag)
 	}
@@ -215,10 +215,6 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 	}
 }
 
-func intPtr(v int) *int {
-	return &v
-}
-
 func TestExpandDNSRecords_MissingAddress(t *testing.T) {
 	ctx := context.Background()
 	list := buildRecordList(t, dnsRecordModel{
@@ -228,7 +224,7 @@ func TestExpandDNSRecords_MissingAddress(t *testing.T) {
 
 	_, diags := expandDNSRecords(ctx, list, path.Root("records"))
 	if !diags.HasError() {
-		t.Fatalf("expected diagnostis for missing address")
+		t.Fatalf("expected diagnostics for missing address")
 	}
 }
 
@@ -240,7 +236,7 @@ func TestDiffDNSRecords_NoChanges(t *testing.T) {
 	toDelete, toUpsert := diffDNSRecords(existing, existing)
 
 	if len(toDelete) != 0 {
-		t.Fatalf("Expected no deletion, got %#v", toDelete)
+		t.Fatalf("expected no deletions, got %#v", toDelete)
 	}
 
 	if len(toUpsert) != 0 {
@@ -259,8 +255,9 @@ func TestDiffDNSRecords_AddressChange(t *testing.T) {
 	toDelete, toUpsert := diffDNSRecords(existing, desired)
 
 	if !reflect.DeepEqual(toDelete, existing) {
-		t.Fatal("expected deletion of existing record, got %#v", toDelete)
+		t.Fatalf("expected deletion of existing record, got %#v", toDelete)
 	}
+
 	if !reflect.DeepEqual(toUpsert, desired) {
 		t.Fatalf("expected upsert of desired record, got %#v", toUpsert)
 	}
@@ -349,6 +346,10 @@ func TestRecordValueSignatureTLSA(t *testing.T) {
 	}
 
 	if recordValueSignature(rec1) != recordValueSignature(rec2) {
-		t.Fatalf("expected TLSA signatures to match destipe spacing and case difference")
+		t.Fatalf("expected TLSA signatures to match despite spacing and case differences")
 	}
+}
+
+func intPtr(v int) *int {
+	return &v
 }

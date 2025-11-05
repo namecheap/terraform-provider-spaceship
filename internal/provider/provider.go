@@ -36,7 +36,7 @@ type spaceshipProvider struct {
 }
 
 type providerModel struct {
-	APIKey    types.String `tfsdk:"apk_key"`
+	APIKey    types.String `tfsdk:"api_key"`
 	APISecret types.String `tfsdk:"api_secret"`
 }
 
