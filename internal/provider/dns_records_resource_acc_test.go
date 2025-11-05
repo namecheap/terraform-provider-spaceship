@@ -109,6 +109,81 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 	})
 }
 
+func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	resourceName := "spaceship_dns_records.test"
+	host := fmt.Sprintf("%s-order", prefix)
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"address": "198.51.100.20",
+			},
+		},
+		{
+			Type: "TXT",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"value": "order-check",
+			},
+		},
+		{
+			Type: "AAAA",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"address": "2001:db8::2",
+			},
+		},
+	}
+
+	checks := []resource.TestCheckFunc{
+		resource.TestCheckResourceAttr(resourceName, "records.#", "3"),
+		resource.TestCheckResourceAttr(resourceName, "records.0.type", "A"),
+		resource.TestCheckResourceAttr(resourceName, "records.0.name", host),
+		resource.TestCheckResourceAttr(resourceName, "records.1.type", "TXT"),
+		resource.TestCheckResourceAttr(resourceName, "records.1.name", host),
+		resource.TestCheckResourceAttr(resourceName, "records.1.value", "order-check"),
+		resource.TestCheckResourceAttr(resourceName, "records.2.type", "AAAA"),
+		resource.TestCheckResourceAttr(resourceName, "records.2.name", host),
+		resource.TestCheckResourceAttr(resourceName, "records.2.address", "2001:db8::2"),
+	}
+
+	destroyChecks := []resource.TestCheckFunc{
+		testAccCheckDNSRecordAbsent(domain, "A", host),
+		testAccCheckDNSRecordAbsent(domain, "TXT", host),
+		testAccCheckDNSRecordAbsent(domain, "AAAA", host),
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDNSRecordsConfig(domain, records),
+				Check:  resource.ComposeTestCheckFunc(checks...),
+			},
+			{
+				ResourceName:            resourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"force"},
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(destroyChecks...),
+	})
+}
+
 type testAccDNSRecord struct {
 	Type        string
 	Name        string
