@@ -2,9 +2,9 @@ SHELL := /bin/bash
 
 .PHONY: test
 test:
-	go test ./...
+	go test -run 'Test[^A]' ./...
 
-.PHONY testacc
+.PHONY: testacc
 testacc:
 	@if [[ -z "$$SPACESHIP_API_KEY" ]]; then \
 		echo "SPACESHIP_API_KEY must be set"; exit 1; \
