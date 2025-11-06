@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -134,7 +135,10 @@ func NewClient(baseURL, apiKey, apiSecret string) *Client {
 	}
 }
 
-const maxListPageSize = 500
+const (
+	maxListPageSize     = 500
+	defaultRecordsOrder = "type"
+)
 
 // fetches DNS records for the supplied domain name.
 func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord, error) {
@@ -145,7 +149,12 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 	)
 
 	for {
-		endpoint := fmt.Sprintf("%s/dns/records/%s?take=%d&skip=%d&orderBy=name", c.baseURL, url.PathEscape(domain), maxListPageSize, skip)
+		query := url.Values{}
+		query.Set("take", strconv.Itoa(maxListPageSize))
+		query.Set("skip", strconv.Itoa(skip))
+		query.Set("orderBy", defaultRecordsOrder)
+
+		endpoint := fmt.Sprintf("%s/dns/records/%s?%s", c.baseURL, url.PathEscape(domain), query.Encode())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 		if err != nil {
