@@ -14,7 +14,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -135,16 +137,25 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1), // TODO could be improved by valid regex
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"force": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
 				MarkdownDescription: "Force Spaceship to apply the DNS update even if conflicts are detected. The Spaceship API requires this flag when overwriting existing records.",
 				Default:             booldefault.StaticBool(true),
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"records": schema.ListNestedAttribute{
 				MarkdownDescription: "DNS records that should be configured for the domain. Each apply replaces the complete set of records.",
 				Required:            true,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -428,6 +439,7 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
 	state.Records = flattenedRecords
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)

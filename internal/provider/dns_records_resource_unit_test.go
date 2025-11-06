@@ -310,21 +310,15 @@ func TestOrderDNSRecordsLike(t *testing.T) {
 	}
 
 	records := []DNSRecord{
-		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
-		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
 		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
+		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
+		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
 	}
 
 	ordered := orderDNSRecordsLike(reference, records)
 
-	expected := []DNSRecord{
-		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
-		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
-		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
-	}
-
-	if !reflect.DeepEqual(ordered, expected) {
-		t.Fatalf("expected ordered records %#v, got %#v", expected, ordered)
+	if !reflect.DeepEqual(ordered, reference) {
+		t.Fatalf("expected ordered records %#v, got %#v", reference, ordered)
 	}
 }
 

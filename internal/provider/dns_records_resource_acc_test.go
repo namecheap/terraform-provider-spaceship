@@ -102,7 +102,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"force"},
+				ImportStateVerifyIgnore: []string{"force", "records"},
 			},
 		},
 		CheckDestroy: resource.ComposeTestCheckFunc(destroyChecks...),
@@ -177,10 +177,63 @@ func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"force"},
+				ImportStateVerifyIgnore: []string{"force", "records"},
 			},
 		},
 		CheckDestroy: resource.ComposeTestCheckFunc(destroyChecks...),
+	})
+}
+
+func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	resourceName := "spaceship_dns_records.test"
+	host := fmt.Sprintf("%s-remove", prefix)
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: host,
+			TTL:  intPointer(300),
+			StringAttrs: map[string]string{
+				"address": "198.51.100.30",
+			},
+		},
+		{
+			Type: "TXT",
+			Name: host,
+			TTL:  intPointer(300),
+			StringAttrs: map[string]string{
+				"value": "removal-check",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDNSRecordsConfig(domain, records),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "A"),
+					resource.TestCheckResourceAttr(resourceName, "records.1.type", "TXT"),
+				),
+			},
+			{
+				Config: testAccProviderOnlyConfig(),
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "A", host),
+			testAccCheckDNSRecordAbsent(domain, "TXT", host),
+		),
 	})
 }
 
@@ -240,6 +293,12 @@ resource "spaceship_dns_records" "test" {
   ]
 }
 `, domain, b.String())
+}
+
+func testAccProviderOnlyConfig() string {
+	return `
+provider "spaceship" {}
+`
 }
 
 func intPointer(v int) *int {
