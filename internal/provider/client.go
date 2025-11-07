@@ -225,7 +225,6 @@ func (c *Client) errorFromResponse(resp *http.Response) error {
 }
 
 // returns true if the err represents 404 response
-// todo why it is needed?
 func IsNotFoundError(err error) bool {
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
@@ -318,8 +317,6 @@ func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []
 }
 
 // ClearDNSRecords removed all DNS records that aree managed through Terraform for the domain
-// TODO
-// WHY this is needed?
 func (c *Client) ClearDNSRecords(ctx context.Context, domain string, force bool) error {
 	records, err := c.GetDNSRecords(ctx, domain)
 	if err != nil {

@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -236,6 +237,35 @@ func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
 		),
 	})
 }
+
+func TestAccDNSRecords_invalidRecordNameFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: ".example.",
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"address": "198.51.100.20",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Invalid Record Name"),
+			},
+		},
+	})
+}
+
+
 
 type testAccDNSRecord struct {
 	Type        string

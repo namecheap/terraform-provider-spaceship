@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -30,10 +31,54 @@ var (
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
 
 	// todo double check from api specs
+	// extend schema with what is present in provider for each record
+	// copy description from api into terraform provider
 	portStringPattern      = regexp.MustCompile(`^(\*|_[0-9]{1,5})$`)
 	schemeLabelPattern     = regexp.MustCompile(`^_[A-Za-z0-9-]+$`)
 	tlsaAssociationPattern = regexp.MustCompile(`^[0-9a-fA-F]{2}(\s?[0-9a-fA-F]{2})*$`)
+	recordNamePattern      = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
+
+// validators
+func recordNameValidator() validator.String {
+	return &recordNameValidatorImpl{}
+}
+
+type recordNameValidatorImpl struct{}
+
+func (v recordNameValidatorImpl) Description(ctx context.Context) string {
+	return "must be a valid record name"
+}
+func (v recordNameValidatorImpl) MarkdownDescription(ctx context.Context) string {
+	return "must be a valid record name"
+}
+func (v recordNameValidatorImpl) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	value := req.ConfigValue.ValueString()
+
+	match, err := recordNamePattern.MatchString(value)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid Record Name",
+			fmt.Sprintf("Error validating record name: %s", err),
+		)
+		return
+	}
+
+	if !match {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid Record Name",
+			"must be a valid record name format",
+		)
+	}
+
+}
+
+//validators ends
 
 func NewDNSRecordsResource() resource.Resource {
 	return &dnsRecordsResource{}
@@ -167,11 +212,11 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 							},
 						},
 						"name": schema.StringAttribute{
-							Required: true,
-							// TODO check description from api specs
+							Required:            true,
 							MarkdownDescription: "Record host. Use `@a` for the zone apex.",
 							Validators: []validator.String{
-								stringvalidator.LengthAtLeast(1),
+								stringvalidator.LengthBetween(1, 253),
+								recordNameValidator(),
 							},
 						},
 						// double check all fields
@@ -536,7 +581,6 @@ func (r *dnsRecordsResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("domain"), resourceID)...)
 }
 
-// here goes important part
 func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) ([]DNSRecord, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
