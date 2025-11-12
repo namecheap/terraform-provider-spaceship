@@ -121,7 +121,9 @@ func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resou
 }
 
 func (p *spaceshipProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return nil
+	return []func() datasource.DataSource{
+		NewDomainListDataSource,
+	}
 }
 
 func resolveString(value types.String, envVar string) string {
