@@ -346,9 +346,9 @@ type DomainInfo struct {
 	VerificationStatus string             `json:"verificationStatus"`
 	EPPStatuses        []string           `json:"eppStatuses"`
 	Suspensions        []ReasonCode       `json:"suspensions"`
-	PrivacyProtection  *PrivacyProtection `json:"privacyProtection"`
-	Nameservers        *Nameservers       `json:"nameservers"`
-	Contacts           *Contacts          `json:"contacts"`
+	PrivacyProtection  PrivacyProtection `json:"privacyProtection"`
+	Nameservers        Nameservers       `json:"nameservers"`
+	Contacts           Contacts          `json:"contacts"`
 }
 
 type ReasonCode struct {

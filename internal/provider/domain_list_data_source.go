@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -53,7 +54,7 @@ type privacyProtection struct {
 	Level       types.String `tfsdk:"level"`
 }
 type nameservers struct {
-	Hosts    []string     `tfsdk:"hosts"`
+	Hosts    types.List   `tfsdk:"hosts"`
 	Provider types.String `tfsdk:"provider"`
 }
 type contacts struct {
@@ -61,7 +62,7 @@ type contacts struct {
 	Admin      types.String `tfsdk:"admin"`
 	Tech       types.String `tfsdk:"tech"`
 	Billing    types.String `tfsdk:"billing"`
-	Attributes []string     `tfsdk:"attributes"`
+	Attributes types.List   `tfsdk:"attributes"`
 }
 
 func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -75,6 +76,11 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	tflog.Debug(ctx, "reading domain list")
 
 	var err error
+
+	if r.client == nil {
+		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please run terraform init or configure the provider block.")
+		return
+	}
 
 	response, err := r.client.GetDomainList(ctx)
 
@@ -94,23 +100,32 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			return
 		}
 
-		data.Items = append(data.Items, domainModel{
-			Name:             types.StringValue(item.Name),
-			UnicodeName:      types.StringValue(item.UnicodeName),
-			IsPremium:        types.BoolValue(item.IsPremium),
-			AutoRenew:        types.BoolValue(item.AutoRenew),
-			RegistrationDate: types.StringValue(item.RegistrationDate),
-			ExpirationDate:   types.StringValue(item.ExpirationDate),
-			LifecycleStatus:  types.StringValue(item.LifecycleStatus),
+		nsModel, nsDiags := flattenNameservers(ctx, item.Nameservers)
+		resp.Diagnostics.Append(nsDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 
-			// TODO
-			// this value can be null, verify this
+		contactModel, contactsDiags := flattenContacts(ctx, item.Contacts)
+		resp.Diagnostics.Append(contactsDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		data.Items = append(data.Items, domainModel{
+			Name:               types.StringValue(item.Name),
+			UnicodeName:        types.StringValue(item.UnicodeName),
+			IsPremium:          types.BoolValue(item.IsPremium),
+			AutoRenew:          types.BoolValue(item.AutoRenew),
+			RegistrationDate:   types.StringValue(item.RegistrationDate),
+			ExpirationDate:     types.StringValue(item.ExpirationDate),
+			LifecycleStatus:    types.StringValue(item.LifecycleStatus),
 			VerificationStatus: stringValueOrNull(item.VerificationStatus),
 			EppStatuses:        eppStatuses,
 			Suspensions:        flattenSuspensions(item.Suspensions),
 			PrivacyProtection:  flattenPrivacyProtection(item.PrivacyProtection),
-			Nameservers:        flattenNameservers(item.Nameservers),
-			Contacts:           flattenContacts(item.Contacts),
+			Nameservers:        nsModel,
+			Contacts:           contactModel,
 		},
 		)
 	}
@@ -182,6 +197,9 @@ func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRe
 								"provider": schema.StringAttribute{
 									Computed:    true,
 									Description: "type: basic or custom",
+									Validators: []validator.String{
+										stringvalidator.OneOf("basic", "custom"),
+									},
 								},
 								"hosts": schema.ListAttribute{
 									Computed:    true,
@@ -233,6 +251,10 @@ func stringValueOrNull(value string) types.String {
 }
 
 func flattenSuspensions(values []ReasonCode) []suspension {
+	if len(values) == 0 {
+		return nil
+	}
+
 	out := make([]suspension, len(values))
 
 	for i, s := range values {
@@ -243,32 +265,29 @@ func flattenSuspensions(values []ReasonCode) []suspension {
 	return out
 }
 
-func flattenPrivacyProtection(pp *PrivacyProtection) privacyProtection {
+func flattenPrivacyProtection(pp PrivacyProtection) privacyProtection {
 	return privacyProtection{
 		ContactForm: types.BoolValue(pp.ContactForm),
 		Level:       types.StringValue(pp.Level),
 	}
 }
 
-func flattenNameservers(ns *Nameservers) nameservers {
-	hosts := make([]string, len(ns.Hosts))
-	copy(hosts, ns.Hosts)
-
+func flattenNameservers(ctx context.Context, ns Nameservers) (nameservers, diag.Diagnostics) {
+	hosts, diags := types.ListValueFrom(ctx, types.StringType, ns.Hosts)
 	return nameservers{
-		Hosts:    hosts,
 		Provider: types.StringValue(ns.Provider),
-	}
+		Hosts:    hosts,
+	}, diags
 }
 
-func flattenContacts(c *Contacts) contacts {
-	attributes := make([]string, len(c.Attributes))
-	copy(attributes, c.Attributes)
+func flattenContacts(ctx context.Context, c Contacts) (contacts, diag.Diagnostics) {
+	attrs, diags := types.ListValueFrom(ctx, types.StringType, c.Attributes)
 
 	return contacts{
 		Registrant: types.StringValue(c.Registrant),
 		Admin:      stringValueOrNull(c.Admin),
 		Tech:       stringValueOrNull(c.Tech),
 		Billing:    stringValueOrNull(c.Billing),
-		Attributes: attributes,
-	}
+		Attributes: attrs,
+	}, diags
 }

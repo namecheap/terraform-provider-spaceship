@@ -71,6 +71,10 @@ The Spaceship provider currently offers the following resource:
 
 - `spaceship_dns_records` — Manage the full DNS record set for a Spaceship-managed domain, replacing all records in each apply. The resource supports importing an existing domain by its name.
 
+## Data Sources
+
+- `spaceship_domain_list` — Retrieve every Spaceship-managed domain along with WHOIS, privacy, suspension, nameserver, and contact metadata.
+
 ## Import
 
 Existing DNS configurations can be brought under Terraform management by importing the domain name into the provider's DNS records resource:
