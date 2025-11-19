@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -115,9 +116,9 @@ func domainBasicsChecks() resource.TestCheckFunc {
 			domainAttr(firstDomainIndex, "lifecycle_status"),
 			domainAttr(firstDomainIndex, "verification_status"),
 		}),
-		resource.TestCheckResourceAttr(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), "1"),
+		expectListCountAtLeast(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), 1),
 		expectNonEmptyAttr(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.0")),
-		resource.TestCheckResourceAttr(domainListDataSourceName, domainAttr(firstDomainIndex, "suspensions.#"), "0"),
+		expectListCount(domainListDataSourceName, domainAttr(firstDomainIndex, "suspensions.#"), 0),
 	)
 }
 
@@ -130,13 +131,17 @@ func privacyProtectionChecks() resource.TestCheckFunc {
 
 func nameserverChecks() resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
+		expectListCountAtLeast(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "hosts.#"), 1),
 		expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "hosts.0")),
 		expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "provider")),
 	)
 }
 
 func contactChecks() resource.TestCheckFunc {
-	return expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "contacts", "registrant"))
+	return resource.ComposeTestCheckFunc(
+		expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "contacts", "registrant")),
+		expectListCountAtLeast(domainListDataSourceName, nestedAttr(firstDomainIndex, "contacts", "attributes.#"), 0),
+	)
 }
 
 func expectAttrValues(resourceName string, expectations []attrExpectation) resource.TestCheckFunc {
@@ -162,6 +167,23 @@ func expectNonEmptyAttrs(resourceName string, attributes []string) resource.Test
 		checks[i] = expectNonEmptyAttr(resourceName, attr)
 	}
 	return resource.ComposeTestCheckFunc(checks...)
+}
+
+func expectListCount(resourceName, attribute string, expected int) resource.TestCheckFunc {
+	return resource.TestCheckResourceAttr(resourceName, attribute, strconv.Itoa(expected))
+}
+
+func expectListCountAtLeast(resourceName, attribute string, min int) resource.TestCheckFunc {
+	return resource.TestCheckResourceAttrWith(resourceName, attribute, func(value string) error {
+		count, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("expected %s to be an integer, got %q: %w", attribute, value, err)
+		}
+		if count < min {
+			return fmt.Errorf("expected %s to be >= %d, got %d", attribute, min, count)
+		}
+		return nil
+	})
 }
 
 func domainAttr(index int, attribute string) string {

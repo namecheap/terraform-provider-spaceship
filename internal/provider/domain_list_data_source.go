@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -54,7 +53,7 @@ type privacyProtection struct {
 	Level       types.String `tfsdk:"level"`
 }
 type nameservers struct {
-	Hosts    types.List   `tfsdk:"hosts"`
+	Hosts    []string     `tfsdk:"hosts"`
 	Provider types.String `tfsdk:"provider"`
 }
 type contacts struct {
@@ -62,7 +61,7 @@ type contacts struct {
 	Admin      types.String `tfsdk:"admin"`
 	Tech       types.String `tfsdk:"tech"`
 	Billing    types.String `tfsdk:"billing"`
-	Attributes types.List   `tfsdk:"attributes"`
+	Attributes []string     `tfsdk:"attributes"`
 }
 
 func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -100,17 +99,8 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			return
 		}
 
-		nsModel, nsDiags := flattenNameservers(ctx, item.Nameservers)
-		resp.Diagnostics.Append(nsDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		contactModel, contactsDiags := flattenContacts(ctx, item.Contacts)
-		resp.Diagnostics.Append(contactsDiags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+		nsModel := flattenNameservers(item.Nameservers)
+		contactModel := flattenContacts(item.Contacts)
 
 		data.Items = append(data.Items, domainModel{
 			Name:               types.StringValue(item.Name),
@@ -252,7 +242,7 @@ func stringValueOrNull(value string) types.String {
 
 func flattenSuspensions(values []ReasonCode) []suspension {
 	if len(values) == 0 {
-		return nil
+		return []suspension{}
 	}
 
 	out := make([]suspension, len(values))
@@ -272,22 +262,25 @@ func flattenPrivacyProtection(pp PrivacyProtection) privacyProtection {
 	}
 }
 
-func flattenNameservers(ctx context.Context, ns Nameservers) (nameservers, diag.Diagnostics) {
-	hosts, diags := types.ListValueFrom(ctx, types.StringType, ns.Hosts)
+func flattenNameservers(ns Nameservers) nameservers {
+	hosts := make([]string, len(ns.Hosts))
+	copy(hosts, ns.Hosts)
+
 	return nameservers{
-		Provider: types.StringValue(ns.Provider),
 		Hosts:    hosts,
-	}, diags
+		Provider: types.StringValue(ns.Provider),
+	}
 }
 
-func flattenContacts(ctx context.Context, c Contacts) (contacts, diag.Diagnostics) {
-	attrs, diags := types.ListValueFrom(ctx, types.StringType, c.Attributes)
+func flattenContacts(c Contacts) contacts {
+	attributes := make([]string, len(c.Attributes))
+	copy(attributes, c.Attributes)
 
 	return contacts{
 		Registrant: types.StringValue(c.Registrant),
 		Admin:      stringValueOrNull(c.Admin),
 		Tech:       stringValueOrNull(c.Tech),
 		Billing:    stringValueOrNull(c.Billing),
-		Attributes: attrs,
-	}, diags
+		Attributes: attributes,
+	}
 }
