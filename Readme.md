@@ -9,6 +9,7 @@ This repository contains a Terraform provider that manages DNS records for domai
 - Configure Spaceship credentials via provider configuration or environment variables.
 - Read the current DNS record set for an existing domain.
 - Replace the full list of DNS records in a single Terraform apply.
+- Enumerate every Spaceship-managed domain along with WHOIS, privacy, suspension, nameserver, and contact metadata via the `spaceship_domain_list` data source.
 
 ## Building
 
@@ -69,6 +70,22 @@ resource "spaceship_dns_records" "root" {
       preference = 10
     }
   ]
+}
+```
+
+## Domain Inventory Data Source
+
+Use the `spaceship_domain_list` data source to inspect all domains in the Spaceship account and surface metadata in your configuration or outputs.
+
+```hcl
+data "spaceship_domain_list" "all" {}
+
+output "first_domain" {
+  value = {
+    name        = data.spaceship_domain_list.all.items[0].name
+    nameservers = data.spaceship_domain_list.all.items[0].nameservers.hosts
+    privacy     = data.spaceship_domain_list.all.items[0].privacy_protection.level
+  }
 }
 ```
 
