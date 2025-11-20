@@ -34,23 +34,19 @@ output "domains" {
 
 #### Read-Only
 
-- `admin` (String) Contact handle for the administrative contact.
 - `auto_renew` (Boolean) Whether the domain renews automatically.
-- `billing` (String) Contact handle for the billing contact.
 - `contacts` (Attributes) Contact handles for each role. See [Contacts](#nested-schema-for-contacts).
 - `epp_statuses` (List of String) List of EPP status codes assigned to the domain (for example `clientHold`, `clientTransferProhibited`).
 - `expiration_date` (String) Expiration timestamp in ISO 8601 format.
 - `is_premium` (Boolean) Indicates whether the domain is a premium registration.
-- `lifecycle_status` (String) Lifecycle phase such as `creating`, `registered`, `grace1`, `grace2`, or `redemption`.
+- `lifecycle_status` (String) Lifecycle phase. Enum: `creating`, `registered`, `grace1`, `grace2`, `redemption`.
 - `nameservers` (Attributes) Nameserver configuration for the domain. See [Nameservers](#nested-schema-for-nameservers).
 - `name` (String) ASCII domain name.
 - `privacy_protection` (Attributes) Privacy protection settings. See [Privacy Protection](#nested-schema-for-privacy_protection).
-- `registrant` (String) Contact handle for the registrant.
 - `registration_date` (String) Registration timestamp in ISO 8601 format.
 - `suspensions` (Attributes List) Suspension reasons returned by Spaceship, if any. See [Suspensions](#nested-schema-for-suspensions).
-- `tech` (String) Contact handle for the technical contact.
 - `unicode_name` (String) Unicode/punycode representation of the domain.
-- `verification_status` (String) Current WHOIS verification status.
+- `verification_status` (String) RAA verification status. Enum: `verification`, `success`, `failed`. Null if the RAA procedure is not applied to the domain.
 
 ### Nested Schema for `suspensions`
 
@@ -76,9 +72,8 @@ output "domains" {
 
 #### Read-Only
 
-- `admin` (String) Administrative contact handle.
-- `attributes` (List of String) Additional contact attributes supplied by Spaceship.
-- `billing` (String) Billing contact handle.
-- `registrant` (String) Registrant contact handle.
-- `tech` (String) Technical contact handle.
-
+- `admin` (String) Administrative contact handle, when available.
+- `attributes` (List of String) Optional contact attributes supplied by Spaceship.
+- `billing` (String) Billing contact handle, when available.
+- `registrant` (String) Registrant contact handle (always present).
+- `tech` (String) Technical contact handle, when available.

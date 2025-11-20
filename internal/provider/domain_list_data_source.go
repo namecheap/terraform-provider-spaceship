@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -53,7 +54,7 @@ type privacyProtection struct {
 	Level       types.String `tfsdk:"level"`
 }
 type nameservers struct {
-	Hosts    []string     `tfsdk:"hosts"`
+	Hosts    types.List   `tfsdk:"hosts"`
 	Provider types.String `tfsdk:"provider"`
 }
 type contacts struct {
@@ -61,7 +62,7 @@ type contacts struct {
 	Admin      types.String `tfsdk:"admin"`
 	Tech       types.String `tfsdk:"tech"`
 	Billing    types.String `tfsdk:"billing"`
-	Attributes []string     `tfsdk:"attributes"`
+	Attributes types.List   `tfsdk:"attributes"`
 }
 
 func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -99,8 +100,17 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			return
 		}
 
-		nsModel := flattenNameservers(item.Nameservers)
-		contactModel := flattenContacts(item.Contacts)
+		nsModel, nsDiags := flattenNameservers(ctx, item.Nameservers)
+		resp.Diagnostics.Append(nsDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		contactModel, contactsDiags := flattenContacts(ctx, item.Contacts)
+		resp.Diagnostics.Append(contactsDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 
 		data.Items = append(data.Items, domainModel{
 			Name:               types.StringValue(item.Name),
@@ -143,8 +153,18 @@ func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRe
 						"auto_renew":          schema.BoolAttribute{Computed: true},
 						"registration_date":   schema.StringAttribute{Computed: true},
 						"expiration_date":     schema.StringAttribute{Computed: true},
-						"lifecycle_status":    schema.StringAttribute{Computed: true, Description: "One of creating registered grace1 grace2 redemption"},
-						"verification_status": schema.StringAttribute{Computed: true, Optional: true},
+						"lifecycle_status": schema.StringAttribute{
+							Computed:    true,
+							Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
+						},
+						"verification_status": schema.StringAttribute{
+							Computed:    true,
+							Optional:    true,
+							Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
+							Validators: []validator.String{
+								stringvalidator.OneOf("verification", "success", "failed"),
+							},
+						},
 
 						"epp_statuses": schema.ListAttribute{
 							Computed:    true,
@@ -200,14 +220,27 @@ func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRe
 						"contacts": schema.SingleNestedAttribute{
 							Computed: true,
 							Attributes: map[string]schema.Attribute{
-								"registrant": schema.StringAttribute{Computed: true},
-								"admin":      schema.StringAttribute{Computed: true},
-								"tech":       schema.StringAttribute{Computed: true},
-								"billing":    schema.StringAttribute{Computed: true},
+								"registrant": schema.StringAttribute{
+									Computed:    true,
+									Description: "Always present registrant handle.",
+								},
+								"admin": schema.StringAttribute{
+									Computed:    true,
+									Description: "Administrative contact handle when provided.",
+								},
+								"tech": schema.StringAttribute{
+									Computed:    true,
+									Description: "Technical contact handle when provided.",
+								},
+								"billing": schema.StringAttribute{
+									Computed:    true,
+									Description: "Billing contact handle when provided.",
+								},
 								"attributes": schema.ListAttribute{
 									Computed:    true,
 									ElementType: types.StringType,
 									Optional:    true,
+									Description: "Optional list of contact attributes supplied by Spaceship.",
 								},
 							},
 						},
@@ -262,19 +295,17 @@ func flattenPrivacyProtection(pp PrivacyProtection) privacyProtection {
 	}
 }
 
-func flattenNameservers(ns Nameservers) nameservers {
-	hosts := make([]string, len(ns.Hosts))
-	copy(hosts, ns.Hosts)
+func flattenNameservers(ctx context.Context, ns Nameservers) (nameservers, diag.Diagnostics) {
+	hosts, diags := types.ListValueFrom(ctx, types.StringType, ns.Hosts)
 
 	return nameservers{
-		Hosts:    hosts,
 		Provider: types.StringValue(ns.Provider),
-	}
+		Hosts:    hosts,
+	}, diags
 }
 
-func flattenContacts(c Contacts) contacts {
-	attributes := make([]string, len(c.Attributes))
-	copy(attributes, c.Attributes)
+func flattenContacts(ctx context.Context, c Contacts) (contacts, diag.Diagnostics) {
+	attributes, diags := types.ListValueFrom(ctx, types.StringType, c.Attributes)
 
 	return contacts{
 		Registrant: types.StringValue(c.Registrant),
@@ -282,5 +313,5 @@ func flattenContacts(c Contacts) contacts {
 		Tech:       stringValueOrNull(c.Tech),
 		Billing:    stringValueOrNull(c.Billing),
 		Attributes: attributes,
-	}
+	}, diags
 }
