@@ -122,7 +122,7 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			LifecycleStatus:    types.StringValue(item.LifecycleStatus),
 			VerificationStatus: stringValueOrNull(item.VerificationStatus),
 			EppStatuses:        eppStatuses,
-			Suspensions:        flattenSuspensions(item.Suspensions),
+			Suspensions:        FlattenSuspensions(item.Suspensions),
 			PrivacyProtection:  flattenPrivacyProtection(item.PrivacyProtection),
 			Nameservers:        nsModel,
 			Contacts:           contactModel,
@@ -147,12 +147,12 @@ func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRe
 				Computed: true,
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"name":                schema.StringAttribute{Computed: true},
-						"unicode_name":        schema.StringAttribute{Computed: true},
-						"is_premium":          schema.BoolAttribute{Computed: true},
-						"auto_renew":          schema.BoolAttribute{Computed: true},
-						"registration_date":   schema.StringAttribute{Computed: true},
-						"expiration_date":     schema.StringAttribute{Computed: true},
+						"name":              schema.StringAttribute{Computed: true},
+						"unicode_name":      schema.StringAttribute{Computed: true},
+						"is_premium":        schema.BoolAttribute{Computed: true},
+						"auto_renew":        schema.BoolAttribute{Computed: true},
+						"registration_date": schema.StringAttribute{Computed: true},
+						"expiration_date":   schema.StringAttribute{Computed: true},
 						"lifecycle_status": schema.StringAttribute{
 							Computed:    true,
 							Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
@@ -273,7 +273,7 @@ func stringValueOrNull(value string) types.String {
 	return types.StringValue(value)
 }
 
-func flattenSuspensions(values []ReasonCode) []suspension {
+func FlattenSuspensions(values []ReasonCode) []suspension {
 	if len(values) == 0 {
 		return []suspension{}
 	}

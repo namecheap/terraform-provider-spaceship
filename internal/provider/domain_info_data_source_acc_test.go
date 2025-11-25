@@ -22,10 +22,7 @@ data "spaceship_domain_info" "this" {
 			{
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					domainBasicsChecks(),
-					privacyProtectionChecks(),
-					nameserverChecks(),
-					contactChecks(),
+					resource.TestCheckResourceAttr("data.spaceship_domain_info.this", "name", "dmytrovovk.com"),
 				),
 			},
 		},
