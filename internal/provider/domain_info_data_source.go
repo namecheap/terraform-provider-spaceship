@@ -24,7 +24,7 @@ func (d *domainInfoDataSource) Metadata(_ context.Context, req datasource.Metada
 }
 
 func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data DomainListModel
+	var data domainInfoModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
 	if resp.Diagnostics.HasError() {
@@ -40,8 +40,21 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	eppStatuses, diags := types.ListValueFrom(ctx, types.StringType, response.EPPStatuses)
-	resp.Diagnostics.Append(diags...)
+	eppStatuses, eppDiags := types.ListValueFrom(ctx, types.StringType, response.EPPStatuses)
+	resp.Diagnostics.Append(eppDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	ppModel := flattenPrivacyProtection(response.PrivacyProtection)
+	nsModel, nsDiags := flattenNameservers(ctx, response.Nameservers)
+	resp.Diagnostics.Append(nsDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	contactModel, contactDiags := flattenContacts(ctx, response.Contacts)
+	resp.Diagnostics.Append(contactDiags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -55,11 +68,10 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	data.LifecycleStatus = types.StringValue(response.LifecycleStatus)
 	data.VerificationStatus = stringValueOrNull(response.VerificationStatus)
 	data.EppStatuses = eppStatuses
-	// data.Suspensions = FlattenSuspensions(response.Suspensions)
-	// data.PrivacyProtection = flattenPrivacyProtection(response.PrivacyProtection)
-	// data.Nameservers = nsModel
-
-	// data.Contacts = contactModel
+	data.PrivacyProtection = &ppModel
+	data.Nameservers = &nsModel
+	data.Contacts = &contactModel
+	data.Suspensions = flattenSuspensions(response.Suspensions)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
@@ -187,23 +199,20 @@ func (d *domainInfoDataSource) Configure(_ context.Context, req datasource.Confi
 	d.client = client
 }
 
-type DomainListModel struct {
+type domainInfoModel struct {
 	Domain types.String `tfsdk:"domain"`
 
-	Name               types.String `tfsdk:"name"`
-	UnicodeName        types.String `tfsdk:"unicode_name"`
-	IsPremium          types.Bool   `tfsdk:"is_premium"`
-	AutoRenew          types.Bool   `tfsdk:"auto_renew"`
-	RegistrationDate   types.String `tfsdk:"registration_date"`
-	ExpirationDate     types.String `tfsdk:"expiration_date"`
-	LifecycleStatus    types.String `tfsdk:"lifecycle_status"`
-	VerificationStatus types.String `tfsdk:"verification_status"`
-	EppStatuses        types.List   `tfsdk:"epp_statuses"`
-	Suspensions        types.List   `tfsdk:"suspensions"`
-	//PrivacyProtection  privacyProtection `tfsdk:"privacy_protection"`
-	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
-	//Nameservers        nameservers       `tfsdk:"nameservers"`
-	Nameservers types.Object `tfsdk:"nameservers"`
-	//Contacts    contacts     `tfsdk:"contacts"`
-	Contacts types.Object `tfsdk:"contacts"`
+	Name               types.String       `tfsdk:"name"`
+	UnicodeName        types.String       `tfsdk:"unicode_name"`
+	IsPremium          types.Bool         `tfsdk:"is_premium"`
+	AutoRenew          types.Bool         `tfsdk:"auto_renew"`
+	RegistrationDate   types.String       `tfsdk:"registration_date"`
+	ExpirationDate     types.String       `tfsdk:"expiration_date"`
+	LifecycleStatus    types.String       `tfsdk:"lifecycle_status"`
+	VerificationStatus types.String       `tfsdk:"verification_status"`
+	EppStatuses        types.List         `tfsdk:"epp_statuses"`
+	Suspensions        []suspension       `tfsdk:"suspensions"`
+	PrivacyProtection  *privacyProtection `tfsdk:"privacy_protection"`
+	Nameservers        *nameservers       `tfsdk:"nameservers"`
+	Contacts           *contacts          `tfsdk:"contacts"`
 }

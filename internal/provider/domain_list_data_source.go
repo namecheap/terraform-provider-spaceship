@@ -122,7 +122,7 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 			LifecycleStatus:    types.StringValue(item.LifecycleStatus),
 			VerificationStatus: stringValueOrNull(item.VerificationStatus),
 			EppStatuses:        eppStatuses,
-			Suspensions:        FlattenSuspensions(item.Suspensions),
+			Suspensions:        flattenSuspensions(item.Suspensions),
 			PrivacyProtection:  flattenPrivacyProtection(item.PrivacyProtection),
 			Nameservers:        nsModel,
 			Contacts:           contactModel,
@@ -273,7 +273,7 @@ func stringValueOrNull(value string) types.String {
 	return types.StringValue(value)
 }
 
-func FlattenSuspensions(values []ReasonCode) []suspension {
+func flattenSuspensions(values []ReasonCode) []suspension {
 	if len(values) == 0 {
 		return []suspension{}
 	}
