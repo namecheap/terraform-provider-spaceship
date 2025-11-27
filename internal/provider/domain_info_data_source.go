@@ -83,6 +83,9 @@ func (d *domainInfoDataSource) Schema(_ context.Context, req datasource.SchemaRe
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
 				Required: true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(4, 255),
+				},
 			},
 			"name":              schema.StringAttribute{Computed: true},
 			"unicode_name":      schema.StringAttribute{Computed: true},

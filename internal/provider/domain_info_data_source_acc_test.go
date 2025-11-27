@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -79,4 +80,25 @@ func domainInfoContactChecks() resource.TestCheckFunc {
 
 func domainInfoSuspensionChecks() resource.TestCheckFunc {
 	return expectListCount(domainInfoDataSourceName, "suspensions.#", 0)
+}
+
+func TestAccDomainInfo_wrongDomainInfo(t *testing.T) {
+	cfg := `
+provider "spaceship" {}
+
+data "spaceship_domain_info" "this" {
+	domain = "a.c"
+}
+`
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      cfg,
+				ExpectError: regexp.MustCompile("Invalid Attribute Value Length"),
+			},
+		},
+	})
+
 }
