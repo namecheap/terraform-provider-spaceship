@@ -1,20 +1,26 @@
 package provider
 
 import (
+	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-const domainInfoDataSourceName = "data.spaceship_domain_info.this"
+const (
+	dataSource               = "spaceship_domain_info"
+	dataSourceResourceName   = "this"
+	domainInfoDataSourceName = "data." + dataSource + "." + dataSourceResourceName
+	domainName               = "dmytrovovk.com"
+)
 
 func TestAccDomainInfo_basic(t *testing.T) {
-	cfg := `
+	template := `
 provider "spaceship" {}
 
-data "spaceship_domain_info" "this" {
-	domain = "dmytrovovk.com"
+data "%s" "%s" {
+	domain = "%s"
 }
 `
 
@@ -23,7 +29,7 @@ data "spaceship_domain_info" "this" {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: cfg,
+				Config: fmt.Sprintf(template, dataSource, dataSourceResourceName, domainName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					domainInfoBasicsChecks(),
 					domainInfoPrivacyProtectionChecks(),
@@ -40,8 +46,8 @@ data "spaceship_domain_info" "this" {
 func domainInfoBasicsChecks() resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectAttrValues(domainInfoDataSourceName, []attrExpectation{
-			{Attribute: "name", Value: "dmytrovovk.com"},
-			{Attribute: "unicode_name", Value: "dmytrovovk.com"},
+			{Attribute: "name", Value: domainName},
+			{Attribute: "unicode_name", Value: domainName},
 			{Attribute: "is_premium", Value: "false"},
 			{Attribute: "auto_renew", Value: "false"},
 		}),
