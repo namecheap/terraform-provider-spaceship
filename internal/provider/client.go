@@ -336,16 +336,16 @@ type DomainList struct {
 	Total int64        `json:"total"`
 }
 type DomainInfo struct {
-	Name               string             `json:"name"`
-	UnicodeName        string             `json:"unicodeName"`
-	IsPremium          bool               `json:"isPremium"`
-	AutoRenew          bool               `json:"autoRenew"`
-	RegistrationDate   string             `json:"registrationDate"`
-	ExpirationDate     string             `json:"expirationDate"`
-	LifecycleStatus    string             `json:"lifecycleStatus"`
-	VerificationStatus string             `json:"verificationStatus"`
-	EPPStatuses        []string           `json:"eppStatuses"`
-	Suspensions        []ReasonCode       `json:"suspensions"`
+	Name               string            `json:"name"`
+	UnicodeName        string            `json:"unicodeName"`
+	IsPremium          bool              `json:"isPremium"`
+	AutoRenew          bool              `json:"autoRenew"`
+	RegistrationDate   string            `json:"registrationDate"`
+	ExpirationDate     string            `json:"expirationDate"`
+	LifecycleStatus    string            `json:"lifecycleStatus"`
+	VerificationStatus string            `json:"verificationStatus"`
+	EPPStatuses        []string          `json:"eppStatuses"`
+	Suspensions        []ReasonCode      `json:"suspensions"`
 	PrivacyProtection  PrivacyProtection `json:"privacyProtection"`
 	Nameservers        Nameservers       `json:"nameservers"`
 	Contacts           Contacts          `json:"contacts"`
@@ -405,4 +405,37 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 	}
 
 	return domainList, nil
+}
+
+func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
+
+	var domainInfo DomainInfo
+	// --url https://spaceship.dev/api/v1/domains/spaceship.com \
+
+	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+
+	if err != nil {
+		return domainInfo, fmt.Errorf("create request: %w", err)
+	}
+
+	c.applyAuth(req)
+
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return domainInfo, fmt.Errorf("execute request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return domainInfo, c.errorFromResponse(resp)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&domainInfo); err != nil {
+		return domainInfo, fmt.Errorf("decode response: %w", err)
+	}
+	return domainInfo, nil
 }
