@@ -410,7 +410,6 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
 
 	var domainInfo DomainInfo
-	// --url https://spaceship.dev/api/v1/domains/spaceship.com \
 
 	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
 
