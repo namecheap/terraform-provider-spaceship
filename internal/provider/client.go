@@ -429,6 +429,19 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 
 	defer resp.Body.Close()
 
+	// overcome insane API rate limiting
+	// by using alternative endpoint that does the same
+	// but has 60x times higher limits
+	if resp.StatusCode == 429 {
+		domainList, _ := c.GetDomainList(ctx)
+
+		domainInfo, ok := findDomainByNameFromDomainList(domainList, domain)
+		if ok {
+			return domainInfo, nil
+		}
+
+	}
+
 	if resp.StatusCode >= 300 {
 		return domainInfo, c.errorFromResponse(resp)
 	}
@@ -437,4 +450,58 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 		return domainInfo, fmt.Errorf("decode response: %w", err)
 	}
 	return domainInfo, nil
+}
+
+type AutoRenewalResponse struct {
+	IsEnabled bool `json:"isEnabled"`
+}
+
+func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, autoRenew bool) (AutoRenewalResponse, error) {
+	var autoRenewalResponse AutoRenewalResponse
+
+	endpoint := fmt.Sprintf("%s/domains/%s/autorenew", c.baseURL, domain)
+	payload := struct {
+		IsEnabled bool `json:"isEnabled"`
+	}{
+		IsEnabled: autoRenew,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return autoRenewalResponse, fmt.Errorf("marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return autoRenewalResponse, fmt.Errorf("create request %w", err)
+	}
+
+	c.applyAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return autoRenewalResponse, fmt.Errorf("execute reqeust: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return autoRenewalResponse, c.errorFromResponse(resp)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&autoRenewalResponse); err != nil {
+		return autoRenewalResponse, fmt.Errorf("decode response: %w", err)
+	}
+	return autoRenewalResponse, nil
+}
+
+func findDomainByNameFromDomainList(domainList DomainList, domain string) (DomainInfo, bool) {
+	for _, domainItem := range domainList.Items {
+		if domainItem.Name == domain {
+			return domainItem, true
+		}
+	}
+	return DomainInfo{}, false
+
 }

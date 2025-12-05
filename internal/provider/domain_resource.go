@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 func NewDomainResource() resource.Resource {
@@ -36,10 +37,11 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			},
 			"auto_renew": schema.BoolAttribute{
 				Optional: true,
+				Computed: true,
 			},
 
+			"name": schema.StringAttribute{Computed: true},
 			/*
-				"name":              schema.StringAttribute{Computed: true},
 				"unicode_name":      schema.StringAttribute{Computed: true},
 				"is_premium":        schema.BoolAttribute{Computed: true},
 				"registration_date": schema.StringAttribute{Computed: true},
@@ -140,7 +142,31 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 	}
 }
 
-func (d *domainResource) Read(_ context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+
+	var plan domainResourceModel
+	var domainInfo DomainInfo
+	diags := req.State.Get(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
+
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+	}
+
+	var state domainResourceModel
+
+	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
+	state.Domain = types.StringValue(domainInfo.Name)
+	state.Name = types.StringValue(domainInfo.Name)
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+
 }
 
 func (d *domainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -160,9 +186,68 @@ func (d *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
 	var plan domainResourceModel
+	var domainInfo DomainInfo
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	//var err error
+	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
+
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+	}
+
+	// desiredAutoRenew := plan.AutoRenew.ValueBool()
+	// currentAutoRenew := domainInfo.AutoRenew
+
+	var state domainResourceModel
+
+	// if desiredAutoRenew != currentAutoRenew {
+	// 	resp, _ := d.client.UpdateAutoRenew(ctx, domainInfo.Name, desiredAutoRenew)
+	// 	state.AutoRenew = types.BoolValue(resp.IsEnabled)
+	// } else {
+
+	// 	state.AutoRenew = types.BoolValue(desiredAutoRenew)
+	// }
+
+	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
+	state.Domain = types.StringValue(domainInfo.Name)
+	state.Name = types.StringValue(domainInfo.Name)
+
+	diags = resp.State.Set(ctx, &state)
+	resp.Diagnostics.Append(diags...)
+
+}
+
+func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	// todo should be done as removal from state only
+	// no external call
+	// leaving infra in the same state
+
+}
+
+func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan domainResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	tflog.Info(ctx, "calling domain autorenewal update with domain %s", map[string]any{
+		"domain": plan.Domain.String(),
+	},
+	)
+
+	_, err := d.client.UpdateAutoRenew(ctx, plan.Domain.ValueString(), plan.AutoRenew.ValueBool())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error updating domain auto renew",
+			fmt.Sprintf("Could not update auto_renew for domain %s: %s", plan.Domain.String(), err),
+		)
 		return
 	}
 
@@ -173,20 +258,12 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 
 	var state domainResourceModel
-	state.Domain = types.StringValue(domainInfo.Name)
+
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
+	state.Domain = types.StringValue(domainInfo.Name)
+	state.Name = types.StringValue(domainInfo.Name)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
-
-}
-
-func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
-}
-
-func (d *domainResource) Update(_ context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 type domainResourceModel struct {
@@ -199,7 +276,7 @@ type domainResourceModel struct {
 	// PrivacyProtection basetypes.ObjectValue `tfsdk:"privacy_protection"`
 
 	//read only
-	// Name               types.String          `tfsdk:"name"`
+	Name types.String `tfsdk:"name"`
 	// UnicodeName        types.String          `tfsdk:"unicode_name"`
 	// IsPremium          types.Bool            `tfsdk:"is_premium"`
 	// RegistrationDate   types.String          `tfsdk:"registration_date"`
