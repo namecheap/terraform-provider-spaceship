@@ -482,7 +482,7 @@ func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, autoRenew b
 	resp, err := c.httpClient.Do(req)
 
 	if err != nil {
-		return autoRenewalResponse, fmt.Errorf("execute reqeust: %w", err)
+		return autoRenewalResponse, fmt.Errorf("execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -504,4 +504,51 @@ func findDomainByNameFromDomainList(domainList DomainList, domain string) (Domai
 	}
 	return DomainInfo{}, false
 
+}
+
+func (c *Client) UpdateTransferLock(ctx context.Context, domain string, transferLock bool) (TransferUpdateResponse, error) {
+	var transferLockResponse TransferUpdateResponse
+
+	endpoint := fmt.Sprintf("%s/domains/%s/transfer/lock", c.baseURL, domain)
+	payload := struct {
+		IsLocked bool `json:"isLocked"`
+	}{
+		IsLocked: transferLock,
+	}
+
+	body, err := json.Marshal(payload)
+
+	if err != nil {
+		return transferLockResponse, fmt.Errorf("marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return transferLockResponse, fmt.Errorf("create request: %w", err)
+	}
+
+	c.applyAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return transferLockResponse, fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return transferLockResponse, c.errorFromResponse(resp)
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&transferLockResponse); err != nil {
+		return transferLockResponse, fmt.Errorf("decode response: %w", err)
+	}
+
+	return transferLockResponse, nil
+
+}
+
+type TransferUpdateResponse struct {
+	IsLocked bool `json:"isLocked"`
 }

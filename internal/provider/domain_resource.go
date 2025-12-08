@@ -200,18 +200,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 	}
 
-	// desiredAutoRenew := plan.AutoRenew.ValueBool()
-	// currentAutoRenew := domainInfo.AutoRenew
-
 	var state domainResourceModel
-
-	// if desiredAutoRenew != currentAutoRenew {
-	// 	resp, _ := d.client.UpdateAutoRenew(ctx, domainInfo.Name, desiredAutoRenew)
-	// 	state.AutoRenew = types.BoolValue(resp.IsEnabled)
-	// } else {
-
-	// 	state.AutoRenew = types.BoolValue(desiredAutoRenew)
-	// }
 
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
 	state.Domain = types.StringValue(domainInfo.Name)
