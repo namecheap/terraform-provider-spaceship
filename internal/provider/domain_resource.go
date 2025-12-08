@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -40,44 +42,39 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				Computed: true,
 			},
 
-			"name": schema.StringAttribute{Computed: true},
-			/*
-				"unicode_name":      schema.StringAttribute{Computed: true},
-				"is_premium":        schema.BoolAttribute{Computed: true},
-				"registration_date": schema.StringAttribute{Computed: true},
-				"expiration_date":   schema.StringAttribute{Computed: true},
-				"lifecycle_status": schema.StringAttribute{
-					Computed:    true,
-					Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
-				},
-				"verification_status": schema.StringAttribute{
-					Computed:    true,
-					Optional:    true,
-					Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
-					Validators: []validator.String{
-						stringvalidator.OneOf("verification", "success", "failed"),
-					},
-				},
+			"name":              schema.StringAttribute{Computed: true},
+			"unicode_name":      schema.StringAttribute{Computed: true},
+			"is_premium":        schema.BoolAttribute{Computed: true},
+			"registration_date": schema.StringAttribute{Computed: true},
+			"expiration_date":   schema.StringAttribute{Computed: true},
+			"lifecycle_status": schema.StringAttribute{
+				Computed:    true,
+				Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
+			},
 
-				"epp_statuses": schema.ListAttribute{
-					Computed:    true,
-					ElementType: types.StringType,
-					Description: "Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited",
-				},
-
-				"suspensions": schema.ListNestedAttribute{
-					Computed:    true,
-					Description: "Information about domain suspensions. May contain up to 2 items.",
-					NestedObject: schema.NestedAttributeObject{
-						Attributes: map[string]schema.Attribute{
-							"reason_code": schema.StringAttribute{
-								Computed:    true,
-								Description: "Suspension reason code (raaVerification, abuse, promoAbuse, fraud, pendingAccountVerification, unauthorizedAccess, tosViolation, transferDispute, restrictedSecurity, lockCourt, suspendCourt, udrpUrs, restrictedLegal, paymentPending, unpaidService, restrictedWhois, lockedWhois)",
-							},
+			"verification_status": schema.StringAttribute{
+				Computed:    true,
+				Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
+			},
+			"epp_statuses": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+				Description: "Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited",
+			},
+			"suspensions": schema.ListNestedAttribute{
+				Computed:    true,
+				Description: "Information about domain suspensions. May contain up to 2 items.",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"reason_code": schema.StringAttribute{
+							Computed:    true,
+							Description: "Suspension reason code (raaVerification, abuse, promoAbuse, fraud, pendingAccountVerification, unauthorizedAccess, tosViolation, transferDispute, restrictedSecurity, lockCourt, suspendCourt, udrpUrs, restrictedLegal, paymentPending, unpaidService, restrictedWhois, lockedWhois)",
 						},
 					},
 				},
+			},
 
+			/*
 				"privacy_protection": schema.SingleNestedAttribute{
 					Computed: true,
 					Attributes: map[string]schema.Attribute{
@@ -143,30 +140,52 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 }
 
 func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-
-	var plan domainResourceModel
-	var domainInfo DomainInfo
-	diags := req.State.Get(ctx, &plan)
+	var state domainResourceModel
+	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
-
+	domainInfo, err := d.client.GetDomainInfo(ctx, state.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+		return
 	}
 
-	var state domainResourceModel
-
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
-	state.Domain = types.StringValue(domainInfo.Name)
 	state.Name = types.StringValue(domainInfo.Name)
+	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
+	state.IsPremium = types.BoolValue(domainInfo.IsPremium)
+	state.RegistrationDate = types.StringValue(domainInfo.RegistrationDate)
+	state.ExpirationDate = types.StringValue(domainInfo.ExpirationDate)
+	state.LifecycleStatus = types.StringValue(domainInfo.LifecycleStatus)
+	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
+
+	tflog.Debug(ctx, "API response", map[string]any{
+		"epp_statuses":      domainInfo.EPPStatuses,
+		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+	})
+
+	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
+	state.EppStatuses = eppStatuses
+
+	tflog.Debug(ctx, "API response", map[string]any{
+		"suspensions":      domainInfo.Suspensions,
+		"suspensions_type": fmt.Sprintf("%T", domainInfo.Suspensions),
+		"suspensions_len":  len(domainInfo.Suspensions),
+	})
+
+	suspensions, diags := SuspensionsToTerraformList(ctx, domainInfo.Suspensions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Suspensions = suspensions
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-
 }
 
 func (d *domainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -193,11 +212,11 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	//var err error
 	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+		return
 	}
 
 	var state domainResourceModel
@@ -205,10 +224,31 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
 	state.Domain = types.StringValue(domainInfo.Name)
 	state.Name = types.StringValue(domainInfo.Name)
+	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
+	state.IsPremium = types.BoolValue(domainInfo.IsPremium)
+	state.RegistrationDate = types.StringValue(domainInfo.RegistrationDate)
+	state.ExpirationDate = types.StringValue(domainInfo.ExpirationDate)
+	state.LifecycleStatus = types.StringValue(domainInfo.LifecycleStatus)
+	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
+
+	tflog.Debug(ctx, "API response", map[string]any{
+		"epp_statuses":      domainInfo.EPPStatuses,
+		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+	})
+
+	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
+	state.EppStatuses = eppStatuses
+
+	suspensions, diags := SuspensionsToTerraformList(ctx, domainInfo.Suspensions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Suspensions = suspensions
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
-
 }
 
 func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -265,14 +305,44 @@ type domainResourceModel struct {
 	// PrivacyProtection basetypes.ObjectValue `tfsdk:"privacy_protection"`
 
 	//read only
-	Name types.String `tfsdk:"name"`
-	// UnicodeName        types.String          `tfsdk:"unicode_name"`
-	// IsPremium          types.Bool            `tfsdk:"is_premium"`
-	// RegistrationDate   types.String          `tfsdk:"registration_date"`
-	// ExpirationDate     types.String          `tfsdk:"expiration_date"`
-	// LifecycleStatus    types.String          `tfsdk:"lifecycle_status"`
-	// VerificationStatus types.String          `tfsdk:"verification_status"`
-	// EppStatuses        types.List            `tfsdk:"epp_statuses"`
-	// Suspensions        basetypes.ListValue   `tfsdk:"suspensions"`
+	Name               types.String `tfsdk:"name"`
+	UnicodeName        types.String `tfsdk:"unicode_name"`
+	IsPremium          types.Bool   `tfsdk:"is_premium"`
+	RegistrationDate   types.String `tfsdk:"registration_date"`
+	ExpirationDate     types.String `tfsdk:"expiration_date"`
+	LifecycleStatus    types.String `tfsdk:"lifecycle_status"`
+	VerificationStatus types.String `tfsdk:"verification_status"`
+	EppStatuses        types.List   `tfsdk:"epp_statuses"`
+	Suspensions        types.List   `tfsdk:"suspensions"`
 	// Contacts           basetypes.ObjectValue `tfsdk:"contacts"`
+}
+
+func SuspensionsToTerraformList(ctx context.Context, suspensions []ReasonCode) (types.List, diag.Diagnostics) {
+	suspensionAttrTypes := map[string]attr.Type{
+		"reason_code": types.StringType,
+	}
+
+	suspensionObjectType := types.ObjectType{AttrTypes: suspensionAttrTypes}
+
+	if suspensions == nil {
+		return types.ListNull(suspensionObjectType), nil
+	}
+
+	if len(suspensions) == 0 {
+		return types.ListNull(suspensionObjectType), nil
+	}
+
+	suspensionValues := make([]attr.Value, len(suspensions))
+
+	for i, s := range suspensions {
+		objValue, diags := types.ObjectValue(suspensionAttrTypes, map[string]attr.Value{
+			"reason_code": types.StringValue(s.ReasonCode),
+		})
+		if diags.HasError() {
+			return types.ListNull(suspensionObjectType), diags
+		}
+		suspensionValues[i] = objValue
+	}
+	return types.ListValue(suspensionObjectType, suspensionValues)
+
 }

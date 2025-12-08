@@ -87,29 +87,39 @@ resource "spaceship_domain" "this" {
 	})
 }
 
-// func TestAccDomain_basic(t *testing.T) {
-// 	template := `
-// provider "spaceship" {}
+func TestAccDomain_basic(t *testing.T) {
 
-// resource "spaceship_domain" "this" {
-// 	domain = "dmytrovovk.com"
-// }
-// `
+	//t.Setenv("TF_LOG", "DEBUG")
 
-// 	resource.Test(t, resource.TestCase{
-// 		PreCheck:                 func() { testAccPreCheck(t) },
-// 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-// 		Steps: []resource.TestStep{
-// 			{
-// 				Config: template,
-// 				Check: resource.ComposeAggregateTestCheckFunc(
-// 					resource.TestCheckResourceAttr("spaceship_domain.this", "name", "dmytrovovk.com"),
-// 				),
-// 			},
-// 		},
-// 	})
+	template := `
+provider "spaceship" {}
 
-// }
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: template,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "name", "dmytrovovk.com"),
+					resource.TestCheckResourceAttr("spaceship_domain.this", "unicode_name", "dmytrovovk.com"),
+					resource.TestCheckResourceAttr("spaceship_domain.this", "is_premium", "false"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "registration_date"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "expiration_date"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "lifecycle_status"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "verification_status"),
+					expectListCountAtLeast("spaceship_domain.this", "epp_statuses.#", 0),
+					resource.TestCheckResourceAttr("spaceship_domain.this", "suspensions.#", "0"),
+				),
+			},
+		},
+	})
+}
 
 /*
 maybe sometime later when api would support providing
