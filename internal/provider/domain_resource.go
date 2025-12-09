@@ -184,6 +184,13 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 	state.Suspensions = suspensions
 
+	contactObj, diags := contactsToTerraformObject(ctx, domainInfo.Contacts)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Contacts = contactObj
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -298,6 +305,35 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
 	state.Domain = types.StringValue(domainInfo.Name)
 	state.Name = types.StringValue(domainInfo.Name)
+	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
+	state.IsPremium = types.BoolValue(domainInfo.IsPremium)
+	state.RegistrationDate = types.StringValue(domainInfo.RegistrationDate)
+	state.ExpirationDate = types.StringValue(domainInfo.ExpirationDate)
+	state.LifecycleStatus = types.StringValue(domainInfo.LifecycleStatus)
+	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
+
+	tflog.Debug(ctx, "API response", map[string]any{
+		"epp_statuses":      domainInfo.EPPStatuses,
+		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+	})
+
+	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
+	state.EppStatuses = eppStatuses
+
+	suspensions, diags := SuspensionsToTerraformList(ctx, domainInfo.Suspensions)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Suspensions = suspensions
+
+	contactObj, diags := contactsToTerraformObject(ctx, domainInfo.Contacts)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Contacts = contactObj
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }

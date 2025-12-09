@@ -64,8 +64,6 @@ resource "spaceship_domain" "this" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("spaceship_domain.this", "auto_renew", "false"),
 				),
-				PlanOnly:           true,
-				ExpectNonEmptyPlan: false,
 			},
 			// stage 3
 			// apply changes to the value

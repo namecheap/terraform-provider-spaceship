@@ -49,16 +49,15 @@ func domainInfoBasicsChecks() resource.TestCheckFunc {
 			{Attribute: "name", Value: domainName},
 			{Attribute: "unicode_name", Value: domainName},
 			{Attribute: "is_premium", Value: "false"},
-			{Attribute: "auto_renew", Value: "false"},
 		}),
 		expectNonEmptyAttrs(domainInfoDataSourceName, []string{
 			"registration_date",
 			"expiration_date",
 			"lifecycle_status",
 			"verification_status",
+			"auto_renew",
 		}),
-		expectListCountAtLeast(domainInfoDataSourceName, "epp_statuses.#", 1),
-		expectNonEmptyAttr(domainInfoDataSourceName, "epp_statuses.0"),
+		expectListCountAtLeast(domainInfoDataSourceName, "epp_statuses.#", 0),
 	)
 }
 

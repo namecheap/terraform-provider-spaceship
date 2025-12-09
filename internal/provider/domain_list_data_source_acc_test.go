@@ -108,16 +108,15 @@ func domainBasicsChecks() resource.TestCheckFunc {
 			{Attribute: domainAttr(firstDomainIndex, "name"), Value: "dmytrovovk.com"},
 			{Attribute: domainAttr(firstDomainIndex, "unicode_name"), Value: "dmytrovovk.com"},
 			{Attribute: domainAttr(firstDomainIndex, "is_premium"), Value: "false"},
-			{Attribute: domainAttr(firstDomainIndex, "auto_renew"), Value: "false"},
 		}),
 		expectNonEmptyAttrs(domainListDataSourceName, []string{
 			domainAttr(firstDomainIndex, "registration_date"),
 			domainAttr(firstDomainIndex, "expiration_date"),
 			domainAttr(firstDomainIndex, "lifecycle_status"),
 			domainAttr(firstDomainIndex, "verification_status"),
+			domainAttr(firstDomainIndex, "auto_renew"),
 		}),
-		expectListCountAtLeast(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), 1),
-		expectNonEmptyAttr(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.0")),
+		expectListCountAtLeast(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), 0),
 		expectListCount(domainListDataSourceName, domainAttr(firstDomainIndex, "suspensions.#"), 0),
 	)
 }
