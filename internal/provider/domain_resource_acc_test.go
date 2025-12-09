@@ -115,6 +115,10 @@ resource "spaceship_domain" "this" {
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "verification_status"),
 					expectListCountAtLeast("spaceship_domain.this", "epp_statuses.#", 0),
 					resource.TestCheckResourceAttr("spaceship_domain.this", "suspensions.#", "0"),
+					//contact checks
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "contacts.admin"),
+					expectNonEmptyAttr("spaceship_domain.this", "contacts.registrant"),
+					expectListCountAtLeast("spaceship_domain.this", "contacts.attributes.#", 0),
 				),
 			},
 		},

@@ -73,6 +73,32 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 					},
 				},
 			},
+			"contacts": schema.SingleNestedAttribute{
+				Computed: true,
+				Attributes: map[string]schema.Attribute{
+					"registrant": schema.StringAttribute{
+						Computed:    true,
+						Description: "Always present registrant handle.",
+					},
+					"admin": schema.StringAttribute{
+						Computed:    true,
+						Description: "Administrative contact handle when provided.",
+					},
+					"tech": schema.StringAttribute{
+						Computed:    true,
+						Description: "Technical contact handle when provided.",
+					},
+					"billing": schema.StringAttribute{
+						Computed:    true,
+						Description: "Billing contact handle when provided.",
+					},
+					"attributes": schema.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+						Description: "Optional list of contact attributes supplied by Spaceship.",
+					},
+				},
+			},
 
 			/*
 				"privacy_protection": schema.SingleNestedAttribute{
@@ -107,33 +133,7 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 						},
 					},
 				},
-				"contacts": schema.SingleNestedAttribute{
-					Computed: true,
-					Attributes: map[string]schema.Attribute{
-						"registrant": schema.StringAttribute{
-							Computed:    true,
-							Description: "Always present registrant handle.",
-						},
-						"admin": schema.StringAttribute{
-							Computed:    true,
-							Description: "Administrative contact handle when provided.",
-						},
-						"tech": schema.StringAttribute{
-							Computed:    true,
-							Description: "Technical contact handle when provided.",
-						},
-						"billing": schema.StringAttribute{
-							Computed:    true,
-							Description: "Billing contact handle when provided.",
-						},
-						"attributes": schema.ListAttribute{
-							Computed:    true,
-							ElementType: types.StringType,
-							Optional:    true,
-							Description: "Optional list of contact attributes supplied by Spaceship.",
-						},
-					},
-				},
+
 			*/
 		},
 	}
@@ -247,6 +247,13 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 	state.Suspensions = suspensions
 
+	contactObj, diags := contactsToTerraformObject(ctx, domainInfo.Contacts)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Contacts = contactObj
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -314,7 +321,7 @@ type domainResourceModel struct {
 	VerificationStatus types.String `tfsdk:"verification_status"`
 	EppStatuses        types.List   `tfsdk:"epp_statuses"`
 	Suspensions        types.List   `tfsdk:"suspensions"`
-	// Contacts           basetypes.ObjectValue `tfsdk:"contacts"`
+	Contacts           types.Object `tfsdk:"contacts"`
 }
 
 func SuspensionsToTerraformList(ctx context.Context, suspensions []ReasonCode) (types.List, diag.Diagnostics) {
@@ -344,5 +351,38 @@ func SuspensionsToTerraformList(ctx context.Context, suspensions []ReasonCode) (
 		suspensionValues[i] = objValue
 	}
 	return types.ListValue(suspensionObjectType, suspensionValues)
+
+}
+
+func contactsToTerraformObject(ctx context.Context, contacts Contacts) (types.Object, diag.Diagnostics) {
+
+	contactsAttrTypes := map[string]attr.Type{
+		"admin":      types.StringType,
+		"billing":    types.StringType,
+		"registrant": types.StringType,
+		"tech":       types.StringType,
+		"attributes": types.ListType{ElemType: types.StringType},
+	}
+
+	var attributesValues types.List
+	if contacts.Attributes == nil {
+		attributesValues = types.ListNull(types.StringType)
+	} else {
+		var diags diag.Diagnostics
+		attributesValues, diags = types.ListValueFrom(ctx, types.StringType, contacts.Attributes)
+		if diags.HasError() {
+			return types.ObjectNull(contactsAttrTypes), diags
+		}
+	}
+
+	contactsValues := map[string]attr.Value{
+		"admin":      types.StringValue(contacts.Admin),
+		"billing":    stringValueOrNull(contacts.Billing),
+		"registrant": stringValueOrNull(contacts.Registrant),
+		"tech":       stringValueOrNull(contacts.Tech),
+		"attributes": attributesValues,
+	}
+
+	return types.ObjectValue(contactsAttrTypes, contactsValues)
 
 }
