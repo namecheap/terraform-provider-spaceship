@@ -552,3 +552,97 @@ func (c *Client) UpdateTransferLock(ctx context.Context, domain string, transfer
 type TransferUpdateResponse struct {
 	IsLocked bool `json:"isLocked"`
 }
+
+type PrivacyLevel string
+
+const (
+	PrivacyLevelPublic PrivacyLevel = "public"
+	PrivacyLevelHigh   PrivacyLevel = "high"
+)
+
+/*
+https://docs.spaceship.dev/#tag/Domains/operation/updateDomainPrivacyPreference
+*/
+func (c *Client) UpdateDomainPrivacyPreference(ctx context.Context, domain string, level PrivacyLevel) error {
+	switch level {
+	case PrivacyLevelHigh, PrivacyLevelPublic:
+	default:
+		return fmt.Errorf("invalid privacy level %q", level)
+	}
+
+	endpoint := fmt.Sprintf("%s/domains/%s/privacy/preference", c.baseURL, domain)
+	payload := struct {
+		PrivacyLevel PrivacyLevel `json:"privacyLevel"`
+		UserConsent  bool         `json:"userConsent"`
+	}{
+		PrivacyLevel: level,
+		//user consent strictly defined as true to update this field
+		UserConsent: true,
+	}
+
+	body, err := json.Marshal(payload)
+
+	if err != nil {
+		return fmt.Errorf("marshall payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	c.applyAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return c.errorFromResponse(resp)
+	}
+
+	return nil
+}
+
+/*
+https://docs.spaceship.dev/#tag/Domains/operation/updateDomainEmailProtectionPreference
+Indicates whether WHOIS should display the contact form link
+*/
+func (c *Client) UpdateDomainEmailProtectionPreference(ctx context.Context, domain string, contactForm bool) error {
+	//https://spaceship.dev/api/v1/domains/{domain}/privacy/email-protection-preference
+	endpoint := fmt.Sprintf("%s/domains/%s/privacy/email-protection-preference", c.baseURL, domain)
+	payload := struct {
+		ContactForm bool `json:"contactForm"`
+	}{
+		ContactForm: contactForm,
+	}
+
+	body, err := json.Marshal(payload)
+
+	if err != nil {
+		return fmt.Errorf("marshall payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	c.applyAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return c.errorFromResponse(resp)
+	}
+
+	return nil
+}
