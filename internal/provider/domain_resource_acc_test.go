@@ -117,10 +117,113 @@ resource "spaceship_domain" "this" {
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "contacts.admin"),
 					expectNonEmptyAttr("spaceship_domain.this", "contacts.registrant"),
 					expectListCountAtLeast("spaceship_domain.this", "contacts.attributes.#", 0),
+					//privacy protection settings are adopted
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.contact_form"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.level"),
 				),
 			},
 		},
 	})
+}
+
+func TestAccDomain_privacyProtection(t *testing.T) {
+	t.Setenv("TF_LOG", "DEBUG")
+
+	creationConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+}
+`
+	ppDefaultConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	privacy_protection = {
+		contact_form = true
+		level = "high"
+	}
+}
+`
+
+	ppContactFormFalseConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	privacy_protection = {
+		contact_form = false
+		level = "high"
+	}
+}
+`
+	ppLevelPublicConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	privacy_protection =  {
+		contact_form = false
+		level = "public"
+	}
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// step 1
+			// adopt on creation
+			{
+				Config: creationConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					//resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "true"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.contact_form"),
+					//resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.level", "high"),
+					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.level"),
+				),
+			},
+			// Step 2
+			// verify no changes
+			// default config
+			{
+				Config:             ppDefaultConfig,
+				ExpectNonEmptyPlan: false,
+			},
+			// Step 3
+			// Update contact form to false
+			{
+				Config: ppContactFormFalseConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "false"),
+				),
+			},
+			// Step 4
+			// update level to public
+			{
+				Config: ppLevelPublicConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.level", "public"),
+				),
+			},
+			// Step 5
+			// reset to default
+			{
+				Config: ppDefaultConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "true"),
+					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.level", "high"),
+				),
+			},
+		},
+	})
+
 }
 
 /*

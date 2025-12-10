@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -99,24 +100,26 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 					},
 				},
 			},
-
-			/*
-				"privacy_protection": schema.SingleNestedAttribute{
-					Computed: true,
-					Attributes: map[string]schema.Attribute{
-						"contact_form": schema.BoolAttribute{
-							Computed:    true,
-							Description: "Indicates whether WHOIS should display the contact form link",
-						},
-						"level": schema.StringAttribute{
-							Computed:    true,
-							Description: "Privacy level: public or high",
-							Validators: []validator.String{
-								stringvalidator.OneOf("public", "high"),
-							},
+			"privacy_protection": schema.SingleNestedAttribute{
+				Computed: true,
+				Optional: true,
+				Attributes: map[string]schema.Attribute{
+					"contact_form": schema.BoolAttribute{
+						Computed:    true,
+						Optional:    true,
+						Description: "Indicates whether WHOIS should display the contact form link",
+					},
+					"level": schema.StringAttribute{
+						Computed:    true,
+						Optional:    true,
+						Description: "Privacy level: public or high",
+						Validators: []validator.String{
+							stringvalidator.OneOf("public", "high"),
 						},
 					},
 				},
+			},
+			/*
 				"nameservers": schema.SingleNestedAttribute{
 					Computed: true,
 					Attributes: map[string]schema.Attribute{
@@ -191,6 +194,13 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 	state.Contacts = contactObj
 
+	ppObject, diags := privacyProtectionToTerraformObject(ctx, domainInfo.PrivacyProtection)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.PrivacyProtection = ppObject
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -261,6 +271,13 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 	state.Contacts = contactObj
 
+	ppObject, diags := privacyProtectionToTerraformObject(ctx, domainInfo.PrivacyProtection)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.PrivacyProtection = ppObject
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -273,25 +290,88 @@ func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, r
 }
 
 func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var plan domainResourceModel
+	var plan, state domainResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var (
+		planPrivacy  privacyProtection
+		statePrivacy privacyProtection
+	)
+
+	planHasPrivacy := !plan.PrivacyProtection.IsUnknown() && !plan.PrivacyProtection.IsNull()
+	stateHasPrivacy := !state.PrivacyProtection.IsUnknown() && !state.PrivacyProtection.IsNull()
+
+	domainName := plan.Domain.ValueString()
+
 	tflog.Info(ctx, "calling domain autorenewal update with domain %s", map[string]any{
-		"domain": plan.Domain.String(),
+		"domain": domainName,
 	},
 	)
 
-	_, err := d.client.UpdateAutoRenew(ctx, plan.Domain.ValueString(), plan.AutoRenew.ValueBool())
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error updating domain auto renew",
-			fmt.Sprintf("Could not update auto_renew for domain %s: %s", plan.Domain.String(), err),
-		)
-		return
+	// check auto_renew updates
+	if !plan.AutoRenew.Equal(state.AutoRenew) {
+		tflog.Debug(ctx, "auto_renew changed", map[string]any{
+			"old": state.AutoRenew.ValueBool(),
+			"new": plan.AutoRenew.ValueBool(),
+		})
+
+		_, err := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating domain auto renew",
+				fmt.Sprintf("Could not update auto_renew for domain %s: %s", domainName, err),
+			)
+			return
+		}
+	}
+
+	// check privacy protection changes
+	if planHasPrivacy {
+		// check each field separately
+		resp.Diagnostics.Append(plan.PrivacyProtection.As(ctx, &planPrivacy, basetypes.ObjectAsOptions{})...)
+		if stateHasPrivacy {
+			resp.Diagnostics.Append(state.PrivacyProtection.As(ctx, &statePrivacy, basetypes.ObjectAsOptions{})...)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		// update level first as contact_form preference depends on it being supported
+		if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() &&
+			(!stateHasPrivacy || !planPrivacy.Level.Equal(statePrivacy.Level)) {
+			tflog.Debug(ctx, "privacy level changed")
+
+			err := d.client.UpdateDomainPrivacyPreference(ctx, domainName, PrivacyLevel(planPrivacy.Level.ValueString()))
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to update privacy_protection level", err.Error())
+				return
+			}
+
+		}
+
+		//check contact_form
+		if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() &&
+			(!stateHasPrivacy || !planPrivacy.ContactForm.Equal(statePrivacy.ContactForm)) {
+			tflog.Debug(ctx, "contact_form changed")
+
+			err := d.client.UpdateDomainEmailProtectionPreference(ctx, domainName, planPrivacy.ContactForm.ValueBool())
+			if err != nil {
+				tflog.Debug(ctx, "Failed to update privacy_protection contact_form", map[string]any{
+					"contact_form_type":      fmt.Sprintf("%T", planPrivacy.ContactForm.ValueBool()),
+					"contact_form_new_value": planPrivacy.ContactForm.ValueBool(),
+					"error":                  err.Error(),
+				},
+				)
+				resp.Diagnostics.AddError("Failed to update privacy_protection contact_form", err.Error())
+				return
+			}
+		}
+
 	}
 
 	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
@@ -299,8 +379,6 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 	}
-
-	var state domainResourceModel
 
 	state.AutoRenew = types.BoolValue(domainInfo.AutoRenew)
 	state.Domain = types.StringValue(domainInfo.Name)
@@ -313,9 +391,11 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
 
 	tflog.Debug(ctx, "API response", map[string]any{
-		"epp_statuses":      domainInfo.EPPStatuses,
-		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
-		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+		"epp_statuses":                    domainInfo.EPPStatuses,
+		"epp_statuses_type":               fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":                len(domainInfo.EPPStatuses),
+		"privacy_protection.contact_form": domainInfo.PrivacyProtection.ContactForm,
+		"privacy_protection.level":        domainInfo.PrivacyProtection.Level,
 	})
 
 	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
@@ -335,6 +415,37 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	state.Contacts = contactObj
 
+	ppObject, diags := privacyProtectionToTerraformObject(ctx, domainInfo.PrivacyProtection)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// prefer explicit plan values when provided to avoid transient backend lag
+	ppAttrTypes := map[string]attr.Type{
+		"contact_form": types.BoolType,
+		"level":        types.StringType,
+	}
+	ppValues := map[string]attr.Value{
+		"contact_form": ppObject.Attributes()["contact_form"],
+		"level":        ppObject.Attributes()["level"],
+	}
+	if planHasPrivacy {
+		if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() {
+			ppValues["contact_form"] = planPrivacy.ContactForm
+		}
+		if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() {
+			ppValues["level"] = planPrivacy.Level
+		}
+	}
+
+	statePrivacyObject, ppDiag := types.ObjectValue(ppAttrTypes, ppValues)
+	resp.Diagnostics.Append(ppDiag...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.PrivacyProtection = statePrivacyObject
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -344,8 +455,8 @@ type domainResourceModel struct {
 	//configurable
 	AutoRenew types.Bool `tfsdk:"auto_renew"`
 
-	// Nameservers       basetypes.ObjectValue `tfsdk:"nameservers"`
-	// PrivacyProtection basetypes.ObjectValue `tfsdk:"privacy_protection"`
+	// Nameservers    types.Object `tfsdk:"nameservers"`
+	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
 
 	//read only
 	Name               types.String `tfsdk:"name"`
@@ -421,4 +532,18 @@ func contactsToTerraformObject(ctx context.Context, contacts Contacts) (types.Ob
 
 	return types.ObjectValue(contactsAttrTypes, contactsValues)
 
+}
+
+func privacyProtectionToTerraformObject(_ context.Context, pp PrivacyProtection) (types.Object, diag.Diagnostics) {
+	ppAttrTypes := map[string]attr.Type{
+		"contact_form": types.BoolType,
+		"level":        types.StringType,
+	}
+
+	ppValues := map[string]attr.Value{
+		"contact_form": types.BoolValue(pp.ContactForm),
+		"level":        types.StringValue(pp.Level),
+	}
+
+	return types.ObjectValue(ppAttrTypes, ppValues)
 }
