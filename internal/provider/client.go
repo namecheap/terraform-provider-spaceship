@@ -486,8 +486,13 @@ func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, autoRenew b
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
 		return autoRenewalResponse, c.errorFromResponse(resp)
+	}
+
+	if resp.StatusCode == 429 {
+		time.Sleep(10 * time.Second)
+		return c.UpdateAutoRenew(ctx, domain, autoRenew)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&autoRenewalResponse); err != nil {
@@ -600,8 +605,13 @@ func (c *Client) UpdateDomainPrivacyPreference(ctx context.Context, domain strin
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
 		return c.errorFromResponse(resp)
+	}
+
+	if resp.StatusCode == 429 {
+		time.Sleep(10 * time.Second)
+		return c.UpdateDomainPrivacyPreference(ctx, domain, level)
 	}
 
 	return nil
@@ -640,8 +650,13 @@ func (c *Client) UpdateDomainEmailProtectionPreference(ctx context.Context, doma
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode >= 300 {
+	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
 		return c.errorFromResponse(resp)
+	}
+
+	if resp.StatusCode == 429 {
+		time.Sleep(10 * time.Second)
+		return c.UpdateDomainEmailProtectionPreference(ctx, domain, contactForm)
 	}
 
 	return nil
