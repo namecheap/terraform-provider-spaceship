@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -337,6 +338,49 @@ resource "spaceship_domain" "this" {
 			},
 		},
 	})
+}
+
+func TestAccDomain_nameserversValidationError(t *testing.T) {
+	nsProviderBasicWithHosts := `
+	provider "spaceship" {}
+
+	resource "spaceship_domain" "this" {
+		domain = "dmytrovovk.com"
+
+		nameservers = {
+			provider = "basic"
+			hosts = ["ns1.example.com", "ns2.example.com"]
+		}
+	}
+	`
+
+	nsProviderCustomWithNoHosts := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	nameservers = {
+		provider = "custom"
+	}
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      nsProviderCustomWithNoHosts,
+				ExpectError: regexp.MustCompile("The 'hosts' field is required when provider is 'custom'."),
+			},
+			{
+				Config:      nsProviderBasicWithHosts,
+				ExpectError: regexp.MustCompile("The 'hosts' field must be omitted when provider is 'basic'."),
+			},
+		},
+	})
+
 }
 
 func TestAccDomain_resourceImport(t *testing.T) {
