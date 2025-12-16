@@ -661,3 +661,61 @@ func (c *Client) UpdateDomainEmailProtectionPreference(ctx context.Context, doma
 
 	return nil
 }
+
+/*
+https://docs.spaceship.dev/#tag/Domains/operation/setDomainNameservers
+*/
+func (c *Client) UpdateDomainNameServers(ctx context.Context, domain string, request UpdateNameserverRequest) error {
+	endpoint := fmt.Sprintf("%s/domains/%s/nameservers", c.baseURL, domain)
+	payload := struct {
+		Provider NameserverProvider `json:"provider"`
+		Hosts    []string           `json:"hosts,omitempty"` // omitempty handles conditional
+	}{
+		Provider: request.Provider,
+		Hosts:    request.Hosts,
+	}
+
+	body, err := json.Marshal(payload)
+
+	if err != nil {
+		return fmt.Errorf("marshall payload: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	c.applyAuth(req)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
+		return c.errorFromResponse(resp)
+	}
+
+	if resp.StatusCode == 429 {
+		time.Sleep(10 * time.Second)
+		return c.UpdateDomainNameServers(ctx, domain, request)
+	}
+
+	return nil
+
+}
+
+type NameserverProvider string
+
+const (
+	BasicNameserverProvider NameserverProvider = "basic"
+	CustomNamerverProvider  NameserverProvider = "custom"
+)
+
+type UpdateNameserverRequest struct {
+	Provider NameserverProvider
+	Hosts    []string
+}
