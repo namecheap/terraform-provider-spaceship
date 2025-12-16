@@ -562,10 +562,8 @@ func (r *dnsRecordsResource) Delete(ctx context.Context, req resource.DeleteRequ
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	//
 
 	force := boolOrDefault(state.Force, true)
-	// why it is here?
 	if err := r.client.ClearDNSRecords(ctx, state.Domain.ValueString(), force); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to clear DNS records: %s", err))
 		return

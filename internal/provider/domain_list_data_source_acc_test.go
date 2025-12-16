@@ -131,7 +131,6 @@ func privacyProtectionChecks() resource.TestCheckFunc {
 func nameserverChecks() resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectListCountAtLeast(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "hosts.#"), 1),
-		expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "hosts.0")),
 		expectNonEmptyAttr(domainListDataSourceName, nestedAttr(firstDomainIndex, "nameservers", "provider")),
 	)
 }

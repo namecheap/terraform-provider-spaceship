@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -119,25 +122,32 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 					},
 				},
 			},
-			/*
-				"nameservers": schema.SingleNestedAttribute{
-					Computed: true,
-					Attributes: map[string]schema.Attribute{
-						"provider": schema.StringAttribute{
-							Computed:    true,
-							Description: "type: basic or custom",
-							Validators: []validator.String{
-								stringvalidator.OneOf("basic", "custom"),
-							},
+			"nameservers": schema.SingleNestedAttribute{
+				Computed: true,
+				Optional: true,
+				Attributes: map[string]schema.Attribute{
+					"provider": schema.StringAttribute{
+						Computed:    true,
+						Optional:    true,
+						Description: "type: basic or custom",
+						Validators: []validator.String{
+							stringvalidator.OneOf("basic", "custom"),
 						},
-						"hosts": schema.ListAttribute{
-							Computed:    true,
-							ElementType: types.StringType,
+					},
+					"hosts": schema.SetAttribute{
+						Computed:    true,
+						Optional:    true,
+						ElementType: types.StringType,
+						Validators: []validator.Set{
+							setvalidator.SizeBetween(2, 12),
+							setvalidator.ValueStringsAre(
+								stringvalidator.LengthBetween(4, 255),
+								// Optionally add FQDN validation
+							),
 						},
 					},
 				},
-
-			*/
+			},
 		},
 	}
 }
@@ -147,8 +157,17 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
+		tflog.Error(ctx, "Failed to get state", map[string]interface{}{
+			"errors": resp.Diagnostics.Errors(),
+		})
 		return
 	}
+
+	tflog.Debug(ctx, "About to call API", map[string]interface{}{
+		"domain_value":      state.Domain.ValueString(),
+		"domain_is_null":    state.Domain.IsNull(),
+		"domain_is_unknown": state.Domain.IsUnknown(),
+	})
 
 	domainInfo, err := d.client.GetDomainInfo(ctx, state.Domain.ValueString())
 	if err != nil {
@@ -166,9 +185,12 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
 
 	tflog.Debug(ctx, "API response", map[string]any{
-		"epp_statuses":      domainInfo.EPPStatuses,
-		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
-		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+		"epp_statuses":          domainInfo.EPPStatuses,
+		"epp_statuses_type":     fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":      len(domainInfo.EPPStatuses),
+		"nameservers.provider":  domainInfo.Nameservers.Provider,
+		"nameservers.hosts.len": len(domainInfo.Nameservers.Hosts),
+		"nameservers.hosts":     domainInfo.Nameservers,
 	})
 
 	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
@@ -201,6 +223,13 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 	state.PrivacyProtection = ppObject
 
+	stateNsObject, nsDiag := nameseversToTerraformObject(ctx, domainInfo.Nameservers)
+	resp.Diagnostics.Append(nsDiag...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Nameservers = stateNsObject
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
@@ -217,6 +246,48 @@ func (d *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 	}
 
 	d.client = client
+}
+
+func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var plan domainResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Nameservers.IsUnknown() || plan.Nameservers.IsNull() {
+		return
+	}
+
+	var planNS nameservers
+	resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if planNS.Hosts.IsUnknown() || planNS.Hosts.IsNull() {
+		return
+	}
+
+	var hosts []string
+	resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	sort.Strings(hosts)
+
+	sortedHosts, diags := types.SetValueFrom(ctx, types.StringType, hosts)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), sortedHosts)
 }
 
 func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -249,9 +320,12 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	state.VerificationStatus = types.StringValue(domainInfo.VerificationStatus)
 
 	tflog.Debug(ctx, "API response", map[string]any{
-		"epp_statuses":      domainInfo.EPPStatuses,
-		"epp_statuses_type": fmt.Sprintf("%T", domainInfo.EPPStatuses),
-		"epp_statuses_len":  len(domainInfo.EPPStatuses),
+		"epp_statuses":          domainInfo.EPPStatuses,
+		"epp_statuses_type":     fmt.Sprintf("%T", domainInfo.EPPStatuses),
+		"epp_statuses_len":      len(domainInfo.EPPStatuses),
+		"nameservers.provider":  domainInfo.Nameservers.Provider,
+		"nameservers.hosts.len": len(domainInfo.Nameservers.Hosts),
+		"nameservers.hosts":     domainInfo.Nameservers,
 	})
 
 	eppStatuses, _ := types.ListValueFrom(ctx, types.StringType, domainInfo.EPPStatuses)
@@ -278,12 +352,20 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	}
 	state.PrivacyProtection = ppObject
 
+	stateNsObject, nsDiag := nameseversToTerraformObject(ctx, domainInfo.Nameservers)
+	resp.Diagnostics.Append(nsDiag...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Nameservers = stateNsObject
+
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
 }
 
 func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// todo should be done as removal from state only
+	// should be done as removal from state only
+	// done automatically by empty delete method
 	// no external call
 	// leaving infra in the same state
 
@@ -301,10 +383,14 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	var (
 		planPrivacy  privacyProtection
 		statePrivacy privacyProtection
+		planNS       nameservers
+		stateNS      nameservers
 	)
 
 	planHasPrivacy := !plan.PrivacyProtection.IsUnknown() && !plan.PrivacyProtection.IsNull()
 	stateHasPrivacy := !state.PrivacyProtection.IsUnknown() && !state.PrivacyProtection.IsNull()
+	planHasNameservers := !plan.Nameservers.IsUnknown() && !plan.Nameservers.IsNull()
+	stateHasNameservers := !state.Nameservers.IsUnknown() && !state.Nameservers.IsNull()
 
 	domainName := plan.Domain.ValueString()
 
@@ -371,7 +457,83 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 				return
 			}
 		}
+	}
 
+	//check nameservers changes
+	if planHasNameservers {
+		resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+		if stateHasNameservers {
+			resp.Diagnostics.Append(state.Nameservers.As(ctx, &stateNS, basetypes.ObjectAsOptions{})...)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
+		stateProviderKnown := stateHasNameservers && !stateNS.Provider.IsUnknown() && !stateNS.Provider.IsNull()
+
+		var planHosts, stateHosts []string
+		planHostsKnown := !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull()
+		stateHostsKnown := stateHasNameservers && !stateNS.Hosts.IsUnknown() && !stateNS.Hosts.IsNull()
+
+		if planHostsKnown {
+			resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &planHosts, false)...)
+		}
+		if stateHostsKnown {
+			resp.Diagnostics.Append(stateNS.Hosts.ElementsAs(ctx, &stateHosts, false)...)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		planHostsSorted := append([]string(nil), planHosts...)
+		stateHostsSorted := append([]string(nil), stateHosts...)
+		if planHostsKnown {
+			sort.Strings(planHostsSorted)
+		}
+		if stateHostsKnown {
+			sort.Strings(stateHostsSorted)
+		}
+
+		var planProvider, stateProvider string
+		if planProviderKnown {
+			planProvider = planNS.Provider.ValueString()
+		}
+		if stateProviderKnown {
+			stateProvider = stateNS.Provider.ValueString()
+		}
+
+		providerChanged := planProviderKnown && (!stateProviderKnown || planProvider != stateProvider)
+		hostsChanged := planHostsKnown && !stringSlicesEqual(planHostsSorted, stateHostsSorted)
+
+		if providerChanged || hostsChanged {
+			nsProvider := planProvider
+			if nsProvider == "" {
+				nsProvider = stateProvider
+			}
+
+			requestHosts := planHostsSorted
+			if nsProvider == string(BasicNameserverProvider) {
+				// API ignores hosts for basic provider and expects field to be omitted
+				requestHosts = nil
+			}
+
+			tflog.Debug(ctx, "nameservers changed", map[string]any{
+				"provider_changed": providerChanged,
+				"hosts_changed":    hostsChanged,
+				"new_provider":     nsProvider,
+				"new_hosts":        requestHosts,
+			})
+
+			err := d.client.UpdateDomainNameServers(ctx, domainName, UpdateNameserverRequest{
+				Provider: NameserverProvider(nsProvider),
+				Hosts:    requestHosts,
+			})
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to update domain nameservers", err.Error())
+				return
+			}
+		}
 	}
 
 	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
@@ -446,16 +608,30 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	state.PrivacyProtection = statePrivacyObject
 
+	stateNsObject, nsDiag := nameseversToTerraformObject(ctx, domainInfo.Nameservers)
+	resp.Diagnostics.Append(nsDiag...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.Nameservers = stateNsObject
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+}
+
+func (d *domainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	tflog.Debug(ctx, "ImportState called", map[string]interface{}{
+		"import_id": req.ID,
+	})
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("domain"), req.ID)...)
 }
 
 type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
 
 	//configurable
-	AutoRenew types.Bool `tfsdk:"auto_renew"`
-
-	// Nameservers    types.Object `tfsdk:"nameservers"`
+	AutoRenew         types.Bool   `tfsdk:"auto_renew"`
+	Nameservers       types.Object `tfsdk:"nameservers"`
 	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
 
 	//read only
@@ -469,6 +645,20 @@ type domainResourceModel struct {
 	EppStatuses        types.List   `tfsdk:"epp_statuses"`
 	Suspensions        types.List   `tfsdk:"suspensions"`
 	Contacts           types.Object `tfsdk:"contacts"`
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
 
 func SuspensionsToTerraformList(ctx context.Context, suspensions []ReasonCode) (types.List, diag.Diagnostics) {
@@ -546,4 +736,33 @@ func privacyProtectionToTerraformObject(_ context.Context, pp PrivacyProtection)
 	}
 
 	return types.ObjectValue(ppAttrTypes, ppValues)
+}
+
+func nameseversToTerraformObject(ctx context.Context, ns Nameservers) (types.Object, diag.Diagnostics) {
+
+	nsAttrTypes := map[string]attr.Type{
+		"provider": types.StringType,
+		"hosts":    types.SetType{ElemType: types.StringType},
+	}
+
+	var nsHosts types.Set
+	if ns.Hosts == nil {
+		nsHosts = types.SetNull(types.StringType)
+	} else {
+		sortedHosts := make([]string, len(ns.Hosts))
+		copy(sortedHosts, ns.Hosts)
+		sort.Strings(sortedHosts)
+
+		var diags diag.Diagnostics
+		nsHosts, diags = types.SetValueFrom(ctx, types.StringType, sortedHosts)
+		if diags.HasError() {
+			return types.ObjectNull(nsAttrTypes), diags
+		}
+	}
+
+	nsValues := map[string]attr.Value{
+		"provider": types.StringValue(ns.Provider),
+		"hosts":    nsHosts,
+	}
+	return types.ObjectValue(nsAttrTypes, nsValues)
 }

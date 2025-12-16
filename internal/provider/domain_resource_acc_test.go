@@ -120,6 +120,9 @@ resource "spaceship_domain" "this" {
 					//privacy protection settings are adopted
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.contact_form"),
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.level"),
+					//nameservers
+					expectListCountAtLeast("spaceship_domain.this", "nameservers.hosts.#", 1),
+					expectNonEmptyAttr("spaceship_domain.this", "nameservers.provider"),
 				),
 			},
 		},
@@ -223,7 +226,148 @@ resource "spaceship_domain" "this" {
 			},
 		},
 	})
+}
 
+func TestAccDomain_nameservers(t *testing.T) {
+
+	//t.Setenv("TF_LOG", "DEBUG")
+
+	creationConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+}
+`
+
+	customDefaultNsConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	nameservers = {
+		provider = "basic"
+		hosts = [
+			"launch1.spaceship.net", 
+			"launch2.spaceship.net",
+		]
+	}
+}
+`
+
+	customHostsNsConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	nameservers = {
+		provider = "custom"
+		hosts = [
+			"ns-669.awsdns-19.net",
+			"ns-1578.awsdns-05.co.uk",
+			"ns-401.awsdns-50.com",
+			"ns-1063.awsdns-04.org",
+		]
+	}
+}
+`
+
+	basicNsConfig := `
+provider "spaceship" {}
+
+resource "spaceship_domain" "this" {
+	domain = "dmytrovovk.com"
+
+	nameservers = {
+		provider = "basic"
+	}
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// step 1
+			// adopt on creation
+			{
+				Config: creationConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					expectListCountAtLeast("spaceship_domain.this", "nameservers.hosts.#", 1),
+					expectNonEmptyAttr("spaceship_domain.this", "nameservers.provider"),
+				),
+			},
+			// Step 2
+			// verify no changes
+			// default config
+			{
+				Config:             customDefaultNsConfig,
+				ExpectNonEmptyPlan: false,
+			},
+			// Step 3
+			// Update ns to basic
+			{
+				Config: basicNsConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "nameservers.provider", "basic"),
+				),
+			},
+			// Step 4
+			// update hosts only
+			{
+				Config: customHostsNsConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckTypeSetElemAttr("spaceship_domain.this", "nameservers.hosts.*", "ns-1063.awsdns-04.org"),
+					resource.TestCheckTypeSetElemAttr("spaceship_domain.this", "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
+					resource.TestCheckTypeSetElemAttr("spaceship_domain.this", "nameservers.hosts.*", "ns-401.awsdns-50.com"),
+					resource.TestCheckTypeSetElemAttr("spaceship_domain.this", "nameservers.hosts.*", "ns-669.awsdns-19.net"),
+					resource.TestCheckResourceAttr("spaceship_domain.this", "nameservers.provider", "custom"),
+				),
+			},
+			// Step 5
+			// reset to default
+			{
+				Config: customDefaultNsConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.this", "nameservers.provider", "basic"),
+					resource.TestCheckTypeSetElemAttr("spaceship_domain.this", "nameservers.hosts.*", "launch1.spaceship.net"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccDomain_resourceImport(t *testing.T) {
+	//t.Setenv("TF_LOG", "DEBUG")
+
+	creationConfig := `
+	provider "spaceship" {}
+
+	resource "spaceship_domain" "this" {
+		domain = "dmytrovovk.com"
+	}
+	`
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			//step 1 creation
+			{
+				Config: creationConfig,
+			},
+			// import
+			{
+				ResourceName:                         "spaceship_domain.this",
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateId:                        "dmytrovovk.com",
+				ImportStateVerifyIdentifierAttribute: "domain",
+			},
+		},
+	})
 }
 
 /*
