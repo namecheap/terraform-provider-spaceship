@@ -2,11 +2,13 @@
 
 # Spaceship Terraform Provider
 
-This repository contains a Terraform provider that manages DNS records for domains hosted with [Spaceship](https://spaceship.com/).
+This repository contains a Terraform provider that manages Spaceship domains and DNS records hosted with [Spaceship](https://spaceship.com/).
 
 ## Features
 
 - Configure Spaceship credentials via provider configuration or environment variables.
+- Manage domain settings (auto-renewal, privacy protection, nameservers) with the `spaceship_domain` resource.
+- Inspect a single Spaceship-managed domain via the `spaceship_domain_info` data source.
 - Read the current DNS record set for an existing domain.
 - Replace the full list of DNS records in a single Terraform apply.
 - Enumerate every Spaceship-managed domain along with WHOIS, privacy, suspension, nameserver, and contact metadata via the `spaceship_domain_list` data source.
@@ -70,6 +72,29 @@ resource "spaceship_dns_records" "root" {
       preference = 10
     }
   ]
+}
+```
+
+### Domain settings example
+
+```hcl
+resource "spaceship_domain" "this" {
+  domain = "example.com"
+
+  auto_renew = false
+
+  privacy_protection = {
+    contact_form = false
+    level        = "public"
+  }
+
+  nameservers = {
+    provider = "custom"
+    hosts = [
+      "ns1.exampledomain.com",
+      "ns2.exampledomain.com",
+    ]
+  }
 }
 ```
 
