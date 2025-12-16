@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -433,6 +434,17 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 	// by using alternative endpoint that does the same
 	// but has 60x times higher limits
 	if resp.StatusCode == 429 {
+		log.Printf(
+			"spaceship: rate limited fetching domain info (domain=%s status=%s error_code=%s op_id=%s limit=%s remaining=%s reset=%s retry_after=%s)",
+			domain,
+			resp.Status,
+			resp.Header.Get("spaceship-error-code"),
+			resp.Header.Get("spaceship-operation-id"),
+			resp.Header.Get("X-RateLimit-Limit"),
+			resp.Header.Get("X-RateLimit-Remaining"),
+			resp.Header.Get("X-RateLimit-Reset"),
+			resp.Header.Get("Retry-After"),
+		)
 		domainList, _ := c.GetDomainList(ctx)
 
 		domainInfo, ok := findDomainByNameFromDomainList(domainList, domain)
