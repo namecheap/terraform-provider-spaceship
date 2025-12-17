@@ -12,6 +12,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
@@ -44,30 +50,70 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"auto_renew": schema.BoolAttribute{
 				Optional: true,
 				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 
-			"name":              schema.StringAttribute{Computed: true},
-			"unicode_name":      schema.StringAttribute{Computed: true},
-			"is_premium":        schema.BoolAttribute{Computed: true},
-			"registration_date": schema.StringAttribute{Computed: true},
-			"expiration_date":   schema.StringAttribute{Computed: true},
+			"name": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"unicode_name": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"is_premium": schema.BoolAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"registration_date": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"expiration_date": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"lifecycle_status": schema.StringAttribute{
 				Computed:    true,
 				Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 
 			"verification_status": schema.StringAttribute{
 				Computed:    true,
 				Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"epp_statuses": schema.ListAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
 				Description: "Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"suspensions": schema.ListNestedAttribute{
 				Computed:    true,
 				Description: "Information about domain suspensions. May contain up to 2 items.",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"reason_code": schema.StringAttribute{
@@ -79,6 +125,9 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			},
 			"contacts": schema.SingleNestedAttribute{
 				Computed: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"registrant": schema.StringAttribute{
 						Computed:    true,
@@ -106,11 +155,17 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"privacy_protection": schema.SingleNestedAttribute{
 				Computed: true,
 				Optional: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"contact_form": schema.BoolAttribute{
 						Computed:    true,
 						Optional:    true,
 						Description: "Indicates whether WHOIS should display the contact form link",
+						PlanModifiers: []planmodifier.Bool{
+							boolplanmodifier.UseStateForUnknown(),
+						},
 					},
 					"level": schema.StringAttribute{
 						Computed:    true,
@@ -119,12 +174,18 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 						Validators: []validator.String{
 							stringvalidator.OneOf("public", "high"),
 						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
 					},
 				},
 			},
 			"nameservers": schema.SingleNestedAttribute{
 				Computed: true,
 				Optional: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 				Attributes: map[string]schema.Attribute{
 					"provider": schema.StringAttribute{
 						Computed:    true,
@@ -132,6 +193,9 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 						Description: "type: basic or custom",
 						Validators: []validator.String{
 							stringvalidator.OneOf("basic", "custom"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
 						},
 					},
 					"hosts": schema.SetAttribute{
@@ -144,6 +208,9 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 								stringvalidator.LengthBetween(4, 255),
 								// Optionally add FQDN validation
 							),
+						},
+						PlanModifiers: []planmodifier.Set{
+							setplanmodifier.UseStateForUnknown(),
 						},
 					},
 				},
