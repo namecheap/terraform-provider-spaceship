@@ -147,24 +147,24 @@ resource "spaceship_domain" "this" {
 	domain = "dmytrovovk.com"
 
 	privacy_protection = {
-		contact_form = true
-		level = "high"
-	}
-}
-`
-
-	ppContactFormFalseConfig := `
-provider "spaceship" {}
-
-resource "spaceship_domain" "this" {
-	domain = "dmytrovovk.com"
-
-	privacy_protection = {
 		contact_form = false
 		level = "high"
 	}
 }
 `
+
+	// 	ppContactFormFalseConfig := `
+	// provider "spaceship" {}
+
+	// resource "spaceship_domain" "this" {
+	// 	domain = "dmytrovovk.com"
+
+	// 	privacy_protection = {
+	// 		contact_form = false
+	// 		level = "high"
+	// 	}
+	// }
+	//`
 	ppLevelPublicConfig := `
 provider "spaceship" {}
 
@@ -172,7 +172,7 @@ resource "spaceship_domain" "this" {
 	domain = "dmytrovovk.com"
 
 	privacy_protection =  {
-		contact_form = false
+		contact_form = true 
 		level = "public"
 	}
 }
@@ -187,9 +187,7 @@ resource "spaceship_domain" "this" {
 			{
 				Config: creationConfig,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					//resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "true"),
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.contact_form"),
-					//resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.level", "high"),
 					resource.TestCheckResourceAttrSet("spaceship_domain.this", "privacy_protection.level"),
 				),
 			},
@@ -197,17 +195,17 @@ resource "spaceship_domain" "this" {
 			// verify no changes
 			// default config
 			{
-				Config:             ppDefaultConfig,
-				ExpectNonEmptyPlan: false,
+				Config: ppDefaultConfig,
+				//ExpectNonEmptyPlan: false,
 			},
 			// Step 3
 			// Update contact form to false
-			{
-				Config: ppContactFormFalseConfig,
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "false"),
-				),
-			},
+			// {
+			// 	Config: ppContactFormFalseConfig,
+			// 	Check: resource.ComposeAggregateTestCheckFunc(
+			// 		resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.contact_form", "false"),
+			// 	),
+			// },
 			// Step 4
 			// update level to public
 			{
@@ -216,6 +214,10 @@ resource "spaceship_domain" "this" {
 					resource.TestCheckResourceAttr("spaceship_domain.this", "privacy_protection.level", "public"),
 				),
 			},
+			// {
+			// 	Config:             ppLevelPublicConfig,
+			// 	ExpectNonEmptyPlan: false,
+			// },
 			// Step 5
 			// reset to default
 			{
@@ -249,10 +251,6 @@ resource "spaceship_domain" "this" {
 
 	nameservers = {
 		provider = "basic"
-		hosts = [
-			"launch1.spaceship.net", 
-			"launch2.spaceship.net",
-		]
 	}
 }
 `

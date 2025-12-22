@@ -337,6 +337,24 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 		return
 	}
 
+	planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
+	planProvider := NameserverProvider(planNS.Provider.ValueString())
+	if planProviderKnown && planProvider == BasicNameserverProvider {
+		defaultHosts := defaultBasicNameserverHosts()
+		sort.Strings(defaultHosts)
+
+		defaultSet, diags := types.SetValueFrom(ctx, types.StringType, defaultHosts)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		resp.Diagnostics.Append(
+			resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), defaultSet)...,
+		)
+		return
+	}
+
 	if planNS.Hosts.IsUnknown() || planNS.Hosts.IsNull() {
 		return
 	}
@@ -563,12 +581,12 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			sort.Strings(stateHostsSorted)
 		}
 
-		var planProvider, stateProvider string
+		var planProvider, stateProvider NameserverProvider
 		if planProviderKnown {
-			planProvider = planNS.Provider.ValueString()
+			planProvider = NameserverProvider(planNS.Provider.ValueString())
 		}
 		if stateProviderKnown {
-			stateProvider = stateNS.Provider.ValueString()
+			stateProvider = NameserverProvider(stateNS.Provider.ValueString())
 		}
 
 		providerChanged := planProviderKnown && (!stateProviderKnown || planProvider != stateProvider)
@@ -581,7 +599,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			}
 
 			requestHosts := planHostsSorted
-			if nsProvider == string(BasicNameserverProvider) {
+			if nsProvider == BasicNameserverProvider {
 				// API ignores hosts for basic provider and expects field to be omitted
 				requestHosts = nil
 			}
@@ -594,7 +612,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			})
 
 			err := d.client.UpdateDomainNameServers(ctx, domainName, UpdateNameserverRequest{
-				Provider: NameserverProvider(nsProvider),
+				Provider: nsProvider,
 				Hosts:    requestHosts,
 			})
 			if err != nil {
@@ -698,11 +716,14 @@ type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
 
 	//configurable
-	AutoRenew         types.Bool   `tfsdk:"auto_renew"`
-	Nameservers       types.Object `tfsdk:"nameservers"`
-	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
+	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
+	Nameservers types.Object `tfsdk:"nameservers"`
 
 	//read only
+
+	// TODO move to read only
+	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
+
 	Name               types.String `tfsdk:"name"`
 	UnicodeName        types.String `tfsdk:"unicode_name"`
 	IsPremium          types.Bool   `tfsdk:"is_premium"`
