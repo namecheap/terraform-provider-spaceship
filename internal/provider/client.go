@@ -617,12 +617,27 @@ func (c *Client) UpdateDomainPrivacyPreference(ctx context.Context, domain strin
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 422 {
+		body, _ := io.ReadAll(resp.Body)
+
+		log.Printf(
+			"spaceship: 422 error (domain=%s status=%s error_code=%s op_id=%s body=%s)",
+			domain,
+			resp.Status,
+			resp.Header.Get("spaceship-error-code"),
+			resp.Header.Get("spaceship-operation-id"),
+			string(body),
+		)
+		return c.errorFromResponse(resp)
+	}
+
 	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
 		return c.errorFromResponse(resp)
 	}
 
 	if resp.StatusCode == 429 {
 		time.Sleep(10 * time.Second)
+		log.Print("retrying")
 		return c.UpdateDomainPrivacyPreference(ctx, domain, level)
 	}
 
@@ -662,12 +677,28 @@ func (c *Client) UpdateDomainEmailProtectionPreference(ctx context.Context, doma
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 422 {
+		body, _ := io.ReadAll(resp.Body)
+
+		log.Printf(
+			"spaceship: 422 error (domain=%s status=%s error_code=%s op_id=%s body=%s)",
+			domain,
+			resp.Status,
+			resp.Header.Get("spaceship-error-code"),
+			resp.Header.Get("spaceship-operation-id"),
+			string(body),
+		)
+
+		return c.errorFromResponse(resp)
+	}
+
 	if resp.StatusCode >= 300 && resp.StatusCode != 429 {
 		return c.errorFromResponse(resp)
 	}
 
 	if resp.StatusCode == 429 {
 		time.Sleep(10 * time.Second)
+		log.Print("retrying")
 		return c.UpdateDomainEmailProtectionPreference(ctx, domain, contactForm)
 	}
 
@@ -727,7 +758,15 @@ const (
 	CustomNamerverProvider  NameserverProvider = "custom"
 )
 
+func (p NameserverProvider) Valid() bool {
+	return p == BasicNameserverProvider || p == CustomNamerverProvider
+}
+
 type UpdateNameserverRequest struct {
 	Provider NameserverProvider
 	Hosts    []string
+}
+
+func defaultBasicNameserverHosts() []string {
+	return []string{"launch1.spaceship.net", "launch2.spaceship.net"}
 }
