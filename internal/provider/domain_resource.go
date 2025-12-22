@@ -154,29 +154,36 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			},
 			"privacy_protection": schema.SingleNestedAttribute{
 				Computed: true,
+				/* uncoment when adding
+				*Optional: true back
 				Optional: true,
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
+				*/
 				Attributes: map[string]schema.Attribute{
 					"contact_form": schema.BoolAttribute{
 						Computed:    true,
-						Optional:    true,
 						Description: "Indicates whether WHOIS should display the contact form link",
+						/* uncoment when adding
 						PlanModifiers: []planmodifier.Bool{
 							boolplanmodifier.UseStateForUnknown(),
 						},
+						*/
 					},
 					"level": schema.StringAttribute{
 						Computed:    true,
-						Optional:    true,
 						Description: "Privacy level: public or high",
+						/* uncoment when adding
+						Optional: true back
 						Validators: []validator.String{
 							stringvalidator.OneOf("public", "high"),
 						},
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
 						},
+						*/
+
 					},
 				},
 			},
@@ -467,14 +474,10 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	var (
-		planPrivacy  privacyProtection
-		statePrivacy privacyProtection
-		planNS       nameservers
-		stateNS      nameservers
+		planNS  nameservers
+		stateNS nameservers
 	)
 
-	planHasPrivacy := !plan.PrivacyProtection.IsUnknown() && !plan.PrivacyProtection.IsNull()
-	stateHasPrivacy := !state.PrivacyProtection.IsUnknown() && !state.PrivacyProtection.IsNull()
 	planHasNameservers := !plan.Nameservers.IsUnknown() && !plan.Nameservers.IsNull()
 	stateHasNameservers := !state.Nameservers.IsUnknown() && !state.Nameservers.IsNull()
 
@@ -502,48 +505,50 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	// check privacy protection changes
-	if planHasPrivacy {
-		// check each field separately
-		resp.Diagnostics.Append(plan.PrivacyProtection.As(ctx, &planPrivacy, basetypes.ObjectAsOptions{})...)
-		if stateHasPrivacy {
-			resp.Diagnostics.Append(state.PrivacyProtection.As(ctx, &statePrivacy, basetypes.ObjectAsOptions{})...)
-		}
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		// update level first as contact_form preference depends on it being supported
-		if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() &&
-			(!stateHasPrivacy || !planPrivacy.Level.Equal(statePrivacy.Level)) {
-			tflog.Debug(ctx, "privacy level changed")
-
-			err := d.client.UpdateDomainPrivacyPreference(ctx, domainName, PrivacyLevel(planPrivacy.Level.ValueString()))
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to update privacy_protection level", err.Error())
+	/*
+		// check privacy protection changes
+		if planHasPrivacy {
+			// check each field separately
+			resp.Diagnostics.Append(plan.PrivacyProtection.As(ctx, &planPrivacy, basetypes.ObjectAsOptions{})...)
+			if stateHasPrivacy {
+				resp.Diagnostics.Append(state.PrivacyProtection.As(ctx, &statePrivacy, basetypes.ObjectAsOptions{})...)
+			}
+			if resp.Diagnostics.HasError() {
 				return
 			}
 
-		}
+			// update level first as contact_form preference depends on it being supported
+			if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() &&
+				(!stateHasPrivacy || !planPrivacy.Level.Equal(statePrivacy.Level)) {
+				tflog.Debug(ctx, "privacy level changed")
 
-		//check contact_form
-		if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() &&
-			(!stateHasPrivacy || !planPrivacy.ContactForm.Equal(statePrivacy.ContactForm)) {
-			tflog.Debug(ctx, "contact_form changed")
+				err := d.client.UpdateDomainPrivacyPreference(ctx, domainName, PrivacyLevel(planPrivacy.Level.ValueString()))
+				if err != nil {
+					resp.Diagnostics.AddError("Failed to update privacy_protection level", err.Error())
+					return
+				}
 
-			err := d.client.UpdateDomainEmailProtectionPreference(ctx, domainName, planPrivacy.ContactForm.ValueBool())
-			if err != nil {
-				tflog.Debug(ctx, "Failed to update privacy_protection contact_form", map[string]any{
-					"contact_form_type":      fmt.Sprintf("%T", planPrivacy.ContactForm.ValueBool()),
-					"contact_form_new_value": planPrivacy.ContactForm.ValueBool(),
-					"error":                  err.Error(),
-				},
-				)
-				resp.Diagnostics.AddError("Failed to update privacy_protection contact_form", err.Error())
-				return
+			}
+
+			//check contact_form
+			if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() &&
+				(!stateHasPrivacy || !planPrivacy.ContactForm.Equal(statePrivacy.ContactForm)) {
+				tflog.Debug(ctx, "contact_form changed")
+
+				err := d.client.UpdateDomainEmailProtectionPreference(ctx, domainName, planPrivacy.ContactForm.ValueBool())
+				if err != nil {
+					tflog.Debug(ctx, "Failed to update privacy_protection contact_form", map[string]any{
+						"contact_form_type":      fmt.Sprintf("%T", planPrivacy.ContactForm.ValueBool()),
+						"contact_form_new_value": planPrivacy.ContactForm.ValueBool(),
+						"error":                  err.Error(),
+					},
+					)
+					resp.Diagnostics.AddError("Failed to update privacy_protection contact_form", err.Error())
+					return
+				}
 			}
 		}
-	}
+	*/
 
 	//check nameservers changes
 	if planHasNameservers {
@@ -663,6 +668,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 	state.Contacts = contactObj
 
+	/* privary protection read only
 	ppObject, diags := privacyProtectionToTerraformObject(ctx, domainInfo.PrivacyProtection)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
@@ -670,29 +676,30 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	// prefer explicit plan values when provided to avoid transient backend lag
-	ppAttrTypes := map[string]attr.Type{
-		"contact_form": types.BoolType,
-		"level":        types.StringType,
-	}
-	ppValues := map[string]attr.Value{
-		"contact_form": ppObject.Attributes()["contact_form"],
-		"level":        ppObject.Attributes()["level"],
-	}
-	if planHasPrivacy {
-		if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() {
-			ppValues["contact_form"] = planPrivacy.ContactForm
+		ppAttrTypes := map[string]attr.Type{
+			"contact_form": types.BoolType,
+			"level":        types.StringType,
 		}
-		if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() {
-			ppValues["level"] = planPrivacy.Level
+		ppValues := map[string]attr.Value{
+			"contact_form": ppObject.Attributes()["contact_form"],
+			"level":        ppObject.Attributes()["level"],
 		}
-	}
+		if planHasPrivacy {
+			if !planPrivacy.ContactForm.IsUnknown() && !planPrivacy.ContactForm.IsNull() {
+				ppValues["contact_form"] = planPrivacy.ContactForm
+			}
+			if !planPrivacy.Level.IsUnknown() && !planPrivacy.Level.IsNull() {
+				ppValues["level"] = planPrivacy.Level
+			}
+		}
 
-	statePrivacyObject, ppDiag := types.ObjectValue(ppAttrTypes, ppValues)
-	resp.Diagnostics.Append(ppDiag...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	state.PrivacyProtection = statePrivacyObject
+		statePrivacyObject, ppDiag := types.ObjectValue(ppAttrTypes, ppValues)
+		resp.Diagnostics.Append(ppDiag...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		state.PrivacyProtection = statePrivacyObject
+	*/
 
 	stateNsObject, nsDiag := nameseversToTerraformObject(ctx, domainInfo.Nameservers)
 	resp.Diagnostics.Append(nsDiag...)
@@ -720,10 +727,7 @@ type domainResourceModel struct {
 	Nameservers types.Object `tfsdk:"nameservers"`
 
 	//read only
-
-	// TODO move to read only
-	PrivacyProtection types.Object `tfsdk:"privacy_protection"`
-
+	PrivacyProtection  types.Object `tfsdk:"privacy_protection"`
 	Name               types.String `tfsdk:"name"`
 	UnicodeName        types.String `tfsdk:"unicode_name"`
 	IsPremium          types.Bool   `tfsdk:"is_premium"`

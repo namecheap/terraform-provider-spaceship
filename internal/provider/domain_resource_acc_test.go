@@ -130,6 +130,7 @@ resource "spaceship_domain" "this" {
 	})
 }
 
+/*
 func TestAccDomain_privacyProtection(t *testing.T) {
 	t.Setenv("TF_LOG", "DEBUG")
 
@@ -172,7 +173,7 @@ resource "spaceship_domain" "this" {
 	domain = "dmytrovovk.com"
 
 	privacy_protection =  {
-		contact_form = true 
+		contact_form = true
 		level = "public"
 	}
 }
@@ -230,6 +231,7 @@ resource "spaceship_domain" "this" {
 		},
 	})
 }
+*/
 
 func TestAccDomain_nameservers(t *testing.T) {
 
