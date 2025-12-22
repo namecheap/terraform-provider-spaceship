@@ -19,6 +19,8 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	},
 }
 
+const testAccDefaultDomain = "dmytrovovk.com"
+
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
@@ -29,10 +31,6 @@ func testAccPreCheck(t *testing.T) {
 	if os.Getenv("SPACESHIP_API_SECRET") == "" {
 		t.Skip("SPACESHIP_API_SECRET must be set for acceptance testing")
 	}
-
-	if os.Getenv("SPACESHIP_TEST_DOMAIN") == "" {
-		t.Skip("SPACESHIP_TEST_DOMAIN must be set for acceptance testing")
-	}
 }
 
 func testAccClient() *Client {
@@ -41,6 +39,18 @@ func testAccClient() *Client {
 		os.Getenv("SPACESHIP_API_KEY"),
 		os.Getenv("SPACESHIP_API_SECRET"),
 	)
+}
+
+func testAccDomainValue() string {
+	if domain := os.Getenv("SPACESHIP_TEST_DOMAIN"); domain != "" {
+		return domain
+	}
+	return testAccDefaultDomain
+}
+
+func testAccDomainName(t *testing.T) string {
+	t.Helper()
+	return testAccDomainValue()
 }
 
 func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {

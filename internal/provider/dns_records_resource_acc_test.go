@@ -14,7 +14,7 @@ import (
 func TestAccDNSRecords_basicTypes(t *testing.T) {
 	testAccPreCheck(t)
 
-	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	domain := testAccDomainName(t)
 	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
 	if prefix == "" {
 		prefix = "tfacc"
@@ -113,7 +113,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 	testAccPreCheck(t)
 
-	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	domain := testAccDomainName(t)
 	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
 	if prefix == "" {
 		prefix = "tfacc"
@@ -188,7 +188,7 @@ func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
 	testAccPreCheck(t)
 
-	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	domain := testAccDomainName(t)
 	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
 	if prefix == "" {
 		prefix = "tfacc"
@@ -241,7 +241,7 @@ func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
 func TestAccDNSRecords_invalidRecordNameFailsPlan(t *testing.T) {
 	testAccPreCheck(t)
 
-	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
+	domain := testAccDomainName(t)
 
 	records := []testAccDNSRecord{
 		{

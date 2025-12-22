@@ -12,10 +12,10 @@ const (
 	dataSource               = "spaceship_domain_info"
 	dataSourceResourceName   = "this"
 	domainInfoDataSourceName = "data." + dataSource + "." + dataSourceResourceName
-	domainName               = "dmytrovovk.com"
 )
 
 func TestAccDomainInfo_basic(t *testing.T) {
+	domainName := testAccDomainName(t)
 	template := `
 provider "spaceship" {}
 
@@ -31,7 +31,7 @@ data "%s" "%s" {
 			{
 				Config: fmt.Sprintf(template, dataSource, dataSourceResourceName, domainName),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					domainInfoBasicsChecks(),
+					domainInfoBasicsChecks(domainName),
 					domainInfoPrivacyProtectionChecks(),
 					domainInfoNameserverChecks(),
 					domainInfoContactChecks(),
@@ -43,7 +43,7 @@ data "%s" "%s" {
 
 }
 
-func domainInfoBasicsChecks() resource.TestCheckFunc {
+func domainInfoBasicsChecks(domainName string) resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectAttrValues(domainInfoDataSourceName, []attrExpectation{
 			{Attribute: "name", Value: domainName},
