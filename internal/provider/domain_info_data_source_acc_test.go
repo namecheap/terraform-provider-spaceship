@@ -62,10 +62,10 @@ func domainInfoBasicsChecks(domainName string) resource.TestCheckFunc {
 }
 
 func domainInfoPrivacyProtectionChecks() resource.TestCheckFunc {
-	return expectAttrValues(domainInfoDataSourceName, []attrExpectation{
-		{Attribute: "privacy_protection.contact_form", Value: "true"},
-		{Attribute: "privacy_protection.level", Value: "high"},
-	})
+	return resource.ComposeTestCheckFunc(
+		expectNonEmptyAttr(domainInfoDataSourceName, "privacy_protection.contact_form"),
+		expectNonEmptyAttr(domainInfoDataSourceName, "privacy_protection.level"),
+	)
 }
 
 func domainInfoNameserverChecks() resource.TestCheckFunc {

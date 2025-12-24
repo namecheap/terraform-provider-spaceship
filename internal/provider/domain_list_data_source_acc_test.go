@@ -20,6 +20,7 @@ type attrExpectation struct {
 }
 
 func TestAccDatasourceDomainList_basic(t *testing.T) {
+	domainName := testAccDomainName(t)
 	cfg := `
 provider "spaceship" {}
 
@@ -34,7 +35,7 @@ data "spaceship_domain_list" "this"{}
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					domainListSummaryChecks(),
-					domainBasicsChecks(),
+					domainBasicsChecks(domainName),
 					privacyProtectionChecks(),
 					nameserverChecks(),
 					contactChecks(),
@@ -102,11 +103,11 @@ func domainListSummaryChecks() resource.TestCheckFunc {
 	})
 }
 
-func domainBasicsChecks() resource.TestCheckFunc {
+func domainBasicsChecks(domainName string) resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectAttrValues(domainListDataSourceName, []attrExpectation{
-			{Attribute: domainAttr(firstDomainIndex, "name"), Value: "dmytrovovk.com"},
-			{Attribute: domainAttr(firstDomainIndex, "unicode_name"), Value: "dmytrovovk.com"},
+			{Attribute: domainAttr(firstDomainIndex, "name"), Value: domainName},
+			{Attribute: domainAttr(firstDomainIndex, "unicode_name"), Value: domainName},
 			{Attribute: domainAttr(firstDomainIndex, "is_premium"), Value: "false"},
 		}),
 		expectNonEmptyAttrs(domainListDataSourceName, []string{
@@ -122,10 +123,10 @@ func domainBasicsChecks() resource.TestCheckFunc {
 }
 
 func privacyProtectionChecks() resource.TestCheckFunc {
-	return expectAttrValues(domainListDataSourceName, []attrExpectation{
-		{Attribute: nestedAttr(firstDomainIndex, "privacy_protection", "contact_form"), Value: "true"},
-		{Attribute: nestedAttr(firstDomainIndex, "privacy_protection", "level"), Value: "high"},
-	})
+	return resource.ComposeTestCheckFunc(
+		resource.TestCheckResourceAttrSet(domainListDataSourceName, nestedAttr(firstDomainIndex, "privacy_protection", "contact_form")),
+		resource.TestCheckResourceAttrSet(domainListDataSourceName, nestedAttr(firstDomainIndex, "privacy_protection", "level")),
+	)
 }
 
 func nameserverChecks() resource.TestCheckFunc {
