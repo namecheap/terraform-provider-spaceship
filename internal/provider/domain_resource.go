@@ -325,6 +325,12 @@ func (d *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 
 func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if req.Plan.Raw.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Resource Destruction Considerations",
+			"Applying this resource destruction will only remove the resource from the Terraform state "+
+				"and will not call the deletion API due to nature of domain specifics."+
+				"Your registered domain and its settings would remain intact",
+		)
 		return
 	}
 
