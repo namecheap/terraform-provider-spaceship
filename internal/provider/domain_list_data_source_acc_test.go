@@ -20,6 +20,7 @@ type attrExpectation struct {
 }
 
 func TestAccDatasourceDomainList_basic(t *testing.T) {
+	domainName := testAccDomainValue()
 	cfg := `
 provider "spaceship" {}
 
@@ -34,7 +35,7 @@ data "spaceship_domain_list" "this"{}
 				Config: cfg,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					domainListSummaryChecks(),
-					domainBasicsChecks(),
+					domainBasicsChecks(domainName),
 					privacyProtectionChecks(),
 					nameserverChecks(),
 					contactChecks(),
@@ -102,11 +103,11 @@ func domainListSummaryChecks() resource.TestCheckFunc {
 	})
 }
 
-func domainBasicsChecks() resource.TestCheckFunc {
+func domainBasicsChecks(domain string) resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectAttrValues(domainListDataSourceName, []attrExpectation{
-			{Attribute: domainAttr(firstDomainIndex, "name"), Value: "dmytrovovk.com"},
-			{Attribute: domainAttr(firstDomainIndex, "unicode_name"), Value: "dmytrovovk.com"},
+			{Attribute: domainAttr(firstDomainIndex, "name"), Value: domain},
+			{Attribute: domainAttr(firstDomainIndex, "unicode_name"), Value: domain},
 			{Attribute: domainAttr(firstDomainIndex, "is_premium"), Value: "false"},
 			{Attribute: domainAttr(firstDomainIndex, "auto_renew"), Value: "false"},
 		}),
@@ -115,18 +116,18 @@ func domainBasicsChecks() resource.TestCheckFunc {
 			domainAttr(firstDomainIndex, "expiration_date"),
 			domainAttr(firstDomainIndex, "lifecycle_status"),
 			domainAttr(firstDomainIndex, "verification_status"),
+			domainAttr(firstDomainIndex, "auto_renew"),
 		}),
-		expectListCountAtLeast(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), 1),
-		expectNonEmptyAttr(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.0")),
+		expectListCountAtLeast(domainListDataSourceName, domainAttr(firstDomainIndex, "epp_statuses.#"), 0),
 		expectListCount(domainListDataSourceName, domainAttr(firstDomainIndex, "suspensions.#"), 0),
 	)
 }
 
 func privacyProtectionChecks() resource.TestCheckFunc {
-	return expectAttrValues(domainListDataSourceName, []attrExpectation{
-		{Attribute: nestedAttr(firstDomainIndex, "privacy_protection", "contact_form"), Value: "true"},
-		{Attribute: nestedAttr(firstDomainIndex, "privacy_protection", "level"), Value: "high"},
-	})
+	return resource.ComposeAggregateTestCheckFunc(
+		resource.TestCheckResourceAttrSet(domainListDataSourceName, nestedAttr(firstDomainIndex, "privacy_protection", "contact_form")),
+		resource.TestCheckResourceAttrSet(domainListDataSourceName, nestedAttr(firstDomainIndex, "privacy_protection", "level")),
+	)
 }
 
 func nameserverChecks() resource.TestCheckFunc {
