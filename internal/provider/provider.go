@@ -117,6 +117,7 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewDNSRecordsResource,
+		NewDomainResource,
 	}
 }
 
