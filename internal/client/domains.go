@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -56,28 +55,8 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 
 	endpoint := fmt.Sprintf("%s/domains?take=100&skip=0&orderBy=name", c.baseURL)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-
-	if err != nil {
-		return domainList, fmt.Errorf("create request: %w", err)
-	}
-
-	c.applyAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return domainList, fmt.Errorf("execute request: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return domainList, c.errorFromResponse(resp)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&domainList); err != nil {
-		return domainList, fmt.Errorf("decode response: %w", err)
+	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
+		return domainList, err
 	}
 
 	return domainList, nil
@@ -88,28 +67,8 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 
 	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-
-	if err != nil {
-		return domainInfo, fmt.Errorf("create request: %w", err)
-	}
-
-	c.applyAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return domainInfo, fmt.Errorf("execute request: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return domainInfo, c.errorFromResponse(resp)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&domainInfo); err != nil {
-		return domainInfo, fmt.Errorf("decode response: %w", err)
+	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo); err != nil {
+		return domainInfo, err
 	}
 	return domainInfo, nil
 }

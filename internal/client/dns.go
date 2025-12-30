@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -114,37 +113,11 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 
 		endpoint := fmt.Sprintf("%s/dns/records/%s?%s", c.baseURL, url.PathEscape(domain), query.Encode())
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-		if err != nil {
-			return nil, fmt.Errorf("create reqeust %w", err)
-		}
-		c.applyAuth(req)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("execute reqeust: %w", err)
-		}
-
 		var payload struct {
 			Items []DNSRecord `json:"items"`
 			Total int         `json:"total"`
 		}
-
-		func() {
-			defer resp.Body.Close()
-
-			if resp.StatusCode >= 300 {
-				err = c.errorFromResponse(resp)
-				return
-			}
-
-			if decodeErr := json.NewDecoder(resp.Body).Decode(&payload); decodeErr != nil {
-				err = fmt.Errorf("decode response: %w", decodeErr)
-				return
-			}
-		}()
-
-		if err != nil {
+		if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &payload); err != nil {
 			return nil, err
 		}
 
@@ -179,32 +152,11 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 		Items: records,
 	}
 
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request %w", err)
-	}
-
-	c.applyAuth(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("execute reqeust: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return c.errorFromResponse(resp)
+	if err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil); err != nil {
+		return err
 	}
 	return nil
 }
-
 
 // DeleteDNSRecords removed the specified DNS records.
 func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []DNSRecord) error {
@@ -214,36 +166,12 @@ func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []
 
 	endpoint := fmt.Sprintf("%s/dns/records/%s", c.baseURL, url.PathEscape(domain))
 
-	body, err := json.Marshal(records)
-	if err != nil {
-		return fmt.Errorf("marshal payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-
-	c.applyAuth(req)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return fmt.Errorf("execute request:%w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		err := c.errorFromResponse(resp)
+	if err := c.doJSON(ctx, http.MethodDelete, endpoint, records, nil); err != nil {
 		if IsNotFoundError(err) {
 			return nil
 		}
-
 		return err
 	}
-
 	return nil
 }
 
