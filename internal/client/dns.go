@@ -1,26 +1,14 @@
-package provider
+package client
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
-	"time"
 )
-
-// Client provides a thin wrapper around Spaceship API
-type Client struct {
-	baseURL    string
-	apiKey     string
-	apiSecret  string
-	httpClient *http.Client
-}
 
 // DNSRecord represents a DNS record managed through the Spaceship API.
 type DNSRecord struct {
@@ -105,36 +93,6 @@ func (p *PortValue) UnmarshallJSON(data []byte) error {
 	return fmt.Errorf("invalid port value: %s", string(data))
 }
 
-// represents an error response from the spaceship api
-type APIError struct {
-	Status  int
-	Message string
-}
-
-func (e *APIError) Error() string {
-	if e == nil {
-		return "<nil>"
-	}
-
-	if e.Message != "" {
-		return fmt.Sprintf("spaceship api error (status %d): %s", e.Status, e.Message)
-	}
-
-	return fmt.Sprintf("spaceship api error (status %d)", e.Status)
-}
-
-// created a new Spaceship API Client
-func NewClient(baseURL, apiKey, apiSecret string) *Client {
-	return &Client{
-		baseURL:   strings.TrimSuffix(baseURL, "/"),
-		apiKey:    apiKey,
-		apiSecret: apiSecret,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
-}
-
 const (
 	maxListPageSize     = 500
 	defaultRecordsOrder = "type"
@@ -205,34 +163,6 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 	return result, nil
 }
 
-func (c *Client) applyAuth(req *http.Request) {
-	req.Header.Set("X-API-Key", c.apiKey)
-	req.Header.Set("X-API-Secret", c.apiSecret)
-}
-
-func (c *Client) errorFromResponse(resp *http.Response) error {
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
-	if err != nil {
-		return &APIError{
-			Status: resp.StatusCode,
-		}
-	}
-
-	return &APIError{
-		Status:  resp.StatusCode,
-		Message: strings.TrimSpace(string(data)),
-	}
-}
-
-// returns true if the err represents 404 response
-func IsNotFoundError(err error) bool {
-	var apiErr *APIError
-	if !errors.As(err, &apiErr) {
-		return false
-	}
-	return apiErr.Status == http.StatusNotFound
-}
-
 // UpsertDNSRecords creates or updated DNS records for the supplied domain
 func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool, records []DNSRecord) error {
 	if len(records) == 0 {
@@ -274,6 +204,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 	}
 	return nil
 }
+
 
 // DeleteDNSRecords removed the specified DNS records.
 func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []DNSRecord) error {
@@ -328,111 +259,4 @@ func (c *Client) ClearDNSRecords(ctx context.Context, domain string, force bool)
 	}
 
 	return c.DeleteDNSRecords(ctx, domain, records)
-}
-
-type DomainList struct {
-	Items []DomainInfo `json:"items"`
-	Total int64        `json:"total"`
-}
-type DomainInfo struct {
-	Name               string            `json:"name"`
-	UnicodeName        string            `json:"unicodeName"`
-	IsPremium          bool              `json:"isPremium"`
-	AutoRenew          bool              `json:"autoRenew"`
-	RegistrationDate   string            `json:"registrationDate"`
-	ExpirationDate     string            `json:"expirationDate"`
-	LifecycleStatus    string            `json:"lifecycleStatus"`
-	VerificationStatus string            `json:"verificationStatus"`
-	EPPStatuses        []string          `json:"eppStatuses"`
-	Suspensions        []ReasonCode      `json:"suspensions"`
-	PrivacyProtection  PrivacyProtection `json:"privacyProtection"`
-	Nameservers        Nameservers       `json:"nameservers"`
-	Contacts           Contacts          `json:"contacts"`
-}
-
-type ReasonCode struct {
-	ReasonCode string `json:"reasonCode"`
-}
-
-type PrivacyProtection struct {
-	ContactForm bool   `json:"contactForm"`
-	Level       string `json:"level"`
-}
-
-type Nameservers struct {
-	Provider string   `json:"provider"`
-	Hosts    []string `json:"hosts"`
-}
-
-type Contacts struct {
-	Registrant string   `json:"registrant"`
-	Admin      string   `json:"admin"`
-	Tech       string   `json:"tech"`
-	Billing    string   `json:"billing"`
-	Attributes []string `json:"attributes"`
-}
-
-// TODO
-// create pagination later when there are more than 100 domains in account
-func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
-	var domainList DomainList
-
-	endpoint := fmt.Sprintf("%s/domains?take=100&skip=0&orderBy=name", c.baseURL)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-
-	if err != nil {
-		return domainList, fmt.Errorf("create request: %w", err)
-	}
-
-	c.applyAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return domainList, fmt.Errorf("execute request: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return domainList, c.errorFromResponse(resp)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&domainList); err != nil {
-		return domainList, fmt.Errorf("decode response: %w", err)
-	}
-
-	return domainList, nil
-}
-
-func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
-	var domainInfo DomainInfo
-
-	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
-
-	if err != nil {
-		return domainInfo, fmt.Errorf("create request: %w", err)
-	}
-
-	c.applyAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-
-	if err != nil {
-		return domainInfo, fmt.Errorf("execute request: %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		return domainInfo, c.errorFromResponse(resp)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&domainInfo); err != nil {
-		return domainInfo, fmt.Errorf("decode response: %w", err)
-	}
-	return domainInfo, nil
 }

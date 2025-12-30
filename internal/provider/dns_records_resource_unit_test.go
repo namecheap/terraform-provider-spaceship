@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -56,7 +58,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 	cases := []struct {
 		name     string
 		model    dnsRecordModel
-		expected DNSRecord
+		expected client.DNSRecord
 	}{
 		{
 			name: "A",
@@ -65,7 +67,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:    types.StringValue("a"),
 				Address: types.StringValue("192.0.2.1"),
 			},
-			expected: DNSRecord{Type: "A", Name: "a", TTL: 3600, Address: "192.0.2.1"},
+			expected: client.DNSRecord{Type: "A", Name: "a", TTL: 3600, Address: "192.0.2.1"},
 		},
 		{
 			name: "AAAA",
@@ -74,7 +76,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:    types.StringValue("ipv6"),
 				Address: types.StringValue("2001:db8::1"),
 			},
-			expected: DNSRecord{Type: "AAAA", Name: "ipv6", TTL: 3600, Address: "2001:db8::1"},
+			expected: client.DNSRecord{Type: "AAAA", Name: "ipv6", TTL: 3600, Address: "2001:db8::1"},
 		},
 		{
 			name: "ALIAS",
@@ -83,7 +85,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:      types.StringValue("alias"),
 				AliasName: types.StringValue("@"),
 			},
-			expected: DNSRecord{Type: "ALIAS", Name: "alias", TTL: 3600, AliasName: "@"},
+			expected: client.DNSRecord{Type: "ALIAS", Name: "alias", TTL: 3600, AliasName: "@"},
 		},
 		{
 			name: "CAA",
@@ -94,7 +96,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Tag:   types.StringValue("issue"),
 				Value: types.StringValue("letsencrypt.org"),
 			},
-			expected: DNSRecord{Type: "CAA", Name: "caa", TTL: 3600, Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"},
+			expected: client.DNSRecord{Type: "CAA", Name: "caa", TTL: 3600, Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"},
 		},
 		{
 			name: "CNAME",
@@ -103,7 +105,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:  types.StringValue("cname"),
 				CName: types.StringValue("origin.example.com"),
 			},
-			expected: DNSRecord{Type: "CNAME", Name: "cname", TTL: 3600, CName: "origin.example.com"},
+			expected: client.DNSRecord{Type: "CNAME", Name: "cname", TTL: 3600, CName: "origin.example.com"},
 		},
 		{
 			name: "HTTPS",
@@ -116,7 +118,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Port:        types.StringValue("_8443"),
 				Scheme:      types.StringValue("_https"),
 			},
-			expected: DNSRecord{Type: "HTTPS", Name: "https", TTL: 3600, SvcPriority: intPtr(1), TargetName: "_8443._https.example.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_8443"), Scheme: "_https"},
+			expected: client.DNSRecord{Type: "HTTPS", Name: "https", TTL: 3600, SvcPriority: intPtr(1), TargetName: "_8443._https.example.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_8443"), Scheme: "_https"},
 		},
 		{
 			name: "MX",
@@ -126,7 +128,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Exchange:   types.StringValue("mail.example.com"),
 				Preference: types.Int64Value(10),
 			},
-			expected: DNSRecord{Type: "MX", Name: "mx", TTL: 3600, Exchange: "mail.example.com", Preference: intPtr(10)},
+			expected: client.DNSRecord{Type: "MX", Name: "mx", TTL: 3600, Exchange: "mail.example.com", Preference: intPtr(10)},
 		},
 		{
 			name: "NS",
@@ -135,7 +137,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:       types.StringValue("ns"),
 				Nameserver: types.StringValue("ns1.example.com"),
 			},
-			expected: DNSRecord{Type: "NS", Name: "ns", TTL: 3600, Nameserver: "ns1.example.com"},
+			expected: client.DNSRecord{Type: "NS", Name: "ns", TTL: 3600, Nameserver: "ns1.example.com"},
 		},
 		{
 			name: "PTR",
@@ -144,7 +146,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:    types.StringValue("ptr"),
 				Pointer: types.StringValue("ptr.example.com"),
 			},
-			expected: DNSRecord{Type: "PTR", Name: "ptr", TTL: 3600, Pointer: "ptr.example.com"},
+			expected: client.DNSRecord{Type: "PTR", Name: "ptr", TTL: 3600, Pointer: "ptr.example.com"},
 		},
 		{
 			name: "SRV",
@@ -158,7 +160,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				PortNumber: types.Int64Value(5060),
 				Target:     types.StringValue("srv.example.com"),
 			},
-			expected: DNSRecord{Type: "SRV", Name: "_sip._tcp", TTL: 3600, Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10), Port: NewIntPortValue(5060), Target: "srv.example.com"},
+			expected: client.DNSRecord{Type: "SRV", Name: "_sip._tcp", TTL: 3600, Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10), Port: client.NewIntPortValue(5060), Target: "srv.example.com"},
 		},
 		{
 			name: "SVCB",
@@ -171,7 +173,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Port:        types.StringValue("_853"),
 				Scheme:      types.StringValue("_dot"),
 			},
-			expected: DNSRecord{Type: "SVCB", Name: "svcb", TTL: 3600, SvcPriority: intPtr(1), TargetName: "svc.example.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"},
+			expected: client.DNSRecord{Type: "SVCB", Name: "svcb", TTL: 3600, SvcPriority: intPtr(1), TargetName: "svc.example.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"},
 		},
 		{
 			name: "TLSA",
@@ -185,7 +187,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Matching:        types.Int64Value(1),
 				AssociationData: types.StringValue("7F83B1657FF1FC53"),
 			},
-			expected: DNSRecord{Type: "TLSA", Name: "_443._tcp", TTL: 3600, Port: NewStringPortValue("_443"), Protocol: "_tcp", Usage: intPtr(2), Selector: intPtr(1), Matching: intPtr(1), AssociationData: "7F83B1657FF1FC53"},
+			expected: client.DNSRecord{Type: "TLSA", Name: "_443._tcp", TTL: 3600, Port: client.NewStringPortValue("_443"), Protocol: "_tcp", Usage: intPtr(2), Selector: intPtr(1), Matching: intPtr(1), AssociationData: "7F83B1657FF1FC53"},
 		},
 		{
 			name: "TXT",
@@ -194,7 +196,7 @@ func TestExpandDNSRecords_AllTypes(t *testing.T) {
 				Name:  types.StringValue("txt"),
 				Value: types.StringValue("hello"),
 			},
-			expected: DNSRecord{Type: "TXT", Name: "txt", TTL: 3600, Value: "hello"},
+			expected: client.DNSRecord{Type: "TXT", Name: "txt", TTL: 3600, Value: "hello"},
 		},
 	}
 
@@ -229,7 +231,7 @@ func TestExpandDNSRecords_MissingAddress(t *testing.T) {
 }
 
 func TestDiffDNSRecords_NoChanges(t *testing.T) {
-	existing := []DNSRecord{
+	existing := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 3600},
 	}
 
@@ -245,10 +247,10 @@ func TestDiffDNSRecords_NoChanges(t *testing.T) {
 }
 
 func TestDiffDNSRecords_AddressChange(t *testing.T) {
-	existing := []DNSRecord{
+	existing := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 3600},
 	}
-	desired := []DNSRecord{
+	desired := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.11", TTL: 3600},
 	}
 
@@ -264,10 +266,10 @@ func TestDiffDNSRecords_AddressChange(t *testing.T) {
 }
 
 func TestDiffDNSRecords_TTLChange(t *testing.T) {
-	existing := []DNSRecord{
+	existing := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 3600},
 	}
-	desired := []DNSRecord{
+	desired := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 600},
 	}
 
@@ -283,11 +285,11 @@ func TestDiffDNSRecords_TTLChange(t *testing.T) {
 }
 
 func TestDiffDNSRecords_RecordRemoval(t *testing.T) {
-	existing := []DNSRecord{
+	existing := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 3600},
 		{Type: "A", Name: "tf2", Address: "198.51.100.11", TTL: 3600},
 	}
-	desired := []DNSRecord{
+	desired := []client.DNSRecord{
 		{Type: "A", Name: "tf", Address: "198.51.100.10", TTL: 3600},
 	}
 
@@ -303,13 +305,13 @@ func TestDiffDNSRecords_RecordRemoval(t *testing.T) {
 }
 
 func TestOrderDNSRecordsLike(t *testing.T) {
-	reference := []DNSRecord{
+	reference := []client.DNSRecord{
 		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
 		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
 		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
 	}
 
-	records := []DNSRecord{
+	records := []client.DNSRecord{
 		{Type: "TXT", Name: "@", Value: "hi", TTL: 3600},
 		{Type: "AAAA", Name: "@", Address: "2001:db8::1", TTL: 3600},
 		{Type: "A", Name: "@", Address: "198.51.100.10", TTL: 3600},
@@ -323,10 +325,10 @@ func TestOrderDNSRecordsLike(t *testing.T) {
 }
 
 func TestRecordValueSignatureTLSA(t *testing.T) {
-	rec1 := DNSRecord{
+	rec1 := client.DNSRecord{
 		Type:            "TLSA",
 		Name:            "_443._tcp",
-		Port:            NewStringPortValue("_443"),
+		Port:            client.NewStringPortValue("_443"),
 		Protocol:        "_tcp",
 		Usage:           intPtr(2),
 		Selector:        intPtr(1),
@@ -334,10 +336,10 @@ func TestRecordValueSignatureTLSA(t *testing.T) {
 		AssociationData: "7F83B1 657FF1FC53",
 	}
 
-	rec2 := DNSRecord{
+	rec2 := client.DNSRecord{
 		Type:            "TLSA",
 		Name:            "_443._tcp",
-		Port:            NewStringPortValue("_443"),
+		Port:            client.NewStringPortValue("_443"),
 		Protocol:        "_tcp",
 		Usage:           intPtr(2),
 		Selector:        intPtr(1),

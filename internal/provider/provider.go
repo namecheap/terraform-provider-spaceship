@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -103,7 +105,7 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client := NewClient(defaultBaseURL, apiKey, apiSecret)
+	client := client.NewClient(defaultBaseURL, apiKey, apiSecret)
 	//map of any type could be improved at least in this case?
 	// or it will not work for empty interface?
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{

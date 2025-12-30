@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -20,7 +22,7 @@ func NewDomainResource() resource.Resource {
 }
 
 type domainResource struct {
-	client *Client
+	client *client.Client
 }
 
 type domainResourceModel struct {
@@ -99,9 +101,9 @@ func (d *domainResource) Configure(ctx context.Context, req resource.ConfigureRe
 		return
 	}
 
-	client, ok := req.ProviderData.(*Client)
+	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *Client got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client got %T", req.ProviderData))
 		return
 	}
 
@@ -110,7 +112,7 @@ func (d *domainResource) Configure(ctx context.Context, req resource.ConfigureRe
 
 func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan domainResourceModel
-	var domainInfo DomainInfo
+	var domainInfo client.DomainInfo
 
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)

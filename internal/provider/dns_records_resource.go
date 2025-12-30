@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/dlclark/regexp2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -85,7 +87,7 @@ func NewDNSRecordsResource() resource.Resource {
 }
 
 type dnsRecordsResource struct {
-	client *Client
+	client *client.Client
 }
 
 type dnsRecordsResourceModel struct {
@@ -380,9 +382,9 @@ func (r *dnsRecordsResource) Configure(_ context.Context, req resource.Configure
 		return
 	}
 
-	client, ok := req.ProviderData.(*Client)
+	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *Client, got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
 	r.client = client
@@ -468,7 +470,7 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 
 	apiRecords, err := r.client.GetDNSRecords(ctx, state.Domain.ValueString())
 	if err != nil {
-		if IsNotFoundError(err) {
+		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
 			return
 		}
@@ -579,7 +581,7 @@ func (r *dnsRecordsResource) ImportState(ctx context.Context, req resource.Impor
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("domain"), resourceID)...)
 }
 
-func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) ([]DNSRecord, diag.Diagnostics) {
+func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) ([]client.DNSRecord, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	if list.IsNull() || list.IsUnknown() {
@@ -592,7 +594,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 		return nil, diags
 	}
 
-	records := make([]DNSRecord, 0, len(models))
+	records := make([]client.DNSRecord, 0, len(models))
 
 	for idx, item := range models {
 		recordPath := listPath.AtListIndex(idx)
@@ -615,7 +617,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 			ttl = item.TTL.ValueInt64()
 		}
 
-		record := DNSRecord{
+		record := client.DNSRecord{
 			Type: recordType,
 			Name: name,
 			TTL:  int(ttl),
@@ -703,7 +705,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 				record.SvcParams = ""
 			}
 			if port, ok := getString(item.Port, "port"); ok {
-				record.Port = NewStringPortValue(port)
+				record.Port = client.NewStringPortValue(port)
 				if _, hasScheme := getString(item.Scheme, "scheme"); !hasScheme {
 					diags.AddAttributeError(recordPath.AtName("scheme"), "Missing scheme", "HTTPS records that specify `port` must also set `scheme` (usually `_https`)")
 					valid = false
@@ -760,7 +762,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 				valid = false
 			}
 			if port, ok := requireInt(item.PortNumber, "port_number", "SRV records require the `port_number` attribute(1-65535)."); ok {
-				record.Port = NewIntPortValue(port)
+				record.Port = client.NewIntPortValue(port)
 			} else {
 				valid = false
 			}
@@ -787,7 +789,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 				record.SvcParams = ""
 			}
 			if port, ok := getString(item.Port, "port"); ok {
-				record.Port = NewStringPortValue(port)
+				record.Port = client.NewStringPortValue(port)
 			}
 			if scheme, ok := getString(item.Scheme, "scheme"); ok {
 				record.Scheme = scheme
@@ -795,7 +797,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 
 		case "TLSA":
 			if port, ok := requireString(item.Port, "port", "TLSA records require the `port` attribute (for example `_443`)."); ok {
-				record.Port = NewStringPortValue(port)
+				record.Port = client.NewStringPortValue(port)
 			} else {
 				valid = false
 			}
@@ -847,7 +849,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 	return records, diags
 }
 
-func flattenDNSRecords(ctx context.Context, records []DNSRecord) (types.List, diag.Diagnostics) {
+func flattenDNSRecords(ctx context.Context, records []client.DNSRecord) (types.List, diag.Diagnostics) {
 	elements := make([]dnsRecordModel, 0, len(records))
 	for _, record := range records {
 		model := dnsRecordModel{
@@ -916,13 +918,13 @@ func flattenDNSRecords(ctx context.Context, records []DNSRecord) (types.List, di
 	return types.ListValueFrom(ctx, dnsRecordObjectType, elements)
 }
 
-func diffDNSRecords(existing, desired []DNSRecord) (toDelete, toUpsert []DNSRecord) {
-	desiredMap := make(map[string]DNSRecord, len(desired))
+func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []client.DNSRecord) {
+	desiredMap := make(map[string]client.DNSRecord, len(desired))
 	for _, record := range desired {
 		desiredMap[recordKey(record)] = record
 	}
 
-	existingMap := make(map[string]DNSRecord, len(existing))
+	existingMap := make(map[string]client.DNSRecord, len(existing))
 	for _, record := range existing {
 		existingMap[recordKey(record)] = record
 		if _, ok := desiredMap[recordKey(record)]; !ok {
@@ -950,18 +952,18 @@ func diffDNSRecords(existing, desired []DNSRecord) (toDelete, toUpsert []DNSReco
 	return toDelete, toUpsert
 }
 
-func recordKey(record DNSRecord) string {
+func recordKey(record client.DNSRecord) string {
 	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name) + "|" + recordValueSignature(record)
 }
 
-func orderDNSRecordsLike(reference, records []DNSRecord) []DNSRecord {
+func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSRecord {
 	if len(records) <= 1 || len(reference) == 0 {
 		return records
 	}
 
 	type keyedRecord struct {
 		key    string
-		record DNSRecord
+		record client.DNSRecord
 		used   bool
 	}
 
@@ -973,7 +975,7 @@ func orderDNSRecordsLike(reference, records []DNSRecord) []DNSRecord {
 		}
 	}
 
-	ordered := make([]DNSRecord, 0, len(records))
+	ordered := make([]client.DNSRecord, 0, len(records))
 
 	for _, ref := range reference {
 		key := recordKey(ref)
@@ -998,7 +1000,7 @@ func orderDNSRecordsLike(reference, records []DNSRecord) []DNSRecord {
 	return ordered
 }
 
-func recordValueSignature(record DNSRecord) string {
+func recordValueSignature(record client.DNSRecord) string {
 	var builder strings.Builder
 	write := func(parts ...string) {
 		for _, part := range parts {
@@ -1049,7 +1051,7 @@ func intToString(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
-func portValueSignature(port *PortValue) string {
+func portValueSignature(port *client.PortValue) string {
 	if port == nil {
 		return ""
 	}

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -42,8 +44,8 @@ func testAccDomainValue() string {
 
 }
 
-func testAccClient() *Client {
-	return NewClient(
+func testAccClient() *client.Client {
+	return client.NewClient(
 		defaultBaseURL,
 		os.Getenv("SPACESHIP_API_KEY"),
 		os.Getenv("SPACESHIP_API_SECRET"),
@@ -52,10 +54,10 @@ func testAccClient() *Client {
 
 func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		client := testAccClient()
-		records, err := client.GetDNSRecords(context.Background(), domain)
+		testClient := testAccClient()
+		records, err := testClient.GetDNSRecords(context.Background(), domain)
 		if err != nil {
-			if IsNotFoundError(err) {
+			if client.IsNotFoundError(err) {
 				return nil
 			}
 			return err
