@@ -67,8 +67,9 @@ The following arguments are supported in the provider block. All attributes are 
 
 ## Resources
 
-The Spaceship provider currently offers the following resource:
+The Spaceship provider currently offers the following resources:
 
+- `spaceship_domain` — Read domain metadata, including ASCII and Unicode representations of the name.
 - `spaceship_dns_records` — Manage the full DNS record set for a Spaceship-managed domain, replacing all records in each apply. The resource supports importing an existing domain by its name.
 
 ## Data Sources
