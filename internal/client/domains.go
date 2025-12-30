@@ -55,7 +55,7 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 
 	endpoint := fmt.Sprintf("%s/domains?take=100&skip=0&orderBy=name", c.baseURL)
 
-	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
+	if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
 		return domainList, err
 	}
 
@@ -67,8 +67,32 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 
 	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
 
-	if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo); err != nil {
+	// overcome insane API rate limiting
+	// by using alternative endpoint that does the same
+	// but has 60x times higher limits
+	statusCode, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo)
+	if statusCode == 429 {
+		domainList, _ := c.GetDomainList(ctx)
+
+		domainInfo, ok := findDomainByNameFromDomainList(domainList, domain)
+
+		if ok {
+			return domainInfo, nil
+		}
+
+	}
+
+	if err != nil {
 		return domainInfo, err
 	}
 	return domainInfo, nil
+}
+
+func findDomainByNameFromDomainList(dl DomainList, domain string) (DomainInfo, bool) {
+	for _, domainItem := range dl.Items {
+		if domainItem.Name == domain {
+			return domainItem, true
+		}
+	}
+	return DomainInfo{}, false
 }

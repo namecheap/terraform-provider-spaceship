@@ -117,7 +117,7 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 			Items []DNSRecord `json:"items"`
 			Total int         `json:"total"`
 		}
-		if err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &payload); err != nil {
+		if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &payload); err != nil {
 			return nil, err
 		}
 
@@ -152,7 +152,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 		Items: records,
 	}
 
-	if err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil); err != nil {
+	if _, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil); err != nil {
 		return err
 	}
 	return nil
@@ -166,7 +166,7 @@ func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []
 
 	endpoint := fmt.Sprintf("%s/dns/records/%s", c.baseURL, url.PathEscape(domain))
 
-	if err := c.doJSON(ctx, http.MethodDelete, endpoint, records, nil); err != nil {
+	if _, err := c.doJSON(ctx, http.MethodDelete, endpoint, records, nil); err != nil {
 		if IsNotFoundError(err) {
 			return nil
 		}
