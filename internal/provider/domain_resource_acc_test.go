@@ -2,9 +2,11 @@ package provider
 
 import (
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
 const (
@@ -25,6 +27,14 @@ resource "%s" "%s" {
 }
 `, providerName, domainResourceRef, domainResouceName, domainName)
 
+	templateDomainNameChanged := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+}
+`, providerName, domainResourceRef, domainResouceName, "spaceship.com")
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -36,6 +46,18 @@ resource "%s" "%s" {
 					resource.TestCheckResourceAttr(domainResourceReference, "name", domainName),
 					resource.TestCheckResourceAttr(domainResourceReference, "unicode_name", domainName),
 				),
+			},
+			// test for recreation on domain name change
+			{
+				Config: templateDomainNameChanged,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(domainResourceReference, plancheck.ResourceActionReplace),
+					},
+				},
+				// workaround when I have only one domain in account
+				// and cant use another one for now
+				ExpectError: regexp.MustCompile("spaceship api error"),
 			},
 		},
 	})
