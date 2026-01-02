@@ -63,3 +63,28 @@ resource "%s" "%s" {
 	})
 
 }
+
+func TestAccDomain_autoRenewal(t *testing.T) {
+	domainName := testAccDomainValue()
+
+	config := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+}
+`, providerName, domainResourceRef, domainResouceName, domainName)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// resource contains current autorenew value
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet(domainResourceReference, "auto_renewal"),
+				),
+			},
+		}})
+}
