@@ -7,7 +7,7 @@ This repository contains a Terraform provider that manages DNS records for domai
 ## Features
 
 - Configure Spaceship credentials via provider configuration or environment variables.
-- Read domain metadata, including ASCII and Unicode representations of the domain name.
+- Read domain metadata, including ASCII and Unicode representations of the domain name, and manage auto-renew settings.
 - Read the current DNS record set for an existing domain.
 - Replace the full list of DNS records in a single Terraform apply.
 - Enumerate every Spaceship-managed domain along with WHOIS, privacy, suspension, nameserver, and contact metadata via the `spaceship_domain_list` data source.
@@ -74,7 +74,8 @@ resource "spaceship_dns_records" "root" {
 }
 
 resource "spaceship_domain" "example" {
-  domain = "example.com"
+  domain     = "example.com"
+  auto_renew = true
 }
 ```
 

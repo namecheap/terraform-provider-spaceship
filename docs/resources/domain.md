@@ -2,18 +2,19 @@
 page_title: "spaceship_domain Resource - spaceship"
 subcategory: ""
 description: |-
-  Reads domain metadata for a Spaceship-managed domain.
+  Manages domain settings for a Spaceship-managed domain.
 ---
 
 # spaceship_domain (Resource)
 
-Use this resource to read metadata for an existing Spaceship domain and store the ASCII and Unicode forms of the name in state. The resource does not modify the domain in Spaceship.
+Use this resource to manage domain settings for an existing Spaceship domain and store the ASCII and Unicode forms of the name in state. Set `auto_renew` to enable or disable renewal automation.
 
 ## Example Usage
 
 ```hcl
 resource "spaceship_domain" "example" {
-  domain = "example.com"
+  domain     = "example.com"
+  auto_renew = true
 }
 ```
 
@@ -22,6 +23,10 @@ resource "spaceship_domain" "example" {
 ### Required
 
 - `domain` (String) Domain name to read from Spaceship.
+
+### Optional
+
+- `auto_renew` (Boolean) Whether the domain renews automatically. When omitted, the current setting is preserved.
 
 ### Read-Only
 
