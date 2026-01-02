@@ -10,22 +10,21 @@ import (
 )
 
 const (
-	providerName            = "spaceship"
-	domainResourceRef       = providerName + "_domain"
-	domainResouceName       = "this"
-	domainResourceReference = domainResourceRef + "." + domainResouceName
+	providerName           = "spaceship"
+	domainResourceRef      = providerName + "_domain"
+	domainResourceName     = "this"
+	domainResourceFullName = domainResourceRef + "." + domainResourceName
 )
 
-func TestAccDomain_basic(t *testing.T) {
-	domainName := testAccDomainValue()
-
-	template := fmt.Sprintf(`
+var emptyDomainResourceConfiguration = fmt.Sprintf(`
 provider "%s" {}
 
 resource "%s" "%s" {
 	domain = "%s"
 }
-`, providerName, domainResourceRef, domainResouceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+func TestAccDomain_basic(t *testing.T) {
 
 	templateDomainNameChanged := fmt.Sprintf(`
 provider "%s" {}
@@ -33,7 +32,7 @@ provider "%s" {}
 resource "%s" "%s" {
 	domain = "%s"
 }
-`, providerName, domainResourceRef, domainResouceName, "spaceship.com")
+`, providerName, domainResourceRef, domainResourceName, "spaceship.com")
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -41,10 +40,10 @@ resource "%s" "%s" {
 		Steps: []resource.TestStep{
 			// creation and deletion
 			{
-				Config: template,
+				Config: emptyDomainResourceConfiguration,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(domainResourceReference, "name", domainName),
-					resource.TestCheckResourceAttr(domainResourceReference, "unicode_name", domainName),
+					resource.TestCheckResourceAttr(domainResourceFullName, "name", domainName),
+					resource.TestCheckResourceAttr(domainResourceFullName, "unicode_name", domainName),
 				),
 			},
 			// test for recreation on domain name change
@@ -52,7 +51,7 @@ resource "%s" "%s" {
 				Config: templateDomainNameChanged,
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectResourceAction(domainResourceReference, plancheck.ResourceActionReplace),
+						plancheck.ExpectResourceAction(domainResourceFullName, plancheck.ResourceActionReplace),
 					},
 				},
 				// workaround when I have only one domain in account
@@ -65,15 +64,6 @@ resource "%s" "%s" {
 }
 
 func TestAccDomain_autoRenewal(t *testing.T) {
-	domainName := testAccDomainValue()
-
-	config := fmt.Sprintf(`
-provider "%s" {}
-
-resource "%s" "%s" {
-	domain = "%s"
-}
-`, providerName, domainResourceRef, domainResouceName, domainName)
 
 	configAutoRenewTrue := fmt.Sprintf(`
 provider "%s" {}
@@ -81,9 +71,9 @@ provider "%s" {}
 resource "%s" "%s" {
 	domain = "%s"
 	
-	auto_renew = "true"
+	auto_renew = true
 }
-`, providerName, domainResourceRef, domainResouceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, domainName)
 
 	configAutoRenewFalse := fmt.Sprintf(`
 provider "%s" {}
@@ -91,9 +81,9 @@ provider "%s" {}
 resource "%s" "%s" {
 	domain = "%s"
 	
-	auto_renew = "false"
+	auto_renew = false
 }
-`, providerName, domainResourceRef, domainResouceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, domainName)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -101,23 +91,23 @@ resource "%s" "%s" {
 		Steps: []resource.TestStep{
 			// resource contains current autorenew value
 			{
-				Config: config,
+				Config: emptyDomainResourceConfiguration,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(domainResourceReference, "auto_renew"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "auto_renew"),
 				),
 			},
 			// resource has auto_renew value true
 			{
 				Config: configAutoRenewTrue,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(domainResourceReference, "auto_renew", "true"),
+					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
 				),
 			},
 			// auto_renew value false
 			{
 				Config: configAutoRenewFalse,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(domainResourceReference, "auto_renew", "false"),
+					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "false"),
 				),
 			},
 		}})
