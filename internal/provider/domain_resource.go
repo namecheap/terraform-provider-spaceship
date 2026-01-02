@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -27,9 +28,10 @@ type domainResource struct {
 
 type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
-	Name   types.String `tfsdk:"name"`
 
+	Name        types.String `tfsdk:"name"`
 	UnicodeName types.String `tfsdk:"unicode_name"`
+	AutoRenewal types.Bool   `tfsdk:"auto_renewal"`
 }
 
 func (d *domainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -57,6 +59,14 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"name": schema.StringAttribute{
 				Computed:    true,
 				Description: "Domain name in ASCII format (A-label)",
+			},
+			"auto_renewal": schema.BoolAttribute{
+				Computed:    true,
+				Optional:    true,
+				Description: "Indicates whether the auto-renew option is enabled",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -91,6 +101,7 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	state.Name = types.StringValue(domainInfo.Name)
 	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
+	state.AutoRenewal = types.BoolValue(domainInfo.AutoRenew)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -133,6 +144,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
 	state.Name = types.StringValue(domainInfo.Name)
+	state.AutoRenewal = types.BoolValue(domainInfo.AutoRenew)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -168,6 +180,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
 	state.Name = types.StringValue(domainInfo.Name)
+	state.AutoRenewal = types.BoolValue(domainInfo.AutoRenew)
 
 	state.Domain = plan.Domain
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
