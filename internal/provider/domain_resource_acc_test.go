@@ -75,6 +75,16 @@ resource "%s" "%s" {
 }
 `, providerName, domainResourceRef, domainResouceName, domainName)
 
+	configAutoRenewTrue := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	auto_renew = "true"
+}
+`, providerName, domainResourceRef, domainResouceName, domainName)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -83,7 +93,14 @@ resource "%s" "%s" {
 			{
 				Config: config,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(domainResourceReference, "auto_renewal"),
+					resource.TestCheckResourceAttrSet(domainResourceReference, "auto_renew"),
+				),
+			},
+			// resource has auto_renew value true
+			{
+				Config: configAutoRenewTrue,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceReference, "auto_renew", "true"),
 				),
 			},
 		}})
