@@ -292,11 +292,12 @@ func (d *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 }
 
 func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Handle destruction
 	if req.Plan.Raw.IsNull() {
 		resp.Diagnostics.AddWarning(
 			"Resource Destruction Considerations",
 			"Applying this resource destruction will only remove the resource from the Terraform state "+
-				"and will not call the deletion API due to nature of domain specifics."+
+				"and will not call the deletion API due to nature of domain specifics. "+
 				"Your registered domain and its settings would remain intact",
 		)
 		return
@@ -318,42 +319,28 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 		return
 	}
 
-	planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
-	planProvider := client.NameserverProvider(planNS.Provider.ValueString())
-	if planProviderKnown && planProvider == client.BasicNameserverProvider {
-		defaultHosts := client.DefaultBasicNameserverHosts()
-		sort.Strings(defaultHosts)
+	// Determine which hosts to set
+	var hostsToSet []string
 
-		defaultSet, diags := types.SetValueFrom(ctx, types.StringType, defaultHosts)
-		resp.Diagnostics.Append(diags...)
+	// ValueString() returns "" for null/unknown, which won't match "basic"
+	if planNS.Provider.ValueString() == string(client.BasicNameserverProvider) {
+		hostsToSet = client.DefaultBasicNameserverHosts()
+	} else if !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull() {
+		resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hostsToSet, false)...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
-
-		resp.Diagnostics.Append(
-			resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), defaultSet)...,
-		)
+	} else {
 		return
 	}
 
-	if planNS.Hosts.IsUnknown() || planNS.Hosts.IsNull() {
-		return
-	}
-
-	var hosts []string
-	resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	sort.Strings(hosts)
-
-	sortedHosts, diags := types.SetValueFrom(ctx, types.StringType, hosts)
+	// Sort and set hosts
+	sort.Strings(hostsToSet)
+	sortedHosts, diags := types.SetValueFrom(ctx, types.StringType, hostsToSet)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), sortedHosts)
 }
 
