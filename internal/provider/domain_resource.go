@@ -3,15 +3,17 @@ package provider
 import (
 	"context"
 	"fmt"
-
 	"terraform-provider-spaceship/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -66,6 +68,41 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				Description: "Indicates whether the auto-renew option is enabled",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"nameservers": schema.SingleNestedAttribute{
+				Computed:    true,
+				Optional:    true,
+				Description: "Information about nameservers",
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"provider": schema.StringAttribute{
+						Computed:    true,
+						Optional:    true,
+						Description: "type: basic or custom",
+						Validators: []validator.String{
+							stringvalidator.OneOf("basic", "custom"),
+						},
+						PlanModifiers: []planmodifier.String{
+							stringplanmodifier.UseStateForUnknown(),
+						},
+					},
+					"hosts": schema.SetAttribute{
+						Computed:    true,
+						Optional:    true,
+						ElementType: types.StringType,
+						Validators: []validator.Set{
+							setvalidator.SizeBetween(2, 12),
+							setvalidator.ValueStringsAre(
+								stringvalidator.LengthBetween(4, 255),
+							),
+						},
+						PlanModifiers: []planmodifier.Set{
+							setplanmodifier.UseStateForUnknown(),
+						},
+					},
 				},
 			},
 		},

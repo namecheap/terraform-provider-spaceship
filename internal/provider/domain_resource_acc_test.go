@@ -113,6 +113,23 @@ resource "%s" "%s" {
 		}})
 }
 
+func TestAccDomain_nameservers(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// resource contains current autorenew value
+			{
+				Config: emptyDomainResourceConfiguration,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "nameservers.hosts"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "nameservers.provider"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccDomain_resourceImport(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
