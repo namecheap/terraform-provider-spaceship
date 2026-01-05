@@ -114,17 +114,107 @@ resource "%s" "%s" {
 }
 
 func TestAccDomain_nameservers(t *testing.T) {
+	nsProviderBasicConfig := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	nameservers = {
+		provider = "basic"
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+	nsProviderCustomConfig := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	nameservers = {
+		provider = "custom"
+		hosts = [
+			"ns-669.awsdns-19.net",
+			"ns-1578.awsdns-05.co.uk",
+			"ns-401.awsdns-50.com",
+			"ns-1063.awsdns-04.org",
+		]
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+	nsProviderBasicWithHosts := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	nameservers = {
+		provider = "basic"
+		hosts = ["ns1.example.com", "ns2.example.com"]
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+	nsProviderCustomWithNoHosts := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	nameservers = {
+		provider = "custom"
+	}
+
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// resource contains current autorenew value
 			{
 				Config: emptyDomainResourceConfiguration,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet(domainResourceFullName, "nameservers.hosts"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "nameservers.hosts.0"),
 					resource.TestCheckResourceAttrSet(domainResourceFullName, "nameservers.provider"),
 				),
+			},
+			// Step 2
+			// verify no changes, changes in code only
+			{
+				Config:             nsProviderBasicConfig,
+				ExpectNonEmptyPlan: false,
+			},
+			// Step 3
+			// update nameservers to custom
+			{
+				Config: nsProviderCustomConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-1063.awsdns-04.org"),
+					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
+					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-401.awsdns-50.com"),
+					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-669.awsdns-19.net"),
+					resource.TestCheckResourceAttr(domainResourceName, "nameservers.provider", "custom"),
+				),
+			},
+			// Step
+			// reset to basic back
+			{
+				Config: nsProviderBasicConfig,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceName, "nameservers.provider", "basic"),
+					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "launch1.spaceship.net"),
+				),
+			},
+			// Test errors on wrong configuration
+			{
+				Config:      nsProviderBasicWithHosts,
+				ExpectError: regexp.MustCompile("The 'hosts' field is required when provider is 'custom'."),
+			},
+			{
+				Config:      nsProviderCustomWithNoHosts,
+				ExpectError: regexp.MustCompile("The 'hosts' field must be omitted when provider is 'basic'."),
 			},
 		},
 	})
