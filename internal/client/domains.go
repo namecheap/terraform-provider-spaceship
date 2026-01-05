@@ -119,3 +119,44 @@ func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool)
 	return resp, nil
 
 }
+
+type NameserverProvider string
+
+const (
+	BasicNameserverProvider NameserverProvider = "basic"
+	CustomNamerverProvider  NameserverProvider = "custom"
+)
+
+func (p NameserverProvider) Valid() bool {
+	return p == BasicNameserverProvider || p == CustomNamerverProvider
+}
+
+type UpdateNameserverRequest struct {
+	Provider NameserverProvider
+	Hosts    []string
+}
+
+func DefaultBasicNameserverHosts() []string {
+	return []string{"launch1.spaceship.net", "launch2.spaceship.net"}
+}
+
+/*
+https://docs.spaceship.dev/#tag/Domains/operation/setDomainNameservers
+*/
+func (c *Client) UpdateDomainNameServers(ctx context.Context, domain string, request UpdateNameserverRequest) error {
+	endpoint := fmt.Sprintf("%s/domains/%s/nameservers", c.baseURL, domain)
+	payload := struct {
+		Provider NameserverProvider `json:"provider"`
+		Hosts    []string           `json:"hosts,omitempty"` // omitempty handles conditional
+	}{
+		Provider: request.Provider,
+		Hosts:    request.Hosts,
+	}
+
+	_, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
