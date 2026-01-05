@@ -3,10 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
+	"sort"
 	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -17,6 +20,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
@@ -34,6 +38,8 @@ type domainResourceModel struct {
 	Name        types.String `tfsdk:"name"`
 	UnicodeName types.String `tfsdk:"unicode_name"`
 	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
+
+	Nameservers types.Object `tfsdk:"nameservers"`
 }
 
 func (d *domainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -136,7 +142,10 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	applyDomainInfo(&state, domainInfo)
+	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -177,10 +186,12 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	state.Domain = plan.Domain
 
-	applyDomainInfo(&state, domainInfo)
+	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 
-	diags = resp.State.Set(ctx, &state)
-	resp.Diagnostics.Append(diags...)
 }
 
 func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -219,6 +230,88 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
+	// check nameservers changes
+	var (
+		planNS  nameservers
+		stateNS nameservers
+	)
+	planHasNameservers := !plan.Nameservers.IsUnknown() && !plan.Nameservers.IsNull()
+	stateHasNameservers := !state.Nameservers.IsUnknown() && !state.Nameservers.IsNull()
+
+	if planHasNameservers {
+		resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+
+		if stateHasNameservers {
+			resp.Diagnostics.Append(state.Nameservers.As(ctx, &stateNS, basetypes.ObjectAsOptions{})...)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
+		stateProviderKnown := !stateNS.Provider.IsUnknown() && !stateNS.Provider.IsNull()
+
+		// TODO how to create set oout of it?
+		// how better to make it?
+		var planHosts, stateHosts []string
+		planHostsKnown := !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull()
+		stateHostsKnown := stateHasNameservers && !stateNS.Hosts.IsUnknown() && !stateNS.Hosts.IsNull()
+
+		if planHostsKnown {
+			resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &planHosts, false)...)
+		}
+		if stateHostsKnown {
+			resp.Diagnostics.Append(stateNS.Hosts.ElementsAs(ctx, &stateHosts, false)...)
+		}
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		planHostsSorted := append([]string(nil), planHosts...)
+		stateHostsSorted := append([]string(nil), stateHosts...)
+		if planHostsKnown {
+			sort.Strings(planHostsSorted)
+		}
+		if stateHostsKnown {
+			sort.Strings(stateHostsSorted)
+		}
+
+		var planProvider, stateProvider client.NameserverProvider
+		if planProviderKnown {
+			planProvider = client.NameserverProvider(planNS.Provider.ValueString())
+		}
+		if stateProviderKnown {
+			stateProvider = client.NameserverProvider(stateNS.Provider.ValueString())
+		}
+
+		providerChanged := planProviderKnown && (!stateProviderKnown || planProvider != stateProvider)
+		hostsChanged := planHostsKnown && !stringSlicesEqual(planHostsSorted, stateHostsSorted)
+
+		if providerChanged || hostsChanged {
+			nsProvider := planProvider
+			if nsProvider == "" {
+				nsProvider = stateProvider
+			}
+
+			requestHosts := planHostsSorted
+			if nsProvider == client.BasicNameserverProvider {
+				// API ignores hosts for basic provider and expects field to be omitted
+				requestHosts = nil
+			}
+
+			err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
+				Provider: nsProvider,
+				Hosts:    requestHosts,
+			})
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to update domain nameservers", err.Error())
+				return
+			}
+		}
+
+	}
+
+	// reread domain info configuration
 	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
@@ -226,7 +319,11 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	state.Domain = plan.Domain
-	applyDomainInfo(&state, domainInfo)
+
+	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -238,8 +335,124 @@ func (d *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("domain"), req.ID)...)
 }
 
-func applyDomainInfo(state *domainResourceModel, info client.DomainInfo) {
+func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if req.Plan.Raw.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Resource Destruction Considerations",
+			"Applying this resource destruction will only remove the resource from the Terraform state "+
+				"and will not call the deletion API due to nature of domain specifics."+
+				"Your registered domain and its settings would remain intact",
+		)
+		return
+	}
+
+	var plan domainResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Nameservers.IsUnknown() || plan.Nameservers.IsNull() {
+		return
+	}
+
+	var planNS nameservers
+	resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
+	planProvider := client.NameserverProvider(planNS.Provider.ValueString())
+	if planProviderKnown && planProvider == client.BasicNameserverProvider {
+		defaultHosts := client.DefaultBasicNameserverHosts()
+		sort.Strings(defaultHosts)
+
+		defaultSet, diags := types.SetValueFrom(ctx, types.StringType, defaultHosts)
+		resp.Diagnostics.Append(diags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		resp.Diagnostics.Append(
+			resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), defaultSet)...,
+		)
+		return
+	}
+
+	if planNS.Hosts.IsUnknown() || planNS.Hosts.IsNull() {
+		return
+	}
+
+	var hosts []string
+	resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	sort.Strings(hosts)
+
+	sortedHosts, diags := types.SetValueFrom(ctx, types.StringType, hosts)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), sortedHosts)
+}
+
+func applyDomainInfo(ctx context.Context, state *domainResourceModel, info client.DomainInfo) diag.Diagnostics {
 	state.Name = types.StringValue(info.Name)
 	state.UnicodeName = types.StringValue(info.UnicodeName)
 	state.AutoRenew = types.BoolValue(info.AutoRenew)
+
+	nameservers, diags := constructNameservers(ctx, info.Nameservers)
+	if diags.HasError() {
+		return diags
+	}
+	state.Nameservers = nameservers
+	return nil
+
+}
+
+func constructNameservers(ctx context.Context, ns client.Nameservers) (types.Object, diag.Diagnostics) {
+	nsAttributeTypes := map[string]attr.Type{
+		"provider": types.StringType,
+		"hosts":    types.SetType{ElemType: types.StringType},
+	}
+
+	var nsHosts types.Set
+	if ns.Hosts == nil {
+		nsHosts = types.SetNull(types.StringType)
+	} else {
+		var diags diag.Diagnostics
+		// SetValueFrom handles the conversion directly - no sorting needed for Sets
+		nsHosts, diags = types.SetValueFrom(ctx, types.StringType, ns.Hosts)
+
+		if diags.HasError() {
+			return types.ObjectNull(nsAttributeTypes), diags
+		}
+	}
+
+	nsValues := map[string]attr.Value{
+		"provider": types.StringValue(ns.Provider),
+		"hosts":    nsHosts,
+	}
+
+	return types.ObjectValue(nsAttributeTypes, nsValues)
+
+}
+
+func stringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }
