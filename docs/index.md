@@ -2,14 +2,14 @@
 page_title: "Spaceship Provider"
 subcategory: ""
 description: |-
-  The Spaceship provider enables Terraform configuration management for DNS records hosted with Spaceship.
+  The Spaceship provider enables Terraform configuration management for domain settings and DNS records hosted with Spaceship.
 ---
 
 # Spaceship Provider
 
 > 🚧 **Active Development:** This provider is still evolving and is not intended for production deployments. Expect breaking changes between releases and test in non-critical environments first.
 
-Use the Spaceship provider to manage DNS records for domains registered with Spaceship. The provider talks to the Spaceship DNS API (`https://spaceship.dev/api/v1`) and supports replacing the full record set for a domain in a single Terraform operation.
+Use the Spaceship provider to manage domain settings (including auto-renew and nameservers) and DNS records for domains registered with Spaceship. The provider talks to the Spaceship DNS API (`https://spaceship.dev/api/v1`) and supports replacing the full record set for a domain in a single Terraform operation.
 
 ## Example Usage
 
@@ -69,7 +69,7 @@ The following arguments are supported in the provider block. All attributes are 
 
 The Spaceship provider currently offers the following resources:
 
-- `spaceship_domain` — Read domain metadata and manage auto-renew for a Spaceship-managed domain, including ASCII and Unicode representations of the name.
+- `spaceship_domain` — Read domain metadata and manage auto-renew plus nameserver settings for a Spaceship-managed domain, including ASCII and Unicode representations of the name.
 - `spaceship_dns_records` — Manage the full DNS record set for a Spaceship-managed domain, replacing all records in each apply. The resource supports importing an existing domain by its name.
 
 ## Data Sources

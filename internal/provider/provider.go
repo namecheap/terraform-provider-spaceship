@@ -49,7 +49,7 @@ func (p *spaceshipProvider) Metadata(_ context.Context, _ provider.MetadataReque
 
 func (p *spaceshipProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "The Spaceship provider is used to manage DNS records for domains managed by the Spaceship registrar",
+		MarkdownDescription: "The Spaceship provider is used to manage DNS records and domain settings, including auto-renew and nameservers, for domains managed by the Spaceship registrar",
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
 				MarkdownDescription: "Spaceship API key. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_KEY` environment variable.",

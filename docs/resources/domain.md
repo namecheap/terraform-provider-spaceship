@@ -7,7 +7,7 @@ description: |-
 
 # spaceship_domain (Resource)
 
-Use this resource to manage domain settings for an existing Spaceship domain and store the ASCII and Unicode forms of the name in state. Set `auto_renew` to enable or disable renewal automation.
+Use this resource to manage domain settings for an existing Spaceship domain and store the ASCII and Unicode forms of the name in state. Set `auto_renew` to enable or disable renewal automation, and update nameservers when needed.
 
 ## Example Usage
 
@@ -15,6 +15,14 @@ Use this resource to manage domain settings for an existing Spaceship domain and
 resource "spaceship_domain" "example" {
   domain     = "example.com"
   auto_renew = true
+
+  nameservers = {
+    provider = "custom"
+    hosts = [
+      "ns1.example.net",
+      "ns2.example.net",
+    ]
+  }
 }
 ```
 
@@ -27,11 +35,19 @@ resource "spaceship_domain" "example" {
 ### Optional
 
 - `auto_renew` (Boolean) Whether the domain renews automatically. When omitted, the current setting is preserved.
+- `nameservers` (Attributes) Nameserver settings for the domain. When omitted, the current nameserver configuration is preserved.
 
 ### Read-Only
 
 - `name` (String) Domain name in ASCII format (A-label).
 - `unicode_name` (String) Domain name in UTF-8 format (U-label).
+
+### Nested Schema for `nameservers`
+
+#### Optional
+
+- `provider` (String) Nameserver provider type. Allowed values: `basic` or `custom`.
+- `hosts` (Set of String) Nameserver hostnames. Required when `provider` is `custom` and must contain 2 to 12 entries. Must be omitted when `provider` is `basic`.
 
 ## Import
 
