@@ -112,3 +112,24 @@ resource "%s" "%s" {
 			},
 		}})
 }
+
+func TestAccDomain_resourceImport(t *testing.T) {
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			//step 1 creation
+			{
+				Config: emptyDomainResourceConfiguration,
+			},
+			// import
+			{
+				ResourceName:                         domainResourceFullName,
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateId:                        domainName,
+				ImportStateVerifyIdentifierAttribute: "domain",
+			},
+		},
+	})
+}
