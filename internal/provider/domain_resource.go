@@ -231,85 +231,40 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		}
 	}
 
-	// check nameservers changes
-	var (
-		planNS  nameservers
-		stateNS nameservers
-	)
-	planHasNameservers := !plan.Nameservers.IsUnknown() && !plan.Nameservers.IsNull()
-	stateHasNameservers := !state.Nameservers.IsUnknown() && !state.Nameservers.IsNull()
-
-	if planHasNameservers {
-		resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
-
-		if stateHasNameservers {
-			resp.Diagnostics.Append(state.Nameservers.As(ctx, &stateNS, basetypes.ObjectAsOptions{})...)
-		}
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		planProviderKnown := !planNS.Provider.IsUnknown() && !planNS.Provider.IsNull()
-		stateProviderKnown := !stateNS.Provider.IsUnknown() && !stateNS.Provider.IsNull()
-
-		// TODO how to create set oout of it?
-		// how better to make it?
-		var planHosts, stateHosts []string
-		planHostsKnown := !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull()
-		stateHostsKnown := stateHasNameservers && !stateNS.Hosts.IsUnknown() && !stateNS.Hosts.IsNull()
-
-		if planHostsKnown {
-			resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &planHosts, false)...)
-		}
-		if stateHostsKnown {
-			resp.Diagnostics.Append(stateNS.Hosts.ElementsAs(ctx, &stateHosts, false)...)
-		}
-		if resp.Diagnostics.HasError() {
-			return
-		}
-
-		planHostsSorted := append([]string(nil), planHosts...)
-		stateHostsSorted := append([]string(nil), stateHosts...)
-		if planHostsKnown {
-			sort.Strings(planHostsSorted)
-		}
-		if stateHostsKnown {
-			sort.Strings(stateHostsSorted)
-		}
-
-		var planProvider, stateProvider client.NameserverProvider
-		if planProviderKnown {
-			planProvider = client.NameserverProvider(planNS.Provider.ValueString())
-		}
-		if stateProviderKnown {
-			stateProvider = client.NameserverProvider(stateNS.Provider.ValueString())
-		}
-
-		providerChanged := planProviderKnown && (!stateProviderKnown || planProvider != stateProvider)
-		hostsChanged := planHostsKnown && !stringSlicesEqual(planHostsSorted, stateHostsSorted)
-
-		if providerChanged || hostsChanged {
-			nsProvider := planProvider
-			if nsProvider == "" {
-				nsProvider = stateProvider
+	// Check nameservers changes
+	if !plan.Nameservers.IsNull() && !plan.Nameservers.IsUnknown() {
+		// Use Terraform's built-in Equal() - it handles sets correctly (order-independent)
+		if !plan.Nameservers.Equal(state.Nameservers) {
+			var planNS nameservers
+			resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+			if resp.Diagnostics.HasError() {
+				return
 			}
 
-			requestHosts := planHostsSorted
-			if nsProvider == client.BasicNameserverProvider {
-				// API ignores hosts for basic provider and expects field to be omitted
-				requestHosts = nil
+			provider := client.NameserverProvider(planNS.Provider.ValueString())
+
+			var hosts []string
+			if !planNS.Hosts.IsNull() && !planNS.Hosts.IsUnknown() {
+				resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+			}
+
+			// API ignores hosts for basic provider
+			if provider == client.BasicNameserverProvider {
+				hosts = nil
 			}
 
 			err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
-				Provider: nsProvider,
-				Hosts:    requestHosts,
+				Provider: provider,
+				Hosts:    hosts,
 			})
 			if err != nil {
 				resp.Diagnostics.AddError("Failed to update domain nameservers", err.Error())
 				return
 			}
 		}
-
 	}
 
 	// reread domain info configuration
