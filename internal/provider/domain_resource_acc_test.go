@@ -173,6 +173,8 @@ resource "%s" "%s" {
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			// Step 1
+			// adopt on creation
 			{
 				Config: emptyDomainResourceConfiguration,
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -191,20 +193,20 @@ resource "%s" "%s" {
 			{
 				Config: nsProviderCustomConfig,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-1063.awsdns-04.org"),
-					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
-					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-401.awsdns-50.com"),
-					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "ns-669.awsdns-19.net"),
-					resource.TestCheckResourceAttr(domainResourceName, "nameservers.provider", "custom"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-1063.awsdns-04.org"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-401.awsdns-50.com"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-669.awsdns-19.net"),
+					resource.TestCheckResourceAttr(domainResourceFullName, "nameservers.provider", "custom"),
 				),
 			},
-			// Step
+			// Step 4
 			// reset to basic back
 			{
 				Config: nsProviderBasicConfig,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(domainResourceName, "nameservers.provider", "basic"),
-					resource.TestCheckTypeSetElemAttr(domainResourceName, "nameservers.hosts.*", "launch1.spaceship.net"),
+					resource.TestCheckResourceAttr(domainResourceFullName, "nameservers.provider", "basic"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "launch1.spaceship.net"),
 				),
 			},
 			// Test errors on wrong configuration
