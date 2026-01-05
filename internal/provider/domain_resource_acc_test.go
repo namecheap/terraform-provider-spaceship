@@ -144,31 +144,6 @@ resource "%s" "%s" {
 }
 `, providerName, domainResourceRef, domainResourceName, domainName)
 
-	nsProviderBasicWithHosts := fmt.Sprintf(`
-provider "%s" {}
-
-resource "%s" "%s" {
-	domain = "%s"
-	
-	nameservers = {
-		provider = "basic"
-		hosts = ["ns1.example.com", "ns2.example.com"]
-	}
-}
-`, providerName, domainResourceRef, domainResourceName, domainName)
-
-	nsProviderCustomWithNoHosts := fmt.Sprintf(`
-provider "%s" {}
-
-resource "%s" "%s" {
-	domain = "%s"
-
-	nameservers = {
-		provider = "custom"
-	}
-
-`, providerName, domainResourceRef, domainResourceName, domainName)
-
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -200,6 +175,7 @@ resource "%s" "%s" {
 					resource.TestCheckResourceAttr(domainResourceFullName, "nameservers.provider", "custom"),
 				),
 			},
+
 			// Step 4
 			// reset to basic back
 			{
@@ -209,13 +185,47 @@ resource "%s" "%s" {
 					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "launch1.spaceship.net"),
 				),
 			},
+		},
+	})
+}
+
+func TestAccDomain_nameserversValidationErrors(t *testing.T) {
+	nsProviderBasicWithHosts := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	nameservers = {
+		provider = "basic"
+		hosts = ["ns1.example.com", "ns2.example.com"]
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+	nsProviderCustomWithNoHosts := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	nameservers = {
+		provider = "custom"
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
 			// Test errors on wrong configuration
 			{
-				Config:      nsProviderBasicWithHosts,
+				Config:      nsProviderCustomWithNoHosts,
 				ExpectError: regexp.MustCompile("The 'hosts' field is required when provider is 'custom'."),
 			},
 			{
-				Config:      nsProviderCustomWithNoHosts,
+				Config:      nsProviderBasicWithHosts,
 				ExpectError: regexp.MustCompile("The 'hosts' field must be omitted when provider is 'basic'."),
 			},
 		},

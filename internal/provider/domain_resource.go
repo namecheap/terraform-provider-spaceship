@@ -110,6 +110,7 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 						},
 					},
 				},
+				Validators: []validator.Object{&nameserversValidator{}},
 			},
 		},
 	}
