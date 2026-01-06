@@ -2,8 +2,8 @@ package client
 
 import (
 	"context"
-	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type DomainList struct {
@@ -53,7 +53,12 @@ type Contacts struct {
 func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 	var domainList DomainList
 
-	endpoint := fmt.Sprintf("%s/domains?take=100&skip=0&orderBy=name", c.baseURL)
+	query := url.Values{}
+	query.Set("take", "100")
+	query.Set("skip", "0")
+	query.Set("orderBy", "name")
+
+	endpoint := c.endpointURL([]string{"domains"}, query)
 
 	if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
 		return domainList, err
@@ -65,7 +70,7 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
 	var domainInfo DomainInfo
 
-	endpoint := fmt.Sprintf("%s/domains/%s", c.baseURL, domain)
+	endpoint := c.endpointURL([]string{"domains", domain}, nil)
 
 	// overcome insane API rate limiting
 	// by using alternative endpoint that does the same
