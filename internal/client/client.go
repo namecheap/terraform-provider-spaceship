@@ -7,7 +7,9 @@ import (
 	"time"
 )
 
-// Client provides a thin wrapper around Spaceship API
+// Client wraps the Spaceship API connection details and helpers used by
+// the provider. It stores the base URL, credentials, and an HTTP client
+// configured with a request timeout for all API calls.
 type Client struct {
 	baseURL    url.URL
 	apiKey     string
@@ -15,7 +17,9 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient creates a new Spaceship API client.
+// NewClient validates and parses the base URL, then returns a Client
+// configured with the provided API credentials and a default timeout.
+// The caller is responsible for supplying a full URL including scheme.
 func NewClient(baseURL, apiKey, apiSecret string) (*Client, error) {
 	parsedBaseURL, err := url.Parse(baseURL)
 	if err != nil {
