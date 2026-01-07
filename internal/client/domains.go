@@ -109,7 +109,8 @@ type AutoRenewalResponse struct {
 func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool) (AutoRenewalResponse, error) {
 	var resp AutoRenewalResponse
 
-	endpoint := fmt.Sprintf("%s/domains/%s/autorenew", c.baseURL, domain)
+	endpoint := c.endpointURL([]string{"domains", domain, "autorenew"}, nil)
+
 	payload := struct {
 		IsEnabled bool `json:"isEnabled"`
 	}{
