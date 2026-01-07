@@ -149,7 +149,8 @@ func DefaultBasicNameserverHosts() []string {
 https://docs.spaceship.dev/#tag/Domains/operation/setDomainNameservers
 */
 func (c *Client) UpdateDomainNameServers(ctx context.Context, domain string, request UpdateNameserverRequest) error {
-	endpoint := fmt.Sprintf("%s/domains/%s/nameservers", c.baseURL, domain)
+	endpoint := c.endpointURL([]string{"domains", domain, "nameservers"}, nil)
+
 	payload := struct {
 		Provider NameserverProvider `json:"provider"`
 		Hosts    []string           `json:"hosts,omitempty"` // omitempty handles conditional
