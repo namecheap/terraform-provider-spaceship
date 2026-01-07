@@ -105,7 +105,14 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client := client.NewClient(defaultBaseURL, apiKey, apiSecret)
+	client, err := client.NewClient(defaultBaseURL, apiKey, apiSecret)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Spaceship base URL",
+			err.Error(),
+		)
+		return
+	}
 	//map of any type could be improved at least in this case?
 	// or it will not work for empty interface?
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{

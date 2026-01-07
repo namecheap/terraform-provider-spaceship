@@ -44,7 +44,7 @@ func testAccDomainValue() string {
 
 }
 
-func testAccClient() *client.Client {
+func testAccClient() (*client.Client, error) {
 	return client.NewClient(
 		defaultBaseURL,
 		os.Getenv("SPACESHIP_API_KEY"),
@@ -54,7 +54,10 @@ func testAccClient() *client.Client {
 
 func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		testClient := testAccClient()
+		testClient, err := testAccClient()
+		if err != nil {
+			return err
+		}
 		records, err := testClient.GetDNSRecords(context.Background(), domain)
 		if err != nil {
 			if client.IsNotFoundError(err) {
