@@ -144,6 +144,19 @@ func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, r
 	// leaving infra in the same state
 }
 
+func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	// Handle destruction
+	if req.Plan.Raw.IsNull() {
+		resp.Diagnostics.AddWarning(
+			"Resource Destruction Considerations",
+			"Applying this resource destruction will only remove the resource from the Terraform state "+
+				"and will not call the deletion API due to nature of domain specifics. "+
+				"Your registered domain and its settings would remain intact",
+		)
+		return
+	}
+}
+
 func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state domainResourceModel
 
