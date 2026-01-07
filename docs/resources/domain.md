@@ -1,0 +1,37 @@
+---
+page_title: "spaceship_domain Resource - spaceship"
+subcategory: ""
+description: |-
+  Reads domain metadata for a Spaceship-managed domain.
+---
+
+# spaceship_domain (Resource)
+
+Use this resource to read metadata for an existing Spaceship domain and store the ASCII and Unicode forms of the name in state. The resource does not modify the domain in Spaceship.
+
+## Example Usage
+
+```hcl
+resource "spaceship_domain" "example" {
+  domain = "example.com"
+}
+```
+
+## Schema
+
+### Required
+
+- `domain` (String) Domain name to read from Spaceship.
+
+### Read-Only
+
+- `name` (String) Domain name in ASCII format (A-label).
+- `unicode_name` (String) Domain name in UTF-8 format (U-label).
+
+## Import
+
+Import an existing domain by specifying the domain name:
+
+```shell
+terraform import spaceship_domain.example example.com
+```

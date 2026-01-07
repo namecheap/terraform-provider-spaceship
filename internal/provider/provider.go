@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -103,7 +105,14 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client := NewClient(defaultBaseURL, apiKey, apiSecret)
+	client, err := client.NewClient(defaultBaseURL, apiKey, apiSecret)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Invalid Spaceship base URL",
+			err.Error(),
+		)
+		return
+	}
 	//map of any type could be improved at least in this case?
 	// or it will not work for empty interface?
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{
@@ -117,6 +126,7 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewDNSRecordsResource,
+		NewDomainResource,
 	}
 }
 

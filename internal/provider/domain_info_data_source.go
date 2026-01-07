@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -17,7 +19,7 @@ func NewDomainInfoDataSource() datasource.DataSource {
 }
 
 type domainInfoDataSource struct {
-	client *Client
+	client *client.Client
 }
 
 func (d *domainInfoDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
@@ -72,9 +74,9 @@ func (d *domainInfoDataSource) Configure(_ context.Context, req datasource.Confi
 		return
 	}
 
-	client, ok := req.ProviderData.(*Client)
+	client, ok := req.ProviderData.(*client.Client)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *Client, got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
 		return
 	}
 

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -19,6 +21,8 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	},
 }
 
+const testAccDefaultDomain = "dmytrovovk.com"
+
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
@@ -29,14 +33,19 @@ func testAccPreCheck(t *testing.T) {
 	if os.Getenv("SPACESHIP_API_SECRET") == "" {
 		t.Skip("SPACESHIP_API_SECRET must be set for acceptance testing")
 	}
-
-	if os.Getenv("SPACESHIP_TEST_DOMAIN") == "" {
-		t.Skip("SPACESHIP_TEST_DOMAIN must be set for acceptance testing")
-	}
 }
 
-func testAccClient() *Client {
-	return NewClient(
+func testAccDomainValue() string {
+	if domain := os.Getenv("SPACESHIP_TEST_DOMAIN"); domain != "" {
+		return domain
+	}
+
+	return testAccDefaultDomain
+
+}
+
+func testAccClient() (*client.Client, error) {
+	return client.NewClient(
 		defaultBaseURL,
 		os.Getenv("SPACESHIP_API_KEY"),
 		os.Getenv("SPACESHIP_API_SECRET"),
@@ -45,10 +54,13 @@ func testAccClient() *Client {
 
 func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		client := testAccClient()
-		records, err := client.GetDNSRecords(context.Background(), domain)
+		testClient, err := testAccClient()
 		if err != nil {
-			if IsNotFoundError(err) {
+			return err
+		}
+		records, err := testClient.GetDNSRecords(context.Background(), domain)
+		if err != nil {
+			if client.IsNotFoundError(err) {
 				return nil
 			}
 			return err

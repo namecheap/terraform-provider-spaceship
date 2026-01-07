@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 
+	"terraform-provider-spaceship/internal/client"
+
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -17,7 +19,7 @@ func stringValueOrNull(value string) types.String {
 	return types.StringValue(value)
 }
 
-func flattenSuspensions(values []ReasonCode) []suspension {
+func flattenSuspensions(values []client.ReasonCode) []suspension {
 	if len(values) == 0 {
 		return []suspension{}
 	}
@@ -32,14 +34,14 @@ func flattenSuspensions(values []ReasonCode) []suspension {
 	return out
 }
 
-func flattenPrivacyProtection(pp PrivacyProtection) privacyProtection {
+func flattenPrivacyProtection(pp client.PrivacyProtection) privacyProtection {
 	return privacyProtection{
 		ContactForm: types.BoolValue(pp.ContactForm),
 		Level:       types.StringValue(pp.Level),
 	}
 }
 
-func flattenNameservers(ctx context.Context, ns Nameservers) (nameservers, diag.Diagnostics) {
+func flattenNameservers(ctx context.Context, ns client.Nameservers) (nameservers, diag.Diagnostics) {
 	hosts, diags := types.ListValueFrom(ctx, types.StringType, ns.Hosts)
 
 	return nameservers{
@@ -48,7 +50,7 @@ func flattenNameservers(ctx context.Context, ns Nameservers) (nameservers, diag.
 	}, diags
 }
 
-func flattenContacts(ctx context.Context, c Contacts) (contacts, diag.Diagnostics) {
+func flattenContacts(ctx context.Context, c client.Contacts) (contacts, diag.Diagnostics) {
 	attributes, diags := types.ListValueFrom(ctx, types.StringType, c.Attributes)
 
 	return contacts{
@@ -162,7 +164,7 @@ func domainAttributes() map[string]schema.Attribute {
 	}
 }
 
-func buildDomainModel(ctx context.Context, info DomainInfo) (domainModel, diag.Diagnostics) {
+func buildDomainModel(ctx context.Context, info client.DomainInfo) (domainModel, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
 	eppStatuses, eppDiags := types.ListValueFrom(ctx, types.StringType, info.EPPStatuses)
