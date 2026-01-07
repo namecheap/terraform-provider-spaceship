@@ -11,9 +11,12 @@ import (
 
 // DNSRecord represents a DNS record managed through the Spaceship API.
 type DNSRecord struct {
-	Type            string       `json:"type"`
-	Name            string       `json:"name"`
-	TTL             int          `json:"ttl,omitempty"`
+	//basic fields for all records
+	Type string `json:"type"`
+	Name string `json:"name"`
+	TTL  int    `json:"ttl,omitempty"`
+
+	//other fields for dns records
 	Address         string       `json:"address,omitempty"`
 	AliasName       string       `json:"aliasName,omitempty"`
 	CName           string       `json:"cname,omitempty"`

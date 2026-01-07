@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-// represents an error response from the spaceship api
-type APIError struct {
+// Represents an error response from the Spaceship API.
+type SpaceshipApiError struct {
 	Status  int
 	Message string
 }
 
-func (e *APIError) Error() string {
+func (e *SpaceshipApiError) Error() string {
 	if e == nil {
 		return "<nil>"
 	}
@@ -29,12 +29,12 @@ func (e *APIError) Error() string {
 func (c *Client) errorFromResponse(resp *http.Response) error {
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
-		return &APIError{
+		return &SpaceshipApiError{
 			Status: resp.StatusCode,
 		}
 	}
 
-	return &APIError{
+	return &SpaceshipApiError{
 		Status:  resp.StatusCode,
 		Message: strings.TrimSpace(string(data)),
 	}
@@ -42,7 +42,7 @@ func (c *Client) errorFromResponse(resp *http.Response) error {
 
 // returns true if the err represents 404 response
 func IsNotFoundError(err error) bool {
-	var apiErr *APIError
+	var apiErr *SpaceshipApiError
 	if !errors.As(err, &apiErr) {
 		return false
 	}

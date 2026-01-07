@@ -76,7 +76,7 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 	// by using alternative endpoint that does the same
 	// but has 60x times higher limits
 	statusCode, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo)
-	if statusCode == 429 {
+	if statusCode == http.StatusTooManyRequests {
 		domainList, _ := c.GetDomainList(ctx)
 
 		domainInfo, ok := findDomainByNameFromDomainList(domainList, domain)
