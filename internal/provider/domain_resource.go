@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"sort"
 	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -340,14 +339,12 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 		return
 	}
 
-	// Sort and set hosts
-	sort.Strings(hostsToSet)
-	sortedHosts, diags := types.SetValueFrom(ctx, types.StringType, hostsToSet)
+	hostsSet, diags := types.SetValueFrom(ctx, types.StringType, hostsToSet)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), sortedHosts)
+	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), hostsSet)
 }
 
 func applyDomainInfo(ctx context.Context, state *domainResourceModel, info client.DomainInfo) diag.Diagnostics {
