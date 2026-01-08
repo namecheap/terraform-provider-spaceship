@@ -63,10 +63,16 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"unicode_name": schema.StringAttribute{
 				Computed:    true,
 				Description: "Domain name in UTF-8 format (U-label)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Computed:    true,
 				Description: "Domain name in ASCII format (A-label)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"auto_renew": schema.BoolAttribute{
 				Computed:    true,
