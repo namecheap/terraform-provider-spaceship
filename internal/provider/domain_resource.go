@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -27,9 +28,10 @@ type domainResource struct {
 
 type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
-	Name   types.String `tfsdk:"name"`
 
+	Name        types.String `tfsdk:"name"`
 	UnicodeName types.String `tfsdk:"unicode_name"`
+	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
 }
 
 func (d *domainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -53,10 +55,24 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"unicode_name": schema.StringAttribute{
 				Computed:    true,
 				Description: "Domain name in UTF-8 format (U-label)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"name": schema.StringAttribute{
 				Computed:    true,
 				Description: "Domain name in ASCII format (A-label)",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"auto_renew": schema.BoolAttribute{
+				Computed:    true,
+				Optional:    true,
+				Description: "Indicates whether the auto-renew option is enabled",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -89,8 +105,7 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	state.Name = types.StringValue(domainInfo.Name)
-	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
+	applyDomainInfo(&state, domainInfo)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -131,8 +146,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	state.Domain = plan.Domain
 
-	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
-	state.Name = types.StringValue(domainInfo.Name)
+	applyDomainInfo(&state, domainInfo)
 
 	diags = resp.State.Set(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -168,21 +182,33 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	domainName := plan.Domain.ValueString()
 
-	tflog.Info(ctx, "calling domain autorenewal update with domain %s", map[string]any{
-		"domain": domainName,
-	},
-	)
+	// check autorenewal change
+	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && !plan.AutoRenew.Equal(state.AutoRenew) {
+		newValue := plan.AutoRenew.ValueBool()
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
+		tflog.Debug(ctx, "auto_renew changed", map[string]any{
+			"old": state.AutoRenew.ValueBool(),
+			"new": newValue,
+		})
 
-	if err != nil {
-		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+		_, err := d.client.UpdateAutoRenew(ctx, domainName, newValue)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating domain auto_renew",
+				fmt.Sprintf("Could not update auto_renew for domain %s: %s", domainName, err),
+			)
+			return
+		}
 	}
 
-	state.UnicodeName = types.StringValue(domainInfo.UnicodeName)
-	state.Name = types.StringValue(domainInfo.Name)
+	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
+	if err != nil {
+		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
+		return
+	}
 
 	state.Domain = plan.Domain
+	applyDomainInfo(&state, domainInfo)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -192,4 +218,10 @@ func (d *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 	})
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("domain"), req.ID)...)
+}
+
+func applyDomainInfo(state *domainResourceModel, info client.DomainInfo) {
+	state.Name = types.StringValue(info.Name)
+	state.UnicodeName = types.StringValue(info.UnicodeName)
+	state.AutoRenew = types.BoolValue(info.AutoRenew)
 }

@@ -101,3 +101,27 @@ func findDomainByNameFromDomainList(dl DomainList, domain string) (DomainInfo, b
 	}
 	return DomainInfo{}, false
 }
+
+type AutoRenewalResponse struct {
+	IsEnabled bool `json:"isEnabled"`
+}
+
+func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool) (AutoRenewalResponse, error) {
+	var resp AutoRenewalResponse
+
+	endpoint := c.endpointURL([]string{"domains", domain, "autorenew"}, nil)
+
+	payload := struct {
+		IsEnabled bool `json:"isEnabled"`
+	}{
+		IsEnabled: value,
+	}
+
+	_, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, &resp)
+
+	if err != nil {
+		return resp, err
+	}
+	return resp, nil
+
+}
