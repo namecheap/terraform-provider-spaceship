@@ -47,7 +47,7 @@ resource "spaceship_domain" "example" {
 #### Optional
 
 - `provider` (String) Nameserver provider type. Allowed values: `basic` or `custom`.
-- `hosts` (Set of String) Nameserver hostnames. Required when `provider` is `custom` and must contain 2 to 12 entries. Must be omitted when `provider` is `basic`.
+- `hosts` (Set of String) Nameserver hostnames. Required when `provider` is `custom` and must contain 2 to 12 entries. Must be omitted when `provider` is `basic`. The default Spaceship nameservers (`launch1.spaceship.net`, `launch2.spaceship.net`) can only be used with `provider = "basic"`.
 
 ## Import
 

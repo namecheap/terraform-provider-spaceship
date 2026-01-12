@@ -215,6 +215,19 @@ resource "%s" "%s" {
 }
 `, providerName, domainResourceRef, domainResourceName, domainName)
 
+	nsProviderCustomWithDefaultHosts := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	nameservers = {
+		provider = "custom"
+		hosts = ["launch1.spaceship.net", "launch2.spaceship.net"]
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, domainName)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -227,6 +240,10 @@ resource "%s" "%s" {
 			{
 				Config:      nsProviderBasicWithHosts,
 				ExpectError: regexp.MustCompile("The 'hosts' field must be omitted when provider is 'basic'."),
+			},
+			{
+				Config:      nsProviderCustomWithDefaultHosts,
+				ExpectError: regexp.MustCompile("The default Spaceship nameservers can only be used with provider \"basic\"."),
 			},
 		},
 	})
