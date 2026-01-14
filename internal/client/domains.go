@@ -147,7 +147,13 @@ func DefaultBasicNameserverHosts() []string {
 }
 
 /*
-https://docs.spaceship.dev/#tag/Domains/operation/setDomainNameservers
+UpdateDomainNameServers updates the nameserver configuration for a domain.
+The request Provider must be one of BasicNameserverProvider or
+CustomNamerverProvider. When Provider is basic, Hosts must be empty and the
+default Spaceship nameservers are used. When Provider is custom, Hosts must
+contain the desired nameserver hostnames.
+
+Docs: https://docs.spaceship.dev/#tag/Domains/operation/setDomainNameservers
 */
 func (c *Client) UpdateDomainNameServers(ctx context.Context, domain string, request UpdateNameserverRequest) error {
 	endpoint := c.endpointURL([]string{"domains", domain, "nameservers"}, nil)
