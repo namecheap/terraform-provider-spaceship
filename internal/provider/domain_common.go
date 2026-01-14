@@ -42,7 +42,7 @@ func flattenPrivacyProtection(pp client.PrivacyProtection) privacyProtection {
 }
 
 func flattenNameservers(ctx context.Context, ns client.Nameservers) (nameservers, diag.Diagnostics) {
-	hosts, diags := types.ListValueFrom(ctx, types.StringType, ns.Hosts)
+	hosts, diags := types.SetValueFrom(ctx, types.StringType, ns.Hosts)
 
 	return nameservers{
 		Provider: types.StringValue(ns.Provider),
@@ -128,7 +128,7 @@ func domainAttributes() map[string]schema.Attribute {
 						stringvalidator.OneOf("basic", "custom"),
 					},
 				},
-				"hosts": schema.ListAttribute{
+				"hosts": schema.SetAttribute{
 					Computed:    true,
 					ElementType: types.StringType,
 				},
@@ -226,7 +226,7 @@ type privacyProtection struct {
 	Level       types.String `tfsdk:"level"`
 }
 type nameservers struct {
-	Hosts    types.List   `tfsdk:"hosts"`
+	Hosts    types.Set    `tfsdk:"hosts"`
 	Provider types.String `tfsdk:"provider"`
 }
 type contacts struct {

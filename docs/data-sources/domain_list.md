@@ -65,7 +65,7 @@ output "domains" {
 
 #### Read-Only
 
-- `hosts` (List of String) Fully-qualified nameserver hosts assigned to the domain.
+- `hosts` (Set of String) Fully-qualified nameserver hosts assigned to the domain.
 - `provider` (String) Nameserver provider type. One of `basic` or `custom`.
 
 ### Nested Schema for `contacts`
