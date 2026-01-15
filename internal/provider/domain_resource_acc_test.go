@@ -44,6 +44,23 @@ resource "%s" "%s" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "name", domainName),
 					resource.TestCheckResourceAttr(domainResourceFullName, "unicode_name", domainName),
+					resource.TestCheckResourceAttr(domainResourceFullName, "is_premium", "false"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "registration_date"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "expiration_date"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "lifecycle_status"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "verification_status"),
+					expectListCountAtLeast(domainResourceFullName, "epp_statuses.#", 0),
+					resource.TestCheckResourceAttr(domainResourceFullName, "suspensions.#", "0"),
+					//contact checks
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "contacts.admin"),
+					expectNonEmptyAttr(domainResourceFullName, "contacts.registrant"),
+					expectListCountAtLeast(domainResourceFullName, "contacts.attributes.#", 0),
+					//privacy protection settings are adopted
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "privacy_protection.contact_form"),
+					resource.TestCheckResourceAttrSet(domainResourceFullName, "privacy_protection.level"),
+					//nameservers
+					expectListCountAtLeast(domainResourceFullName, "nameservers.hosts.#", 1),
+					expectNonEmptyAttr(domainResourceFullName, "nameservers.provider"),
 				),
 			},
 			// test for recreation on domain name change
