@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
@@ -34,11 +35,23 @@ type domainResource struct {
 type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
 
+	// Configurable
+	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
+	Nameservers types.Object `tfsdk:"nameservers"`
+
+	// Read only
 	Name        types.String `tfsdk:"name"`
 	UnicodeName types.String `tfsdk:"unicode_name"`
-	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
 
-	Nameservers types.Object `tfsdk:"nameservers"`
+	IsPremium          types.Bool   `tfsdk:"is_premium"`
+	RegistrationDate   types.String `tfsdk:"registration_date"`
+	ExpirationDate     types.String `tfsdk:"expiration_date"`
+	LifecycleStatus    types.String `tfsdk:"lifecycle_status"`
+	VerificationStatus types.String `tfsdk:"verification_status"`
+	EppStatuses        types.List   `tfsdk:"epp_statuses"`
+	Suspensions        types.List   `tfsdk:"suspensions"`
+	Contacts           types.Object `tfsdk:"contacts"`
+	PrivacyProtection  types.Object `tfsdk:"privacy_protection"`
 }
 
 func (d *domainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -116,6 +129,106 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 					},
 				},
 				Validators: []validator.Object{&nameserversValidator{}},
+			},
+			"is_premium": schema.BoolAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"registration_date": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"expiration_date": schema.StringAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"lifecycle_status": schema.StringAttribute{
+				Computed:    true,
+				Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"verification_status": schema.StringAttribute{
+				Computed:    true,
+				Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"epp_statuses": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+				Description: "Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"suspensions": schema.ListNestedAttribute{
+				Computed:    true,
+				Description: "Information about domain suspensions. May contain up to 2 items.",
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"reason_code": schema.StringAttribute{
+							Computed:    true,
+							Description: "Suspension reason code (raaVerification, abuse, promoAbuse, fraud, pendingAccountVerification, unauthorizedAccess, tosViolation, transferDispute, restrictedSecurity, lockCourt, suspendCourt, udrpUrs, restrictedLegal, paymentPending, unpaidService, restrictedWhois, lockedWhois)",
+						},
+					},
+				},
+			},
+			"contacts": schema.SingleNestedAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"registrant": schema.StringAttribute{
+						Computed:    true,
+						Description: "Always present registrant handle.",
+					},
+					"admin": schema.StringAttribute{
+						Computed:    true,
+						Description: "Administrative contact handle when provided.",
+					},
+					"tech": schema.StringAttribute{
+						Computed:    true,
+						Description: "Technical contact handle when provided.",
+					},
+					"billing": schema.StringAttribute{
+						Computed:    true,
+						Description: "Billing contact handle when provided.",
+					},
+					"attributes": schema.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+						Description: "Optional list of contact attributes supplied by Spaceship.",
+					},
+				},
+			},
+			"privacy_protection": schema.SingleNestedAttribute{
+				Computed: true,
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
+				Attributes: map[string]schema.Attribute{
+					"contact_form": schema.BoolAttribute{
+						Computed:    true,
+						Description: "Indicates whether WHOIS should display the contact form link",
+					},
+					"level": schema.StringAttribute{
+						Computed:    true,
+						Description: "Privacy level: public or high",
+					},
+				},
 			},
 		},
 	}
@@ -348,20 +461,57 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 }
 
 func applyDomainInfo(ctx context.Context, state *domainResourceModel, info client.DomainInfo) diag.Diagnostics {
+	var diags diag.Diagnostics
+
 	state.Name = types.StringValue(info.Name)
 	state.UnicodeName = types.StringValue(info.UnicodeName)
 	state.AutoRenew = types.BoolValue(info.AutoRenew)
 
-	nameservers, diags := constructNameservers(ctx, info.Nameservers)
+	state.IsPremium = types.BoolValue(info.IsPremium)
+	state.RegistrationDate = types.StringValue(info.RegistrationDate)
+	state.ExpirationDate = types.StringValue(info.ExpirationDate)
+	state.LifecycleStatus = types.StringValue(info.LifecycleStatus)
+	state.VerificationStatus = stringValueOrNull(info.VerificationStatus)
+
+	eppStatuses, eppDiags := types.ListValueFrom(ctx, types.StringType, info.EPPStatuses)
+	diags.Append(eppDiags...)
+	if diags.HasError() {
+		return diags
+	}
+	state.EppStatuses = eppStatuses
+
+	nameservers, nsDiags := nameserversToTerraformObject(ctx, info.Nameservers)
+	diags.Append(nsDiags...)
 	if diags.HasError() {
 		return diags
 	}
 	state.Nameservers = nameservers
-	return nil
 
+	suspensions, suspDiags := suspensionsToTerraformList(ctx, info.Suspensions)
+	diags.Append(suspDiags...)
+	if diags.HasError() {
+		return diags
+	}
+	state.Suspensions = suspensions
+
+	contactsObj, contactDiags := contactsToTerraformObject(ctx, info.Contacts)
+	diags.Append(contactDiags...)
+	if diags.HasError() {
+		return diags
+	}
+	state.Contacts = contactsObj
+
+	ppObject, ppDiags := privacyProtectionToTerraformObject(ctx, info.PrivacyProtection)
+	diags.Append(ppDiags...)
+	if diags.HasError() {
+		return diags
+	}
+	state.PrivacyProtection = ppObject
+
+	return diags
 }
 
-func constructNameservers(ctx context.Context, ns client.Nameservers) (types.Object, diag.Diagnostics) {
+func nameserversToTerraformObject(ctx context.Context, ns client.Nameservers) (types.Object, diag.Diagnostics) {
 	nsAttributeTypes := map[string]attr.Type{
 		"provider": types.StringType,
 		"hosts":    types.SetType{ElemType: types.StringType},
@@ -381,10 +531,90 @@ func constructNameservers(ctx context.Context, ns client.Nameservers) (types.Obj
 	}
 
 	nsValues := map[string]attr.Value{
-		"provider": types.StringValue(ns.Provider),
+		"provider": stringValueOrNull(ns.Provider),
 		"hosts":    nsHosts,
 	}
 
 	return types.ObjectValue(nsAttributeTypes, nsValues)
 
+}
+
+func suspensionsToTerraformList(ctx context.Context, suspensions []client.ReasonCode) (types.List, diag.Diagnostics) {
+	suspensionAttrTypes := map[string]attr.Type{
+		"reason_code": types.StringType,
+	}
+
+	suspensionObjectType := types.ObjectType{AttrTypes: suspensionAttrTypes}
+
+	if suspensions == nil {
+		return types.ListNull(suspensionObjectType), nil
+	}
+
+	if len(suspensions) == 0 {
+		return types.ListNull(suspensionObjectType), nil
+	}
+
+	suspensionValues := make([]attr.Value, len(suspensions))
+
+	for i, s := range suspensions {
+		objValue, diags := types.ObjectValue(suspensionAttrTypes, map[string]attr.Value{
+			"reason_code": types.StringValue(s.ReasonCode),
+		})
+		if diags.HasError() {
+			return types.ListNull(suspensionObjectType), diags
+		}
+		suspensionValues[i] = objValue
+	}
+	return types.ListValue(suspensionObjectType, suspensionValues)
+
+}
+
+func contactsToTerraformObject(ctx context.Context, contacts client.Contacts) (types.Object, diag.Diagnostics) {
+
+	contactsAttrTypes := map[string]attr.Type{
+		"admin":      types.StringType,
+		"billing":    types.StringType,
+		"registrant": types.StringType,
+		"tech":       types.StringType,
+		"attributes": types.ListType{ElemType: types.StringType},
+	}
+
+	var attributesValues types.List
+	if contacts.Attributes == nil {
+		attributesValues = types.ListNull(types.StringType)
+	} else {
+		var diags diag.Diagnostics
+		attributesValues, diags = types.ListValueFrom(ctx, types.StringType, contacts.Attributes)
+		if diags.HasError() {
+			return types.ObjectNull(contactsAttrTypes), diags
+		}
+	}
+
+	contactsValues := map[string]attr.Value{
+		// cant be empty or null accordingly to api
+		// it is required
+		// https://docs.spaceship.dev/#tag/Domains/operation/getDomainInfo
+		"registrant": types.StringValue(contacts.Registrant),
+		"admin":      stringValueOrNull(contacts.Admin),
+		"billing":    stringValueOrNull(contacts.Billing),
+		"tech":       stringValueOrNull(contacts.Tech),
+		"attributes": attributesValues,
+	}
+
+	return types.ObjectValue(contactsAttrTypes, contactsValues)
+
+}
+
+func privacyProtectionToTerraformObject(_ context.Context, pp client.PrivacyProtection) (types.Object, diag.Diagnostics) {
+	ppAttrTypes := map[string]attr.Type{
+		"contact_form": types.BoolType,
+		"level":        types.StringType,
+	}
+
+	ppValues := map[string]attr.Value{
+		"contact_form": types.BoolValue(pp.ContactForm),
+		"level":        types.StringValue(pp.Level),
+	}
+
+	return types.ObjectValue(ppAttrTypes, ppValues)
 }
