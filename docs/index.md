@@ -69,7 +69,7 @@ The following arguments are supported in the provider block. All attributes are 
 
 The Spaceship provider currently offers the following resources:
 
-- `spaceship_domain` — Read domain metadata and manage auto-renew plus nameserver settings for a Spaceship-managed domain, including ASCII and Unicode representations of the name.
+- `spaceship_domain` — Read domain metadata (name forms, premium flag, registration/expiration dates, lifecycle and verification status, EPP statuses, suspensions, contacts, and privacy protection) and manage auto-renew plus nameserver settings for a Spaceship-managed domain.
 - `spaceship_dns_records` — Manage the full DNS record set for a Spaceship-managed domain, replacing all records in each apply. The resource supports importing an existing domain by its name.
 
 ## Data Sources
