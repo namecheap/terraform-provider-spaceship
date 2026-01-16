@@ -476,6 +476,7 @@ func applyDomainInfo(ctx context.Context, state *domainResourceModel, info clien
 	eppStatuses, eppDiags := types.ListValueFrom(ctx, types.StringType, info.EPPStatuses)
 	diags.Append(eppDiags...)
 	if diags.HasError() {
+		logDiagnostics(ctx, "Failed to map epp_statuses", diags)
 		return diags
 	}
 	state.EppStatuses = eppStatuses
@@ -483,6 +484,7 @@ func applyDomainInfo(ctx context.Context, state *domainResourceModel, info clien
 	nameservers, nsDiags := nameserversToTerraformObject(ctx, info.Nameservers)
 	diags.Append(nsDiags...)
 	if diags.HasError() {
+		logDiagnostics(ctx, "Failed to map nameservers", diags)
 		return diags
 	}
 	state.Nameservers = nameservers
@@ -490,6 +492,7 @@ func applyDomainInfo(ctx context.Context, state *domainResourceModel, info clien
 	suspensions, suspDiags := suspensionsToTerraformList(ctx, info.Suspensions)
 	diags.Append(suspDiags...)
 	if diags.HasError() {
+		logDiagnostics(ctx, "Failed to map suspensions", diags)
 		return diags
 	}
 	state.Suspensions = suspensions
@@ -497,6 +500,7 @@ func applyDomainInfo(ctx context.Context, state *domainResourceModel, info clien
 	contactsObj, contactDiags := contactsToTerraformObject(ctx, info.Contacts)
 	diags.Append(contactDiags...)
 	if diags.HasError() {
+		logDiagnostics(ctx, "Failed to map contacts", diags)
 		return diags
 	}
 	state.Contacts = contactsObj
@@ -504,11 +508,22 @@ func applyDomainInfo(ctx context.Context, state *domainResourceModel, info clien
 	ppObject, ppDiags := privacyProtectionToTerraformObject(ctx, info.PrivacyProtection)
 	diags.Append(ppDiags...)
 	if diags.HasError() {
+		logDiagnostics(ctx, "Failed to map privacy_protection", diags)
 		return diags
 	}
 	state.PrivacyProtection = ppObject
 
 	return diags
+}
+
+func logDiagnostics(ctx context.Context, message string, diags diag.Diagnostics) {
+	if !diags.HasError() {
+		return
+	}
+
+	tflog.Error(ctx, message, map[string]any{
+		"diagnostics": diags,
+	})
 }
 
 func nameserversToTerraformObject(ctx context.Context, ns client.Nameservers) (types.Object, diag.Diagnostics) {
