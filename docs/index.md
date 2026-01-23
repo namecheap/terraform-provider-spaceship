@@ -1,6 +1,5 @@
 ---
 page_title: "Spaceship Provider"
-subcategory: ""
 description: |-
   The Spaceship provider enables Terraform configuration management for domain settings and DNS records hosted with Spaceship.
 ---
