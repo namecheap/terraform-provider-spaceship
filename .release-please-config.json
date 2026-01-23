@@ -1,0 +1,7 @@
+{
+  "release-type": "simple",
+  "include-v-in-tag": true,
+  "packages": {
+    ".": {}
+  }
+}

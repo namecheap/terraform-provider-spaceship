@@ -4,6 +4,8 @@ on:
     push:
         branches:
             - "**"
+        tags-ignore:
+            - "v*"
     workflow_dispatch:
 
 jobs:
@@ -12,14 +14,53 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
             - name: Set up Go
               uses: actions/setup-go@v5
               with:
-                  go-version: 1.24
+                  go-version-file: go.mod
 
             - name: Lint
               uses: golangci/golangci-lint-action@v6
               with:
                   version: v1.64
-                  skip-pkg-cache: true
+                  args: --timeout=3m
+
+            - name: Unit Test
+              run: make test
+
+            - name: Validate Documentation
+              run: |
+                  make docs
+                  if ! git diff --exit-code docs/; then
+                      echo "❌ Documentation is out of sync with provider code!"
+                      echo "Please run 'make docs' locally and commit the changes."
+                      echo ""
+                      echo "Changed files:"
+                      git diff --name-only docs/
+                      echo ""
+                      echo "Diff:"
+                      git diff docs/
+                      exit 1
+                  fi
+                  make docs-validate
+
+            - name: Check Acceptance Secrets
+              id: acc_secrets
+              env:
+                  SPACESHIP_API_KEY: ${{ secrets.SPACESHIP_API_KEY }}
+                  SPACESHIP_API_SECRET: ${{ secrets.SPACESHIP_API_SECRET }}
+                  SPACESHIP_TEST_DOMAIN: ${{ secrets.SPACESHIP_TEST_DOMAIN }}
+              run: |
+                  if [ -n "$SPACESHIP_API_KEY" ] && [ -n "$SPACESHIP_API_SECRET" ] && [ -n "$SPACESHIP_TEST_DOMAIN" ]; then
+                      echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Acceptance Tests
+              if: ${{ steps.acc_secrets.outputs.has_secrets == 'true' }}
+              env:
+                  SPACESHIP_API_KEY: ${{ secrets.SPACESHIP_API_KEY }}
+                  SPACESHIP_API_SECRET: ${{ secrets.SPACESHIP_API_SECRET }}
+                  SPACESHIP_TEST_DOMAIN: ${{ secrets.SPACESHIP_TEST_DOMAIN }}
+              run: make testacc

@@ -1,0 +1,18 @@
+---
+page_title: "Spaceship Provider"
+subcategory: ""
+description: |-
+  The Spaceship provider enables Terraform configuration management for domain settings and DNS records hosted with Spaceship.
+---
+
+# Spaceship Provider
+
+> 🚧 **Active Development:** This provider is still evolving and is not intended for production deployments. Expect breaking changes between releases and test in non-critical environments first.
+
+Use the Spaceship provider to manage domain settings (including auto-renew and nameservers) and DNS records for domains registered with Spaceship.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

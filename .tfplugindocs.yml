@@ -1,0 +1,14 @@
+# Configuration for tfplugindocs
+# See: https://github.com/hashicorp/terraform-plugin-docs
+
+# Provider name (short form)
+provider-name: spaceship
+
+# Rendered provider name (display name)
+rendered-provider-name: Spaceship
+
+# Use legacy sidebar rendering (set to false for better Terraform Registry rendering)
+legacy-sidebar: false
+
+# Ignore deprecated fields in schemas
+hide-deprecated: false
