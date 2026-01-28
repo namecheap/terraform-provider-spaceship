@@ -215,7 +215,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						},
 						"name": schema.StringAttribute{
 							Required:            true,
-							MarkdownDescription: "Record host. Use `@a` for the zone apex.",
+							MarkdownDescription: "Record host. Use `@` for the zone apex.",
 							Validators: []validator.String{
 								stringvalidator.LengthBetween(1, 253),
 								recordNameValidator(),
@@ -256,7 +256,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						},
 						"value": schema.StringAttribute{
 							Optional:            true,
-							MarkdownDescription: "Generic value field used by several record tyeps (CAA, TXT).",
+							MarkdownDescription: "Generic value field used by several record types (CAA, TXT).",
 						},
 						"port": schema.StringAttribute{
 							Optional:            true,

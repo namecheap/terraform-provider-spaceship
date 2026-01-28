@@ -3,10 +3,8 @@ name: CI
 on:
     push:
         branches:
-            - "**"
-        tags-ignore:
-            - "v*"
-    workflow_dispatch:
+            - master
+    pull_request:
 
 jobs:
     check:
