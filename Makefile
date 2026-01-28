@@ -16,3 +16,13 @@ testacc:
 		echo "SPACESHIP_TEST_DOMAIN must be set"; exit 1; \
 	fi
 	go test -run TestAcc ./internal/provider -v
+
+.PHONY: docs
+docs:
+	@go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
+	@PATH="$(shell go env GOPATH)/bin:$$PATH" tfplugindocs generate --provider-name "spaceship"
+
+.PHONY: docs-validate
+docs-validate:
+	@go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest
+	@PATH="$(shell go env GOPATH)/bin:$$PATH" tfplugindocs validate --provider-name "spaceship"

@@ -1,3 +1,6 @@
 .env
 .DS_Store
 terraform-provider-spaceship
+
+# Claude Code local settings
+.claude/settings.local.json

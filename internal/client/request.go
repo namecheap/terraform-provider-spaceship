@@ -34,7 +34,9 @@ func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload an
 	if err != nil {
 		return status, fmt.Errorf("execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	status = resp.StatusCode
 	if resp.StatusCode >= 300 {
