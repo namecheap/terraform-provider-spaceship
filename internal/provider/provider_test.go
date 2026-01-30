@@ -21,8 +21,6 @@ var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServe
 	},
 }
 
-const testAccDefaultDomain = "dmytrovovk.com"
-
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
@@ -36,12 +34,7 @@ func testAccPreCheck(t *testing.T) {
 }
 
 func testAccDomainValue() string {
-	if domain := os.Getenv("SPACESHIP_TEST_DOMAIN"); domain != "" {
-		return domain
-	}
-
-	return testAccDefaultDomain
-
+	return os.Getenv("SPACESHIP_TEST_DOMAIN")
 }
 
 func testAccClient() (*client.Client, error) {
