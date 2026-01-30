@@ -61,4 +61,5 @@ jobs:
                   SPACESHIP_API_KEY: ${{ secrets.SPACESHIP_API_KEY }}
                   SPACESHIP_API_SECRET: ${{ secrets.SPACESHIP_API_SECRET }}
                   SPACESHIP_TEST_DOMAIN: ${{ secrets.SPACESHIP_TEST_DOMAIN }}
+                  TF_ACC: 1
               run: make testacc

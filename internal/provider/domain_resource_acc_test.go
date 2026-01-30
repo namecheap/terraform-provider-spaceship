@@ -22,7 +22,7 @@ provider "%s" {}
 resource "%s" "%s" {
 	domain = "%s"
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 func TestAccDomain_basic(t *testing.T) {
 
@@ -42,8 +42,8 @@ resource "%s" "%s" {
 			{
 				Config: emptyDomainResourceConfiguration,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(domainResourceFullName, "name", domainName),
-					resource.TestCheckResourceAttr(domainResourceFullName, "unicode_name", domainName),
+					resource.TestCheckResourceAttr(domainResourceFullName, "name", testAccDomainValue()),
+					resource.TestCheckResourceAttr(domainResourceFullName, "unicode_name", testAccDomainValue()),
 					resource.TestCheckResourceAttr(domainResourceFullName, "is_premium", "false"),
 					resource.TestCheckResourceAttrSet(domainResourceFullName, "registration_date"),
 					resource.TestCheckResourceAttrSet(domainResourceFullName, "expiration_date"),
@@ -90,7 +90,7 @@ resource "%s" "%s" {
 	
 	auto_renew = true
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	configAutoRenewFalse := fmt.Sprintf(`
 provider "%s" {}
@@ -100,7 +100,7 @@ resource "%s" "%s" {
 	
 	auto_renew = false
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -141,7 +141,7 @@ resource "%s" "%s" {
 		provider = "basic"
 	}
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	nsProviderCustomConfig := fmt.Sprintf(`
 provider "%s" {}
@@ -159,7 +159,7 @@ resource "%s" "%s" {
 		]
 	}
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -218,7 +218,7 @@ resource "%s" "%s" {
 		hosts = ["ns1.example.com", "ns2.example.com"]
 	}
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	nsProviderCustomWithNoHosts := fmt.Sprintf(`
 provider "%s" {}
@@ -230,7 +230,7 @@ resource "%s" "%s" {
 		provider = "custom"
 	}
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	nsProviderCustomWithDefaultHosts := fmt.Sprintf(`
 provider "%s" {}
@@ -243,7 +243,7 @@ resource "%s" "%s" {
 		hosts = ["launch1.spaceship.net", "launch2.spaceship.net"]
 	}
 }
-`, providerName, domainResourceRef, domainResourceName, domainName)
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -280,7 +280,7 @@ func TestAccDomain_resourceImport(t *testing.T) {
 				ResourceName:                         domainResourceFullName,
 				ImportState:                          true,
 				ImportStateVerify:                    true,
-				ImportStateId:                        domainName,
+				ImportStateId:                        testAccDomainValue(),
 				ImportStateVerifyIdentifierAttribute: "domain",
 			},
 		},

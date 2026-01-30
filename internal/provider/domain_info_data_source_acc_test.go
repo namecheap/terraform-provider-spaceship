@@ -12,7 +12,6 @@ const (
 	dataSource               = "spaceship_domain_info"
 	dataSourceResourceName   = "this"
 	domainInfoDataSourceName = "data." + dataSource + "." + dataSourceResourceName
-	domainName               = "dmytrovovk.com"
 )
 
 func TestAccDomainInfo_basic(t *testing.T) {
@@ -29,7 +28,7 @@ data "%s" "%s" {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(template, dataSource, dataSourceResourceName, domainName),
+				Config: fmt.Sprintf(template, dataSource, dataSourceResourceName, testAccDomainValue()),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					domainInfoBasicsChecks(),
 					domainInfoPrivacyProtectionChecks(),
@@ -46,16 +45,16 @@ data "%s" "%s" {
 func domainInfoBasicsChecks() resource.TestCheckFunc {
 	return resource.ComposeTestCheckFunc(
 		expectAttrValues(domainInfoDataSourceName, []attrExpectation{
-			{Attribute: "name", Value: domainName},
-			{Attribute: "unicode_name", Value: domainName},
+			{Attribute: "name", Value: testAccDomainValue()},
+			{Attribute: "unicode_name", Value: testAccDomainValue()},
 			{Attribute: "is_premium", Value: "false"},
-			{Attribute: "auto_renew", Value: "false"},
 		}),
 		expectNonEmptyAttrs(domainInfoDataSourceName, []string{
 			"registration_date",
 			"expiration_date",
 			"lifecycle_status",
 			"verification_status",
+			"auto_renew",
 		}),
 		expectListCountAtLeast(domainInfoDataSourceName, "epp_statuses.#", 0),
 	)
