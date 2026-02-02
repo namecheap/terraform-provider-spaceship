@@ -38,6 +38,7 @@ resource "spaceship_domain" "example" {
 
 - `auto_renew` (Boolean) Indicates whether the auto-renew option is enabled
 - `nameservers` (Attributes) Information about nameservers (see [below for nested schema](#nestedatt--nameservers))
+- `timeouts` (Attributes) (see [below for nested schema](#nestedatt--timeouts))
 
 ### Read-Only
 
@@ -60,6 +61,16 @@ Optional:
 
 - `hosts` (Set of String)
 - `provider` (String) type: basic or custom
+
+
+<a id="nestedatt--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) Timeout for creating the domain resource. Default is 12 minutes.
+- `read` (String) Timeout for creating the domain resource. Default is 12 minutes.
+- `update` (String) Timeout for creating the domain resource. Default is 12 minutes.
 
 
 <a id="nestedatt--contacts"></a>
