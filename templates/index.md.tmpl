@@ -6,7 +6,6 @@ description: |-
 
 # Spaceship Provider
 
-> 🚧 **Active Development:** This provider is still evolving and is not intended for production deployments. Expect breaking changes between releases and test in non-critical environments first.
 
 Use the Spaceship provider to manage domain settings (including auto-renew and nameservers) and DNS records for domains registered with Spaceship.
 

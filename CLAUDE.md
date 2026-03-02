@@ -37,7 +37,7 @@ This is a [Terraform Plugin Framework v1](https://github.com/hashicorp/terraform
 **Key design decisions:**
 
 - **DNS records use full-replacement**: `spaceship_dns_records` replaces the entire record set on every apply. `domain_common.go` contains the reconciliation logic that computes the diff between desired and actual state.
-- **Rate-limit handling**: Two strategies — `GetDomainInfo` falls back to the domain list API on HTTP 429; all other mutating endpoints use `doJSONWithRetry` which retries with `Retry-After` header timing via a shared `rateLimiter` (see `ratelimiter.go`, `clock.go`). Provider-level rate-limit tests use `resource.UnitTest` with `httptest.NewServer` mock (see `domain_resource_ratelimit_test.go`).
+- **Rate-limit handling**: Two strategies — `GetDomainInfo` falls back to the domain list API on HTTP 429; all other endpoints use `doJSONWithRetry` which retries with `Retry-After` header timing via a shared `rateLimiter`. The client package is self-contained (see `internal/client/RATELIMIT.md`). At the provider level, Terraform resource timeouts (default 12 min) set context deadlines that bound retries; the client's own `maxRetryWait` (default 10 min) is a safety net when no deadline is set. Provider-level rate-limit tests use `resource.UnitTest` with `httptest.NewServer` mock (see `domain_resource_ratelimit_test.go`).
 - **Nested attributes**: Single nested objects use `types.Object`; repeating blocks use `types.List` with `NestedAttributeObject`. Conversion helpers like `flattenNameservers()` and `buildDomainModel()` live in `domain_common.go`.
 
 **Adding a new resource:**

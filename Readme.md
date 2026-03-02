@@ -1,5 +1,3 @@
-> 🚧 **Active Development:** This provider is experimental, under active development, and not yet recommended for production workloads. Expect breaking changes and use only with disposable test domains.
-
 # Spaceship Terraform Provider
 
 This repository contains a Terraform provider that manages domain settings and DNS records for domains hosted with [Spaceship](https://spaceship.com/).
@@ -112,6 +110,14 @@ output "first_domain" {
 ```
 
 > **Note:** The Spaceship API updates DNS records in batches. Each apply **replaces** the full set of records for the domain with whatever is declared in Terraform. The resource's `force` argument defaults to `true` and may be adjusted if Spaceship changes its API requirements.
+
+## Rate Limits
+
+The Spaceship API enforces per-endpoint rate limits.
+The provider handles `429 Too Many Requests` responses automatically — retrying after the server's
+`Retry-After` window and coordinating concurrent requests through a shared wait.
+Operations are bounded by configurable timeouts to prevent indefinite hangs.
+See the `timeouts` block on `spaceship_domain` for per-operation configuration.
 
 ## Testing
 

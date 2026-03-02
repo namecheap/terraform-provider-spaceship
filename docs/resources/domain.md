@@ -24,6 +24,7 @@ resource "spaceship_domain" "example" {
       "ns2.example.net",
     ]
   }
+
 }
 ```
 
