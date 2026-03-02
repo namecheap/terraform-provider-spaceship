@@ -4,7 +4,8 @@
 
 ```bash
 go build .                                              # Build
-make test                                               # Unit tests (excludes acceptance)
+make test                                               # Unit tests (excludes acceptance; pattern: Test[^A])
+# Note: unit test names must NOT start with TestAcc — they won't run in `make test`
 go test -run TestFunctionName ./internal/provider       # Single unit test
 golangci-lint run ./...                                 # Lint
 make docs                                               # Generate docs
@@ -29,14 +30,14 @@ After making changes, follow this order:
 
 This is a [Terraform Plugin Framework v1](https://github.com/hashicorp/terraform-plugin-framework) provider (protocol 6) for managing Spaceship domains and DNS.
 
-**`internal/provider`** — Terraform resource/data-source implementations. Each file implements one resource or data source using the Plugin Framework interfaces (`resource.Resource`, `datasource.DataSource`). Shared schema types, model builders, and reconciliation helpers live in `domain_common.go`. Custom validators (e.g. nameserver format) are in separate `_validator.go` files.
+**`internal/provider`** — Terraform resource/data-source implementations. Each file implements one resource or data source using the Plugin Framework interfaces (`resource.Resource`, `datasource.DataSource`). Resources: `domain_resource.go`, `dns_records_resource.go`. Data sources: `domain_info_data_source.go`, `domain_list_data_source.go`. Shared schema types, model builders, and reconciliation helpers live in `domain_common.go`. Custom validators (e.g. nameserver format) are in separate `_validator.go` files.
 
 **`internal/client`** — HTTP client for the Spaceship API (`https://spaceship.dev/api/v1`). Handles authentication headers, request building, and error parsing. Each API domain (domains, DNS) has its own file with typed request/response methods.
 
 **Key design decisions:**
 
 - **DNS records use full-replacement**: `spaceship_dns_records` replaces the entire record set on every apply. `domain_common.go` contains the reconciliation logic that computes the diff between desired and actual state.
-- **Rate-limit fallback**: The domain info endpoint falls back to the domain list API on HTTP 429 — preserve this pattern if modifying client code.
+- **Rate-limit handling**: Two strategies — `GetDomainInfo` falls back to the domain list API on HTTP 429; all other mutating endpoints use `doJSONWithRetry` which retries with `Retry-After` header timing via a shared `rateLimiter` (see `ratelimiter.go`, `clock.go`). Provider-level rate-limit tests use `resource.UnitTest` with `httptest.NewServer` mock (see `domain_resource_ratelimit_test.go`).
 - **Nested attributes**: Single nested objects use `types.Object`; repeating blocks use `types.List` with `NestedAttributeObject`. Conversion helpers like `flattenNameservers()` and `buildDomainModel()` live in `domain_common.go`.
 
 **Adding a new resource:**
@@ -49,3 +50,5 @@ This is a [Terraform Plugin Framework v1](https://github.com/hashicorp/terraform
 **Credentials:**
 
 Provider reads `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET` env vars or inline HCL attributes. Auth is passed as `X-API-Key` and `X-API-Secret` HTTP headers.
+
+`SPACESHIP_API_BASE_URL` can override the default API endpoint (used by mock-server unit tests, not for production).

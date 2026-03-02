@@ -10,9 +10,7 @@ import (
 	"time"
 )
 
-// real test case
 func TestAccDomain_ApiClient_basic(t *testing.T) {
-	//var ctx context.Context
 	ctx := context.Background()
 
 	apiKey := os.Getenv("SPACESHIP_API_KEY")
@@ -39,28 +37,86 @@ func TestAccDomain_ApiClient_basic(t *testing.T) {
 
 }
 
-func composeRateLimitApiResponse(retryAfterSeconds string) *http.Response {
-	resp := &http.Response{
-		StatusCode: 429,
-		Status:     "429 Too Many Requests",
-		Proto:      "HTTP/2.0",
-		ProtoMajor: 2,
-		ProtoMinor: 0,
-		Header: http.Header{
-			"Content-Type":           []string{"application/problem+json"},
-			"Retry-After":            []string{retryAfterSeconds}, // seconds to wait
-			"Spaceship-Operation-Id": []string{"71814014307c5e96"},
-			"Spaceship-Error-Code":   []string{"application.rateLimit"},
-		},
+// TestGetDomainInfo_Success verifies the happy path: the single-domain endpoint
+// returns 200 and the response is decoded correctly.
+func TestGetDomainInfo_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"name":"example.com","unicodeName":"example.com","autoRenew":true}`))
+	}))
+	defer server.Close()
+
+	c := newTestClient(t, server.URL)
+	info, err := c.GetDomainInfo(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	return resp
+	if info.Name != "example.com" {
+		t.Fatalf("expected name %q, got %q", "example.com", info.Name)
+	}
+	if !info.AutoRenew {
+		t.Fatal("expected autoRenew to be true")
+	}
 }
 
-// func TestWaiting(t *testing.T) {
-// 	resp := composeRateLimitApiResponse("2")
+// TestGetDomainInfo_RateLimitFallback_Found verifies that when the single-domain
+// endpoint returns 429, GetDomainInfo falls back to GetDomainList and finds the
+// domain in the list.
+func TestGetDomainInfo_RateLimitFallback_Found(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/domains/example.com" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		// List endpoint returns the domain.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"items":[{"name":"example.com","autoRenew":true}],"total":1}`))
+	}))
+	defer server.Close()
 
-// 	t.Run()
-// }
+	c := newTestClient(t, server.URL)
+	info, err := c.GetDomainInfo(context.Background(), "example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.Name != "example.com" {
+		t.Fatalf("expected name %q, got %q", "example.com", info.Name)
+	}
+}
+
+// TestGetDomainInfo_RateLimitFallback_NotFound verifies that when the single-domain
+// endpoint returns 429 and the domain is not present in the list fallback, a
+// not-found error is returned instead of the original 429 error.
+func TestGetDomainInfo_RateLimitFallback_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/domains/missing.com" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		// List endpoint returns domains, but not the one we're looking for.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"items":[{"name":"other.com"}],"total":1}`))
+	}))
+	defer server.Close()
+
+	c := newTestClient(t, server.URL)
+	_, err := c.GetDomainInfo(context.Background(), "missing.com")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !IsNotFoundError(err) {
+		t.Fatalf("expected not-found error, got: %v", err)
+	}
+}
+
+func newTestClient(t *testing.T, baseURL string) *Client {
+	t.Helper()
+	c, err := NewClient(baseURL, "test-key", "test-secret")
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+	return c
+}
 
 // TestDoJSON_ConcurrentRateLimit verifies that when goroutine A hits a 429 and
 // activates the shared rate limiter, goroutine B (started afterwards) sees the
@@ -79,7 +135,7 @@ func TestDoJSON_ConcurrentRateLimit(t *testing.T) {
 		}
 		// All subsequent calls succeed.
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"isEnabled": true}`))
+		_, _ = w.Write([]byte(`{"isEnabled": true}`))
 	}))
 	defer server.Close()
 
@@ -142,31 +198,20 @@ func TestDoJSON_ConcurrentRateLimit(t *testing.T) {
 }
 
 func TestDoJSON_SingleRetry(t *testing.T) {
-	// why atomic and not just 1?
-	// probably due to concurency
 	var callCount atomic.Int32
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		current := callCount.Add(1)
 
 		if current == 1 {
-			w.Header().Set("Retry-After", "60") // 60 seconds
+			w.Header().Set("Retry-After", "60")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Header().Set("Content-Type", "application/problem+json")
-
-			// 	strToEncode := `"detail":"Request rate limit
-			// exceeded.","data":{"rateLimitRule":"The limit for updating the autorenewal
-			// state for a domain is 5 requests per domain, within 300
-			// seconds.","limit":5,"windowInSeconds":300}`
-
-			// 	data, _ := json.Marshal(strToEncode)
-			//w.Write([]byte(data))
 			return
 		}
 
 		if current == 2 {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"isEnabled": true}`))
+			_, _ = w.Write([]byte(`{"isEnabled": true}`))
 			return
 		}
 
@@ -193,15 +238,12 @@ func TestDoJSON_SingleRetry(t *testing.T) {
 	select {
 	case <-done:
 		t.Fatal("should still be waiting")
-	// why this default is so imortant
-	// does not work without it at all
 	default:
 	}
 
 	fakeClock.Advance(60 * time.Second)
 
 	select {
-	// why res here?
 	case res := <-done:
 		if res.err != nil {
 			t.Fatalf("unexpected error: %v", res.err)

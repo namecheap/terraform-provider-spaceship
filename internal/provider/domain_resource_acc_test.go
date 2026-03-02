@@ -122,35 +122,6 @@ func TestAccDomain_autoRenewal(t *testing.T) {
 		}})
 }
 
-// autorenewal with ratelimit handling
-func TestAccDomain_autoRenewalWithRateLimiting(t *testing.T) {
-	testSteps := []resource.TestStep{}
-
-	// initial case. adopt domain into state
-	testSteps = append(testSteps, resource.TestStep{
-		Config: emptyDomainResourceConfiguration,
-		Check: resource.ComposeAggregateTestCheckFunc(
-			resource.TestCheckResourceAttrSet(domainResourceFullName, "auto_renew"),
-		),
-	})
-
-	autoRenewalTestCases := []bool{true, false, true, false, true, false}
-
-	for _, state := range autoRenewalTestCases {
-		testSteps = append(testSteps, resource.TestStep{
-			Config: configAutoRenewWithStatus(state),
-			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttrSet(domainResourceFullName, "auto_renew"),
-			),
-		})
-	}
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps:                    testSteps})
-}
-
 func TestAccDomain_nameservers(t *testing.T) {
 	nsProviderBasicConfig := fmt.Sprintf(`
 provider "%s" {}
@@ -316,7 +287,7 @@ resource "%s" "%s" {
 	domain = "%s"
 
 	timeouts = {
-		create = "1s"
+		create = "1ms"
 	} 
 }
 `, providerName, domainResourceRef, domainResourceName, testAccDomainValue())

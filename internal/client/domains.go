@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 )
@@ -84,6 +85,10 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 		}
 		if info, ok := findDomainByNameFromDomainList(domainList, domain); ok {
 			return info, nil
+		}
+		return DomainInfo{}, &SpaceshipApiError{
+			Status:  http.StatusNotFound,
+			Message: fmt.Sprintf("domain %q not found via list fallback after rate limit", domain),
 		}
 	}
 
