@@ -69,8 +69,8 @@ Optional:
 Optional:
 
 - `create` (String) Timeout for creating the domain resource. Default is 12 minutes.
-- `read` (String) Timeout for creating the domain resource. Default is 12 minutes.
-- `update` (String) Timeout for creating the domain resource. Default is 12 minutes.
+- `read` (String) Timeout for reading the domain resource. Default is 12 minutes.
+- `update` (String) Timeout for updating the domain resource. Default is 12 minutes.
 
 
 <a id="nestedatt--contacts"></a>

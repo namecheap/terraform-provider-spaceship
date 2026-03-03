@@ -7,20 +7,25 @@ import (
 	"time"
 )
 
-// todo define in one place
-// see provider.go in provider
-const defaultBaseURL = "https://spaceship.dev/api/v1"
+// DefaultBaseURL is the production Spaceship API endpoint.
+const DefaultBaseURL = "https://spaceship.dev/api/v1"
+
+// defaultMaxRetryWait is the client-level safety net for retry loops when
+// no context deadline is set. Terraform timeouts (default 12 min) take
+// precedence when present.
+const defaultMaxRetryWait = 10 * time.Minute
 
 // Client wraps the Spaceship API connection details and helpers used by
 // the provider. It stores the base URL, credentials, and an HTTP client
 // configured with a request timeout for all API calls.
 type Client struct {
-	baseURL    url.URL
-	apiKey     string
-	apiSecret  string
-	httpClient *http.Client
-	clock      Clock
-	rl         *rateLimiter
+	baseURL      url.URL
+	apiKey       string
+	apiSecret    string
+	httpClient   *http.Client
+	clock        Clock
+	rl           *rateLimiter
+	maxRetryWait time.Duration
 }
 
 type ClientOptions func(*Client)
@@ -28,6 +33,12 @@ type ClientOptions func(*Client)
 func WithClock(c Clock) ClientOptions {
 	return func(client *Client) {
 		client.clock = c
+	}
+}
+
+func WithMaxRetryWait(d time.Duration) ClientOptions {
+	return func(client *Client) {
+		client.maxRetryWait = d
 	}
 }
 
@@ -47,7 +58,8 @@ func NewClient(baseURL, apiKey, apiSecret string, opts ...ClientOptions) (*Clien
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		clock: RealClock{},
+		clock:        RealClock{},
+		maxRetryWait: defaultMaxRetryWait,
 	}
 
 	for _, opt := range opts {

@@ -62,6 +62,14 @@ func (c *Client) doJSONWithRetry(ctx context.Context, method, endpoint string, p
 		return 0, err
 	}
 
+	// If the caller hasn't set a deadline (e.g. context.Background()), apply the
+	// client-level retry budget so the loop cannot run forever.
+	if _, ok := ctx.Deadline(); !ok && c.maxRetryWait > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.maxRetryWait)
+		defer cancel()
+	}
+
 	for {
 		// Gate: wait out any active global rate-limit pause before sending.
 		if waitCh := c.rl.peek(); waitCh != nil {
@@ -89,6 +97,7 @@ func (c *Client) doJSONWithRetry(ctx context.Context, method, endpoint string, p
 
 		if resp.StatusCode == http.StatusTooManyRequests {
 			retryAfter := parseRetryAfter(resp)
+			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 
 			waitCh := c.rl.activate(retryAfter)

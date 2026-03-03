@@ -14,8 +14,6 @@ import (
 
 	"terraform-provider-spaceship/internal/client"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
@@ -196,14 +194,8 @@ func TestDomain_autoRenewalWithRateLimiting(t *testing.T) {
 	t.Setenv("SPACESHIP_API_KEY", "test-key")
 	t.Setenv("SPACESHIP_API_SECRET", "test-secret")
 
-	providerFactories := map[string]func() (tfprotov6.ProviderServer, error){
-		"spaceship": func() (tfprotov6.ProviderServer, error) {
-			return providerserver.NewProtocol6WithError(New("test")())()
-		},
-	}
-
 	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: providerFactories,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Step 1: Adopt domain into state. No rate limiting — establish baseline.
 			{
@@ -282,14 +274,8 @@ func TestDomain_timeoutCancellation(t *testing.T) {
 	t.Setenv("SPACESHIP_API_KEY", "test-key")
 	t.Setenv("SPACESHIP_API_SECRET", "test-secret")
 
-	providerFactories := map[string]func() (tfprotov6.ProviderServer, error){
-		"spaceship": func() (tfprotov6.ProviderServer, error) {
-			return providerserver.NewProtocol6WithError(New("test")())()
-		},
-	}
-
 	resource.UnitTest(t, resource.TestCase{
-		ProtoV6ProviderFactories: providerFactories,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: fmt.Sprintf(`

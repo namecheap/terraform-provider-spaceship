@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +18,7 @@ func TestAccDomain_ApiClient_basic(t *testing.T) {
 	apiSecret := os.Getenv("SPACESHIP_API_SECRET")
 	domain := os.Getenv("SPACESHIP_TEST_DOMAIN")
 
-	client, _ := NewClient(defaultBaseURL, apiKey, apiSecret)
+	client, _ := NewClient(DefaultBaseURL, apiKey, apiSecret)
 
 	autoRenewalTestCases := []bool{true, false, true, false, true, false, true}
 
@@ -259,6 +260,43 @@ func TestDoJSON_SingleRetry(t *testing.T) {
 	expectedHitCount := 2
 	if callCount.Load() != int32(expectedHitCount) {
 		t.Fatalf("expected %d calls, but got %d", expectedHitCount, callCount.Load())
+	}
+}
+
+// TestDoJSON_MaxRetryWaitBudget verifies that when no context deadline is set,
+// the client-level maxRetryWait budget kicks in and stops the retry loop.
+func TestDoJSON_MaxRetryWaitBudget(t *testing.T) {
+	var callCount atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount.Add(1)
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	c, err := NewClient(server.URL, "test-key", "test-secret",
+		WithMaxRetryWait(500*time.Millisecond),
+	)
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	// context.Background() has no deadline — the client-level budget is the only safety net.
+	var resp AutoRenewalResponse
+	_, err = c.doJSONWithRetry(context.Background(), http.MethodPut, server.URL, nil, &resp)
+
+	if err == nil {
+		t.Fatal("expected error from maxRetryWait budget, got nil")
+	}
+
+	var rlErr *RateLimitTimeoutError
+	if !errors.As(err, &rlErr) {
+		t.Fatalf("expected RateLimitTimeoutError, got: %v", err)
+	}
+
+	if callCount.Load() < 1 {
+		t.Fatal("expected at least 1 API call")
 	}
 }
 

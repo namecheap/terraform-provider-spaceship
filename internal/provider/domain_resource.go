@@ -30,16 +30,16 @@ func NewDomainResource() resource.Resource {
 	return &domainResource{}
 }
 
-// defaultTimeout returns the default timeout for operations.
+// defaultTimeoutMinutes is the default timeout for all domain operations.
 // 12 minutes: 5-minute rate-limit window + 5-minute retry window + 2-minute buffer.
-const defaultTimeoutInt int = 12
+const defaultTimeoutMinutes = 12
 
 func defaultTimeout() time.Duration {
-	return 12 * time.Minute
+	return time.Duration(defaultTimeoutMinutes) * time.Minute
 }
 
-func defaultTimoutDescription() string {
-	return fmt.Sprintf("Timeout for creating the domain resource. Default is %d minutes.", defaultTimeoutInt)
+func timeoutDescription(operation string) string {
+	return fmt.Sprintf("Timeout for %s the domain resource. Default is %d minutes.", operation, defaultTimeoutMinutes)
 }
 
 type domainResource struct {
@@ -247,11 +247,11 @@ func (d *domainResource) Schema(ctx context.Context, req resource.SchemaRequest,
 			},
 			"timeouts": timeouts.Attributes(ctx, timeouts.Opts{
 				Create:            true,
-				CreateDescription: defaultTimoutDescription(),
+				CreateDescription: timeoutDescription("creating"),
 				Read:              true,
-				ReadDescription:   defaultTimoutDescription(),
+				ReadDescription:   timeoutDescription("reading"),
 				Update:            true,
-				UpdateDescription: defaultTimoutDescription(),
+				UpdateDescription: timeoutDescription("updating"),
 			}),
 		},
 	}
@@ -360,7 +360,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 }
 
 func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// removing resouce from state only
+	// removing resource from state only
 	// no external call
 	// leaving infra in the same state
 }

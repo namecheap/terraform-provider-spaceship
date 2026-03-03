@@ -56,7 +56,7 @@ jobs:
                   fi
 
             - name: Acceptance Tests
-              # should be enought to pass all tests
+              # should be enough to pass all tests
               # with retries
               timeout-minutes: 10
               if: ${{ steps.acc_secrets.outputs.has_secrets == 'true' }}

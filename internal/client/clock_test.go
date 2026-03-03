@@ -69,6 +69,6 @@ func (f *FakeClock) WaitForWaiters(n int) {
 		if count >= n {
 			return
 		}
-		time.Sleep(1 * time.Millisecond) // smal real sleep for sync
+		time.Sleep(1 * time.Millisecond) // small real sleep for sync
 	}
 }

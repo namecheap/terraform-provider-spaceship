@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const defaultBaseURL = "https://spaceship.dev/api/v1"
+const defaultBaseURL = client.DefaultBaseURL
 
 // ensure spaceship provider satisfies expected interfaces
 var (
