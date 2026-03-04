@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 )
@@ -60,37 +61,38 @@ func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
 
 	endpoint := c.endpointURL([]string{"domains"}, query)
 
-	if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
+	if _, err := c.doJSONWithRetry(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
 		return domainList, err
 	}
 
 	return domainList, nil
 }
 
+// GetDomainInfo fetches a single domain's details. On a 429, it falls back to
+// GetDomainList which has significantly higher rate-limit allowances, and
+// searches the result for the requested domain.
 func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
 	var domainInfo DomainInfo
 
 	endpoint := c.endpointURL([]string{"domains", domain}, nil)
 
-	// overcome insane API rate limiting
-	// by using alternative endpoint that does the same
-	// but has 60x times higher limits
 	statusCode, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo)
 	if statusCode == http.StatusTooManyRequests {
-		domainList, _ := c.GetDomainList(ctx)
-
-		domainInfo, ok := findDomainByNameFromDomainList(domainList, domain)
-
-		if ok {
-			return domainInfo, nil
+		// Fall back to the list endpoint which has ~60x higher rate limits.
+		domainList, listErr := c.GetDomainList(ctx)
+		if listErr != nil {
+			return DomainInfo{}, listErr
 		}
-
+		if info, ok := findDomainByNameFromDomainList(domainList, domain); ok {
+			return info, nil
+		}
+		return DomainInfo{}, &SpaceshipApiError{
+			Status:  http.StatusNotFound,
+			Message: fmt.Sprintf("domain %q not found via list fallback after rate limit", domain),
+		}
 	}
 
-	if err != nil {
-		return domainInfo, err
-	}
-	return domainInfo, nil
+	return domainInfo, err
 }
 
 func findDomainByNameFromDomainList(dl DomainList, domain string) (DomainInfo, bool) {
@@ -117,7 +119,7 @@ func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool)
 		IsEnabled: value,
 	}
 
-	_, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, &resp)
+	_, err := c.doJSONWithRetry(ctx, http.MethodPut, endpoint, payload, &resp)
 
 	if err != nil {
 		return resp, err
@@ -166,7 +168,7 @@ func (c *Client) UpdateDomainNameServers(ctx context.Context, domain string, req
 		Hosts:    request.Hosts,
 	}
 
-	_, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil)
+	_, err := c.doJSONWithRetry(ctx, http.MethodPut, endpoint, payload, nil)
 
 	if err != nil {
 		return err

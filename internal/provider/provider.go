@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-const defaultBaseURL = "https://spaceship.dev/api/v1"
+const defaultBaseURL = client.DefaultBaseURL
 
 // ensure spaceship provider satisfies expected interfaces
 var (
@@ -105,7 +105,12 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := client.NewClient(defaultBaseURL, apiKey, apiSecret)
+	baseURL := defaultBaseURL
+	if envURL := os.Getenv("SPACESHIP_API_BASE_URL"); envURL != "" {
+		baseURL = envURL
+	}
+
+	client, err := client.NewClient(baseURL, apiKey, apiSecret)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Spaceship base URL",
@@ -113,10 +118,9 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		)
 		return
 	}
-	//map of any type could be improved at least in this case?
-	// or it will not work for empty interface?
+
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{
-		"base_url": defaultBaseURL,
+		"base_url": baseURL,
 	})
 
 	resp.DataSourceData = client

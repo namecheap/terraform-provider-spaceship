@@ -423,7 +423,7 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 
 	if len(toUpsert) > 0 {
 		if err := r.client.UpsertDNSRecords(ctx, plan.Domain.ValueString(), force, toUpsert); err != nil {
-			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Fail;ed to apply DNS records: %s", err))
+			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to apply DNS records: %s", err))
 			return
 		}
 	}

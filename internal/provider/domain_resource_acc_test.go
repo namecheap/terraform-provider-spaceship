@@ -80,28 +80,20 @@ resource "%s" "%s" {
 
 }
 
+func configAutoRenewWithStatus(autoRenew bool) string {
+	return fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+	
+	auto_renew = %t 
+}
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue(), autoRenew)
+
+}
+
 func TestAccDomain_autoRenewal(t *testing.T) {
-
-	configAutoRenewTrue := fmt.Sprintf(`
-provider "%s" {}
-
-resource "%s" "%s" {
-	domain = "%s"
-	
-	auto_renew = true
-}
-`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
-
-	configAutoRenewFalse := fmt.Sprintf(`
-provider "%s" {}
-
-resource "%s" "%s" {
-	domain = "%s"
-	
-	auto_renew = false
-}
-`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
-
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -115,14 +107,14 @@ resource "%s" "%s" {
 			},
 			// resource has auto_renew value true
 			{
-				Config: configAutoRenewTrue,
+				Config: configAutoRenewWithStatus(true),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
 				),
 			},
 			// auto_renew value false
 			{
-				Config: configAutoRenewFalse,
+				Config: configAutoRenewWithStatus(false),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "false"),
 				),
@@ -285,4 +277,30 @@ func TestAccDomain_resourceImport(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestAccDomain_timeoutCancellation(t *testing.T) {
+	config := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	timeouts = {
+		create = "1ms"
+	} 
+}
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`context deadline exceeded`),
+			},
+		},
+	})
+
 }
