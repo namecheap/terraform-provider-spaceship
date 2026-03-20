@@ -23,8 +23,26 @@ jobs:
                   version: v1.64
                   args: --timeout=3m
 
-            - name: Unit Test
-              run: make test
+            - name: Unit Test with Coverage
+              run: make test-cover
+
+            - name: Check Coverage Threshold
+              run: |
+                  COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+                  echo "Total coverage: ${COVERAGE}%"
+                  THRESHOLD=40.0
+                  if [ "$(echo "${COVERAGE} < ${THRESHOLD}" | bc -l)" -eq 1 ]; then
+                      echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
+                      exit 1
+                  fi
+
+            - name: Upload Coverage Report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report
+                  path: coverage.out
+                  retention-days: 30
 
             - name: Validate Documentation
               run: |
