@@ -24,7 +24,7 @@ jobs:
                     - go
 
         env:
-            CODEQL_ACTION_DISABLE_FILE_COVERAGE: true
+            CODEQL_ACTION_FILE_COVERAGE_ON_PRS: true
 
         steps:
             - uses: actions/checkout@v5
