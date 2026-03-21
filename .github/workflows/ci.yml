@@ -20,7 +20,7 @@ jobs:
             - name: Lint
               uses: golangci/golangci-lint-action@v9
               with:
-                  version: v1.64
+                  version: v2.11
                   args: --timeout=3m
 
             - name: Unit Test with Coverage
