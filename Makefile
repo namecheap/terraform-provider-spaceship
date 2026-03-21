@@ -4,6 +4,11 @@ SHELL := /bin/bash
 test:
 	go test -run 'Test[^A]' ./...
 
+.PHONY: test-cover
+test-cover:
+	go test -run 'Test[^A]' -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -func=coverage.out
+
 .PHONY: testacc
 testacc:
 	@if [[ -z "$$SPACESHIP_API_KEY" ]]; then \
