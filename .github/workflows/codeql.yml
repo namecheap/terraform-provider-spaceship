@@ -23,6 +23,9 @@ jobs:
                 language:
                     - go
 
+        env:
+            CODEQL_ACTION_DISABLE_FILE_COVERAGE: true
+
         steps:
             - uses: actions/checkout@v5
 
