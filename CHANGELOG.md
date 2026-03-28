@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.16](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.15...v0.0.16) (2026-03-28)
+
+
+### Bug Fixes
+
+* handle eventual consistency for auto_renew and nameservers updates ([#23](https://github.com/namecheap/terraform-provider-spaceship/issues/23)) ([fa3afcc](https://github.com/namecheap/terraform-provider-spaceship/commit/fa3afccae64cc064b7326d5cdc217ce9267d89a3))
+
 ## [0.0.15](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.14...v0.0.15) (2026-03-21)
 
 
