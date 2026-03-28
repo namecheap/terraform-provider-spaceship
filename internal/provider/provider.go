@@ -20,6 +20,13 @@ import (
 
 const defaultBaseURL = "https://spaceship.dev/api/v1"
 
+func baseURL() string {
+	if v := os.Getenv("SPACESHIP_BASE_URL"); v != "" {
+		return v
+	}
+	return defaultBaseURL
+}
+
 // ensure spaceship provider satisfies expected interfaces
 var (
 	_ provider.Provider = &spaceshipProvider{}
@@ -105,7 +112,7 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := client.NewClient(defaultBaseURL, apiKey, apiSecret)
+	client, err := client.NewClient(baseURL(), apiKey, apiSecret)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Invalid Spaceship base URL",

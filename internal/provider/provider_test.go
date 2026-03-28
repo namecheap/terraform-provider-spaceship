@@ -39,7 +39,7 @@ func testAccDomainValue() string {
 
 func testAccClient() (*client.Client, error) {
 	return client.NewClient(
-		defaultBaseURL,
+		baseURL(),
 		os.Getenv("SPACESHIP_API_KEY"),
 		os.Getenv("SPACESHIP_API_SECRET"),
 	)
