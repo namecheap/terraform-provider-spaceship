@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -50,15 +51,15 @@ func TestGetDomainInfo_Success(t *testing.T) {
 }
 
 func TestGetDomainInfo_RateLimitFallback(t *testing.T) {
-	callCount := 0
 	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
+		// Domain info endpoint: always 429 (exhausts doJSON retries)
+		if strings.HasSuffix(r.URL.Path, "/domains/example.com") {
+			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = w.Write([]byte("rate limited"))
 			return
 		}
-		// second call is GetDomainList fallback
+		// Domain list fallback endpoint
 		_ = json.NewEncoder(w).Encode(DomainList{
 			Items: []DomainInfo{
 				{Name: "other.com"},
@@ -81,14 +82,15 @@ func TestGetDomainInfo_RateLimitFallback(t *testing.T) {
 }
 
 func TestGetDomainInfo_RateLimitFallback_NotFound(t *testing.T) {
-	callCount := 0
 	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if callCount == 1 {
+		// Domain info endpoint: always 429
+		if strings.HasSuffix(r.URL.Path, "/domains/example.com") {
+			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)
 			_, _ = w.Write([]byte("rate limited"))
 			return
 		}
+		// Domain list fallback: domain not present
 		_ = json.NewEncoder(w).Encode(DomainList{
 			Items: []DomainInfo{{Name: "other.com"}},
 			Total: 1,
