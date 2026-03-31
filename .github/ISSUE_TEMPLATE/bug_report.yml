@@ -1,0 +1,82 @@
+name: Bug Report
+description: Report a bug in the Spaceship Terraform Provider
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please search [existing issues](https://github.com/namecheap/terraform-provider-spaceship/issues) before filing a new one.
+
+  - type: input
+    id: versions
+    attributes:
+      label: Terraform and Provider Versions
+      description: Output of `terraform version`
+      placeholder: "Terraform v1.14.7, provider namecheap/spaceship v0.0.16"
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected Resource(s)
+      description: Which resources or data sources are affected?
+      placeholder: spaceship_dns_records, spaceship_domain
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Terraform Configuration
+      description: A minimal configuration that reproduces the issue. Redact any secrets.
+      render: hcl
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error Output
+      description: Relevant error messages, panic output, or debug logs.
+      render: console
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Commands or actions to reproduce the issue.
+      value: |
+        1. `terraform init`
+        2. `terraform apply`
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Anything else that might help (OS, platform, API behavior, screenshots).
+
+  - type: dropdown
+    id: implement
+    attributes:
+      label: Would you like to submit a fix?
+      options:
+        - "No"
+        - "Yes"
+      default: 0
