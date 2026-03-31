@@ -9,6 +9,11 @@ import (
 	"strconv"
 )
 
+var (
+	_ json.Marshaler   = (*PortValue)(nil)
+	_ json.Unmarshaler = (*PortValue)(nil)
+)
+
 // DNSRecord represents a DNS record managed through the Spaceship API.
 type DNSRecord struct {
 	//basic fields for all records
