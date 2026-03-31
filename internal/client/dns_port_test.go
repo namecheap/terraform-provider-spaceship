@@ -129,5 +129,20 @@ func TestPortValue_JSONRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDNSRecord_UnmarshalNumericPort(t *testing.T) {
+	payload := `{"items":[{"type":"SRV","name":"_autodiscover._tcp","ttl":300,"port":443,"service":"_autodiscover","protocol":"_tcp","priority":0,"weight":0,"target":"autoconfig.spacemail.com"}],"total":1}`
+
+	var result struct {
+		Items []DNSRecord `json:"items"`
+		Total int         `json:"total"`
+	}
+	if err := json.Unmarshal([]byte(payload), &result); err != nil {
+		t.Fatalf("failed to unmarshal DNS response with numeric port: %v", err)
+	}
+	if result.Items[0].Port == nil || result.Items[0].Port.Int == nil || *result.Items[0].Port.Int != 443 {
+		t.Errorf("expected numeric port 443, got %+v", result.Items[0].Port)
+	}
+}
+
 func intP(v int) *int       { return &v }
 func strP(v string) *string { return &v }
