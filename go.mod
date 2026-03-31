@@ -1,6 +1,6 @@
 module terraform-provider-spaceship
 
-go 1.24.3
+go 1.25.8
 
 require (
 	github.com/dlclark/regexp2 v1.11.5
