@@ -342,3 +342,98 @@ func TestExpandDNSRecords_MissingRequiredFields(t *testing.T) {
 		})
 	}
 }
+
+func TestManagedRecordKey(t *testing.T) {
+	r := client.DNSRecord{Type: "A", Name: "test", Address: "1.2.3.4"}
+	key := managedRecordKey(r)
+	if key != "A|test" {
+		t.Errorf("expected A|test, got %s", key)
+	}
+	// case insensitive
+	r2 := client.DNSRecord{Type: "a", Name: "TEST", Address: "5.6.7.8"}
+	if key != managedRecordKey(r2) {
+		t.Error("expected case-insensitive key match")
+	}
+}
+
+func TestFilterToManagedRecords_RemovesUnmanagedRecords(t *testing.T) {
+	managed := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "CNAME", Name: "www", CName: "example.com", TTL: 3600},
+	}
+	all := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "CNAME", Name: "www", CName: "example.com", TTL: 3600},
+		{Type: "TXT", Name: "@", Value: "v=spf1", TTL: 3600},          // unmanaged
+		{Type: "SRV", Name: "_sip._tcp", TTL: 3600, Service: "_sip"},   // unmanaged
+	}
+
+	filtered := filterToManagedRecords(managed, all)
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(filtered))
+	}
+	if filtered[0].Type != "A" || filtered[1].Type != "CNAME" {
+		t.Errorf("unexpected record types: %s, %s", filtered[0].Type, filtered[1].Type)
+	}
+}
+
+func TestFilterToManagedRecords_PreservesAllManagedRecords(t *testing.T) {
+	managed := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "CNAME", Name: "www", CName: "example.com", TTL: 3600},
+	}
+	// API returns exactly what was managed, possibly with normalized values
+	all := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "CNAME", Name: "www", CName: "example.com", TTL: 3600},
+	}
+
+	filtered := filterToManagedRecords(managed, all)
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(filtered))
+	}
+}
+
+func TestFilterToManagedRecords_CountLimitsPerKey(t *testing.T) {
+	// User declares 2 A records for @
+	managed := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "A", Name: "@", Address: "2.2.2.2", TTL: 3600},
+	}
+	// API returns 3 A records for @ (one is platform-injected)
+	all := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+		{Type: "A", Name: "@", Address: "2.2.2.2", TTL: 3600},
+		{Type: "A", Name: "@", Address: "15.197.162.184", TTL: 3600}, // platform record
+	}
+
+	filtered := filterToManagedRecords(managed, all)
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(filtered))
+	}
+}
+
+func TestFilterToManagedRecords_EmptyManaged(t *testing.T) {
+	all := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", TTL: 3600},
+	}
+
+	filtered := filterToManagedRecords(nil, all)
+	if len(filtered) != 0 {
+		t.Fatalf("expected 0 records, got %d", len(filtered))
+	}
+}
+
+func TestFilterToManagedRecords_CaseInsensitive(t *testing.T) {
+	managed := []client.DNSRecord{
+		{Type: "cname", Name: "WWW", CName: "example.com", TTL: 3600},
+	}
+	all := []client.DNSRecord{
+		{Type: "CNAME", Name: "www", CName: "example.com", TTL: 3600},
+	}
+
+	filtered := filterToManagedRecords(managed, all)
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 record, got %d", len(filtered))
+	}
+}

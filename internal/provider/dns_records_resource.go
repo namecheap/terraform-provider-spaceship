@@ -435,6 +435,7 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	orderedRecords := orderDNSRecordsLike(desiredRecords, updatedRecords)
+	orderedRecords = filterToManagedRecords(desiredRecords, orderedRecords)
 
 	flattened, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
@@ -480,6 +481,7 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	orderedRecords := orderDNSRecordsLike(stateRecords, apiRecords)
+	orderedRecords = filterToManagedRecords(stateRecords, orderedRecords)
 
 	flattenedRecords, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
@@ -538,6 +540,7 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 	}
 
 	orderedRecords := orderDNSRecordsLike(desiredRecords, updatedRecords)
+	orderedRecords = filterToManagedRecords(desiredRecords, orderedRecords)
 
 	flattened, diags := flattenDNSRecords(ctx, orderedRecords)
 	resp.Diagnostics.Append(diags...)
@@ -954,6 +957,27 @@ func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []
 
 func recordKey(record client.DNSRecord) string {
 	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name) + "|" + recordValueSignature(record)
+}
+
+func managedRecordKey(record client.DNSRecord) string {
+	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name)
+}
+
+func filterToManagedRecords(managed, all []client.DNSRecord) []client.DNSRecord {
+	counts := make(map[string]int, len(managed))
+	for _, r := range managed {
+		counts[managedRecordKey(r)]++
+	}
+
+	filtered := make([]client.DNSRecord, 0, len(managed))
+	for _, r := range all {
+		key := managedRecordKey(r)
+		if counts[key] > 0 {
+			filtered = append(filtered, r)
+			counts[key]--
+		}
+	}
+	return filtered
 }
 
 func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSRecord {
