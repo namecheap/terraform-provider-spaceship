@@ -9,6 +9,11 @@ import (
 	"strconv"
 )
 
+var (
+	_ json.Marshaler   = (*PortValue)(nil)
+	_ json.Unmarshaler = (*PortValue)(nil)
+)
+
 // DNSRecord represents a DNS record managed through the Spaceship API.
 type DNSRecord struct {
 	//basic fields for all records
@@ -61,7 +66,7 @@ func NewIntPortValue(value int) *PortValue {
 	return &PortValue{Int: &value}
 }
 
-func (p *PortValue) MarshallJSON() ([]byte, error) {
+func (p *PortValue) MarshalJSON() ([]byte, error) {
 	if p == nil {
 		return []byte("null"), nil
 	}
@@ -74,7 +79,7 @@ func (p *PortValue) MarshallJSON() ([]byte, error) {
 	return []byte("null"), nil
 }
 
-func (p *PortValue) UnmarshallJSON(data []byte) error {
+func (p *PortValue) UnmarshalJSON(data []byte) error {
 	if string(data) == "null" {
 		return nil
 	}

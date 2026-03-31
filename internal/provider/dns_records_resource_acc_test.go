@@ -1,12 +1,15 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+
+	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -263,6 +266,92 @@ func TestAccDNSRecords_invalidRecordNameFailsPlan(t *testing.T) {
 			},
 		},
 	})
+}
+
+// TestAccDNSRecords_numericPortInExistingZone reproduces the issue #19 scenario:
+// a zone already contains an SRV record with a numeric port (e.g. Spacemail
+// autodiscovery), and the provider must not crash when reading the zone while
+// managing only CNAME records.
+func TestAccDNSRecords_numericPortInExistingZone(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	srvName := fmt.Sprintf("%s-preseed-srv", prefix)
+	cnameName := fmt.Sprintf("%s-cname-only", prefix)
+	resourceName := "spaceship_dns_records.test"
+
+	// SRV record with a numeric port, simulating Spacemail autodiscovery.
+	srvRecord := client.DNSRecord{
+		Type:     "SRV",
+		Name:     srvName,
+		TTL:      300,
+		Port:     client.NewIntPortValue(443),
+		Service:  "_autodiscover",
+		Protocol: "_tcp",
+		Priority: intPointerClient(0),
+		Weight:   intPointerClient(0),
+		Target:   fmt.Sprintf("autoconfig.%s", domain),
+	}
+
+	// Pre-seed the SRV record before Terraform runs.
+	preConfig := func() {
+		testClient, err := testAccClient()
+		if err != nil {
+			t.Fatalf("failed to create test client: %v", err)
+		}
+		if err := testClient.UpsertDNSRecords(context.Background(), domain, true, []client.DNSRecord{srvRecord}); err != nil {
+			t.Fatalf("failed to pre-seed SRV record: %v", err)
+		}
+	}
+
+	// Clean up the pre-seeded SRV record after the test.
+	cleanup := func() {
+		testClient, err := testAccClient()
+		if err != nil {
+			return
+		}
+		_ = testClient.DeleteDNSRecords(context.Background(), domain, []client.DNSRecord{srvRecord})
+	}
+	t.Cleanup(cleanup)
+
+	// Terraform config manages only a CNAME record.
+	records := []testAccDNSRecord{
+		{
+			Type: "CNAME",
+			Name: cnameName,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"cname": fmt.Sprintf("origin.%s", domain),
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				PreConfig: preConfig,
+				Config:    testAccDNSRecordsConfig(domain, records),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "CNAME"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.name", cnameName),
+				),
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "CNAME", cnameName),
+		),
+	})
+}
+
+func intPointerClient(v int) *int {
+	return &v
 }
 
 type testAccDNSRecord struct {
