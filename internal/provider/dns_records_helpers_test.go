@@ -437,3 +437,85 @@ func TestFilterToManagedRecords_CaseInsensitive(t *testing.T) {
 		t.Fatalf("expected 1 record, got %d", len(filtered))
 	}
 }
+
+// TestIssue20_CreatePipelineFiltersUnmanagedRecords reproduces the exact
+// scenario from https://github.com/namecheap/terraform-provider-spaceship/issues/20:
+//
+// User declares 2 CNAME records. After apply, the API re-read returns those
+// 2 plus additional platform-managed records (A records from URL Redirect,
+// SRV from Spacemail autodiscovery). Without the filter, orderDNSRecordsLike
+// appends the extras to state, causing Terraform to fail with
+// "Provider produced inconsistent result after apply: new element N has appeared".
+func TestIssue20_CreatePipelineFiltersUnmanagedRecords(t *testing.T) {
+	// Step 1: What the user declared in HCL
+	desiredRecords := []client.DNSRecord{
+		{Type: "CNAME", Name: "www", CName: "target.example.net", TTL: 300},
+		{Type: "CNAME", Name: "api", CName: "api-target.example.net", TTL: 300},
+	}
+
+	// Step 2: What GetDNSRecords returns AFTER the upsert — the zone now
+	// contains the user's records PLUS platform-managed records that the
+	// provider did not declare and cannot delete.
+	apiRecordsAfterApply := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "15.197.162.184", TTL: 1800},       // URL Redirect
+		{Type: "A", Name: "*", Address: "15.197.162.184", TTL: 1800},       // URL Redirect
+		{Type: "CNAME", Name: "www", CName: "target.example.net", TTL: 300},
+		{Type: "CNAME", Name: "api", CName: "api-target.example.net", TTL: 300},
+		{Type: "SRV", Name: "_autodiscover._tcp", TTL: 3600, Service: "_autodiscover", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Port: client.NewIntPortValue(443), Target: "autodiscover.spaceship.com"}, // Spacemail
+		{Type: "TXT", Name: "@", Value: "v=spf1 include:spf.spaceship.com ~all", TTL: 3600}, // Spacemail
+	}
+
+	// Step 3: This is what the provider does — order then filter
+	orderedRecords := orderDNSRecordsLike(desiredRecords, apiRecordsAfterApply)
+	filteredRecords := filterToManagedRecords(desiredRecords, orderedRecords)
+
+	// Verify: only the 2 declared CNAMEs survive, in the correct order
+	if len(filteredRecords) != 2 {
+		t.Fatalf("expected 2 records (matching the plan), got %d — "+
+			"Terraform would fail with 'new element N has appeared'", len(filteredRecords))
+	}
+
+	if filteredRecords[0].Type != "CNAME" || filteredRecords[0].Name != "www" {
+		t.Errorf("expected first record CNAME www, got %s %s", filteredRecords[0].Type, filteredRecords[0].Name)
+	}
+	if filteredRecords[1].Type != "CNAME" || filteredRecords[1].Name != "api" {
+		t.Errorf("expected second record CNAME api, got %s %s", filteredRecords[1].Type, filteredRecords[1].Name)
+	}
+
+	// Verify the bug: WITHOUT the filter, orderDNSRecordsLike would have
+	// returned all 6 records (the 2 desired + 4 platform records appended).
+	if len(orderedRecords) != 6 {
+		t.Fatalf("expected orderDNSRecordsLike to return all 6 records (the pre-fix behavior), got %d", len(orderedRecords))
+	}
+}
+
+// TestIssue20_ReadPipelineFiltersUnmanagedRecords verifies that Read also
+// filters out unmanaged records from state, preventing perpetual diff on
+// terraform plan.
+func TestIssue20_ReadPipelineFiltersUnmanagedRecords(t *testing.T) {
+	// Current state has the 2 records the user originally declared
+	stateRecords := []client.DNSRecord{
+		{Type: "CNAME", Name: "www", CName: "target.example.net", TTL: 300},
+		{Type: "CNAME", Name: "api", CName: "api-target.example.net", TTL: 300},
+	}
+
+	// API returns the user's records plus platform records
+	apiRecords := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "15.197.162.184", TTL: 1800},
+		{Type: "CNAME", Name: "www", CName: "target.example.net", TTL: 300},
+		{Type: "CNAME", Name: "api", CName: "api-target.example.net", TTL: 300},
+		{Type: "TXT", Name: "@", Value: "v=spf1 include:spf.spaceship.com ~all", TTL: 3600},
+	}
+
+	orderedRecords := orderDNSRecordsLike(stateRecords, apiRecords)
+	filteredRecords := filterToManagedRecords(stateRecords, orderedRecords)
+
+	if len(filteredRecords) != 2 {
+		t.Fatalf("expected 2 records in state after Read, got %d — "+
+			"would cause perpetual diff on terraform plan", len(filteredRecords))
+	}
+
+	if filteredRecords[0].Name != "www" || filteredRecords[1].Name != "api" {
+		t.Errorf("unexpected record order: %s, %s", filteredRecords[0].Name, filteredRecords[1].Name)
+	}
+}
