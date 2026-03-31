@@ -350,6 +350,99 @@ func TestAccDNSRecords_numericPortInExistingZone(t *testing.T) {
 	})
 }
 
+// TestAccDNSRecords_issue20_unmanagedRecordsFiltered reproduces the scenario
+// from https://github.com/namecheap/terraform-provider-spaceship/issues/20:
+//
+// When the zone contains records that are NOT declared in the Terraform config
+// (e.g. injected by platform features), the provider must filter them out of
+// state. Without the fix, Terraform would fail with:
+//
+//	"Provider produced inconsistent result after apply: new element N has appeared"
+//
+// The test pre-seeds extra records via the API, then runs terraform apply with
+// only a subset of records. If the filter works, apply succeeds cleanly.
+func TestAccDNSRecords_issue20_unmanagedRecordsFiltered(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	resourceName := "spaceship_dns_records.test"
+
+	// These are the records Terraform will manage
+	managedRecords := []testAccDNSRecord{
+		{
+			Type: "CNAME",
+			Name: fmt.Sprintf("%s-i20-www", prefix),
+			TTL:  intPointer(300),
+			StringAttrs: map[string]string{
+				"cname": fmt.Sprintf("target.%s", domain),
+			},
+		},
+		{
+			Type: "CNAME",
+			Name: fmt.Sprintf("%s-i20-api", prefix),
+			TTL:  intPointer(300),
+			StringAttrs: map[string]string{
+				"cname": fmt.Sprintf("api-target.%s", domain),
+			},
+		},
+	}
+
+	// These extra records simulate platform-injected records that are NOT in
+	// the Terraform config. They will be pre-seeded via the API before apply.
+	extraRecords := []client.DNSRecord{
+		{Type: "A", Name: fmt.Sprintf("%s-i20-extra", prefix), Address: "198.51.100.99", TTL: 1800},
+		{Type: "TXT", Name: fmt.Sprintf("%s-i20-extra", prefix), Value: "platform-injected", TTL: 1800},
+	}
+
+	// Pre-seed extra records before Terraform runs
+	testClient, err := testAccClient()
+	if err != nil {
+		t.Fatalf("failed to create test client: %s", err)
+	}
+
+	if err := testClient.UpsertDNSRecords(context.Background(), domain, true, extraRecords); err != nil {
+		t.Fatalf("failed to pre-seed extra DNS records: %s", err)
+	}
+
+	// Cleanup: remove extra records after the test regardless of outcome
+	t.Cleanup(func() {
+		_ = testClient.DeleteDNSRecords(context.Background(), domain, extraRecords)
+	})
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Step 1: Create — the zone already has extra records.
+				// Without the filter, this would fail with "new element N has appeared".
+				Config: testAccDNSRecordsConfig(domain, managedRecords),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "CNAME"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.name", fmt.Sprintf("%s-i20-www", prefix)),
+					resource.TestCheckResourceAttr(resourceName, "records.1.type", "CNAME"),
+					resource.TestCheckResourceAttr(resourceName, "records.1.name", fmt.Sprintf("%s-i20-api", prefix)),
+				),
+			},
+			{
+				// Step 2: Plan-only refresh — extra records still exist in the zone.
+				// Without the filter on Read, this would show a perpetual diff.
+				Config:   testAccDNSRecordsConfig(domain, managedRecords),
+				PlanOnly: true,
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "CNAME", fmt.Sprintf("%s-i20-www", prefix)),
+			testAccCheckDNSRecordAbsent(domain, "CNAME", fmt.Sprintf("%s-i20-api", prefix)),
+		),
+	})
+}
+
 func intPointerClient(v int) *int {
 	return &v
 }
