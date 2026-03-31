@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -24,7 +25,7 @@ func TestNewIntPortValue(t *testing.T) {
 	}
 }
 
-func TestPortValue_MarshallJSON(t *testing.T) {
+func TestPortValue_MarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		pv       *PortValue
@@ -38,7 +39,7 @@ func TestPortValue_MarshallJSON(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			data, err := tc.pv.MarshallJSON()
+			data, err := tc.pv.MarshalJSON()
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -49,7 +50,7 @@ func TestPortValue_MarshallJSON(t *testing.T) {
 	}
 }
 
-func TestPortValue_UnmarshallJSON(t *testing.T) {
+func TestPortValue_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
@@ -64,7 +65,7 @@ func TestPortValue_UnmarshallJSON(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			pv := &PortValue{}
-			err := pv.UnmarshallJSON([]byte(tc.input))
+			err := pv.UnmarshalJSON([]byte(tc.input))
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -82,11 +83,49 @@ func TestPortValue_UnmarshallJSON(t *testing.T) {
 	}
 }
 
-func TestPortValue_UnmarshallJSON_Invalid(t *testing.T) {
+func TestPortValue_UnmarshalJSON_Invalid(t *testing.T) {
 	pv := &PortValue{}
-	err := pv.UnmarshallJSON([]byte(`[1,2,3]`))
+	err := pv.UnmarshalJSON([]byte(`[1,2,3]`))
 	if err == nil {
 		t.Fatal("expected error for invalid input")
+	}
+}
+
+func TestPortValue_JSONRoundTrip(t *testing.T) {
+	// This is the actual code path that failed: json.Unmarshal calling UnmarshalJSON
+	type wrapper struct {
+		Port *PortValue `json:"port,omitempty"`
+	}
+
+	tests := []struct {
+		name      string
+		input     string
+		expectInt *int
+		expectStr *string
+	}{
+		{"numeric port from SRV record", `{"port":5060}`, intP(5060), nil},
+		{"string port from HTTPS record", `{"port":"_443"}`, nil, strP("_443")},
+		{"null port", `{"port":null}`, nil, nil},
+		{"absent port", `{}`, nil, nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var w wrapper
+			if err := json.Unmarshal([]byte(tc.input), &w); err != nil {
+				t.Fatalf("json.Unmarshal failed: %v", err)
+			}
+			if tc.expectInt != nil {
+				if w.Port == nil || w.Port.Int == nil || *w.Port.Int != *tc.expectInt {
+					t.Errorf("expected int port %d, got %+v", *tc.expectInt, w.Port)
+				}
+			}
+			if tc.expectStr != nil {
+				if w.Port == nil || w.Port.String == nil || *w.Port.String != *tc.expectStr {
+					t.Errorf("expected string port %q, got %+v", *tc.expectStr, w.Port)
+				}
+			}
+		})
 	}
 }
 
