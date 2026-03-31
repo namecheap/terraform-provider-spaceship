@@ -204,6 +204,9 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					listplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
+					Validators: []validator.Object{
+						&srvRecordValidator{},
+					},
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
 							Required:            true,
