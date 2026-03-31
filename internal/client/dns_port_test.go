@@ -144,5 +144,32 @@ func TestDNSRecord_UnmarshalNumericPort(t *testing.T) {
 	}
 }
 
+func TestDNSRecord_UnmarshalMixedPortTypes(t *testing.T) {
+	payload := `{"items":[` +
+		`{"type":"SRV","name":"_autodiscover._tcp","ttl":300,"port":443,"service":"_autodiscover","protocol":"_tcp","priority":0,"weight":0,"target":"autoconfig.spacemail.com"},` +
+		`{"type":"TLSA","name":"_25._tcp","ttl":300,"port":"_25","protocol":"_tcp","usage":3,"selector":1,"matching":1,"associationData":"aabbccdd"}` +
+		`],"total":2}`
+
+	var result struct {
+		Items []DNSRecord `json:"items"`
+		Total int         `json:"total"`
+	}
+	if err := json.Unmarshal([]byte(payload), &result); err != nil {
+		t.Fatalf("failed to unmarshal mixed port types: %v", err)
+	}
+
+	// SRV record: numeric port
+	srv := result.Items[0]
+	if srv.Port == nil || srv.Port.Int == nil || *srv.Port.Int != 443 {
+		t.Errorf("SRV: expected numeric port 443, got %+v", srv.Port)
+	}
+
+	// TLSA record: string port
+	tlsa := result.Items[1]
+	if tlsa.Port == nil || tlsa.Port.String == nil || *tlsa.Port.String != "_25" {
+		t.Errorf("TLSA: expected string port \"_25\", got %+v", tlsa.Port)
+	}
+}
+
 func intP(v int) *int       { return &v }
 func strP(v string) *string { return &v }
