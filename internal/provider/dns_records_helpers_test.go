@@ -153,6 +153,30 @@ func TestDiffDNSRecords_DuplicateDesired(t *testing.T) {
 	}
 }
 
+func TestDiffDNSRecords_DoesNotDeleteFilteredRecords(t *testing.T) {
+	// Simulates the scenario after GetDNSRecords filters out non-custom records.
+	// The existing slice only contains custom records (product/personalNS already removed).
+	// The diff should only delete custom records not in the desired set.
+	existing := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.2.3.4", TTL: 3600, Group: &client.RecordGroup{Type: "custom"}},
+		{Type: "TXT", Name: "@", Value: "old-txt", TTL: 3600, Group: &client.RecordGroup{Type: "custom"}},
+	}
+	desired := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.2.3.4", TTL: 3600},
+	}
+
+	toDelete, toUpsert := diffDNSRecords(existing, desired)
+	if len(toDelete) != 1 {
+		t.Errorf("expected 1 deletion (old TXT), got %d", len(toDelete))
+	}
+	if len(toDelete) > 0 && toDelete[0].Value != "old-txt" {
+		t.Errorf("expected deleted record to be old TXT, got %+v", toDelete[0])
+	}
+	if len(toUpsert) != 0 {
+		t.Errorf("expected 0 upserts (A record unchanged), got %d", len(toUpsert))
+	}
+}
+
 func TestOrderDNSRecordsLike_EmptyReference(t *testing.T) {
 	records := []client.DNSRecord{{Type: "A", Name: "@", Address: "1.2.3.4"}}
 	result := orderDNSRecordsLike(nil, records)
