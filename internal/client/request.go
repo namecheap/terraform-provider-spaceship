@@ -93,17 +93,23 @@ func (c *Client) doJSONWithRetries(ctx context.Context, method, endpoint string,
 	return 0, fmt.Errorf("exhausted retries")
 }
 
-// retryDelay reads the Retry-After header from a 429 response and returns
-// the appropriate delay, capped to maxRetryDelay. Falls back to
-// defaultRetryDelay if the header is missing or unparseable.
+// retryDelay determines how long to wait before retrying a 429 response.
+// It checks headers in order of specificity:
+//  1. Retry-After — explicit wait time from the server
+//  2. X-RateLimit-Reset — seconds until the rate limit window resets
+//
+// The result is capped to maxRetryDelay. Falls back to defaultRetryDelay
+// if neither header is present or parseable.
 func retryDelay(resp *http.Response) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
-			delay := time.Duration(seconds) * time.Second
-			if delay > maxRetryDelay {
-				return maxRetryDelay
+	for _, header := range []string{"Retry-After", "X-RateLimit-Reset"} {
+		if v := resp.Header.Get(header); v != "" {
+			if seconds, err := strconv.Atoi(v); err == nil && seconds > 0 {
+				delay := time.Duration(seconds) * time.Second
+				if delay > maxRetryDelay {
+					return maxRetryDelay
+				}
+				return delay
 			}
-			return delay
 		}
 	}
 	return defaultRetryDelay

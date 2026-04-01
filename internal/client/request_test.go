@@ -229,22 +229,26 @@ func TestDoJSON_Non429ErrorNotRetried(t *testing.T) {
 func TestRetryDelay(t *testing.T) {
 	tests := []struct {
 		name     string
-		header   string
+		headers  map[string]string
 		expected time.Duration
 	}{
-		{"valid header", "3", 3 * time.Second},
-		{"missing header", "", defaultRetryDelay},
-		{"non-numeric header", "abc", defaultRetryDelay},
-		{"zero header", "0", defaultRetryDelay},
-		{"negative header", "-1", defaultRetryDelay},
-		{"exceeds max", "120", maxRetryDelay},
+		{"Retry-After present", map[string]string{"Retry-After": "3"}, 3 * time.Second},
+		{"no headers", nil, defaultRetryDelay},
+		{"non-numeric Retry-After", map[string]string{"Retry-After": "abc"}, defaultRetryDelay},
+		{"zero Retry-After", map[string]string{"Retry-After": "0"}, defaultRetryDelay},
+		{"negative Retry-After", map[string]string{"Retry-After": "-1"}, defaultRetryDelay},
+		{"exceeds max", map[string]string{"Retry-After": "120"}, maxRetryDelay},
+		{"X-RateLimit-Reset only", map[string]string{"X-RateLimit-Reset": "10"}, 10 * time.Second},
+		{"X-RateLimit-Reset exceeds max", map[string]string{"X-RateLimit-Reset": "60"}, maxRetryDelay},
+		{"Retry-After takes priority over X-RateLimit-Reset", map[string]string{"Retry-After": "2", "X-RateLimit-Reset": "10"}, 2 * time.Second},
+		{"invalid Retry-After falls through to X-RateLimit-Reset", map[string]string{"Retry-After": "abc", "X-RateLimit-Reset": "7"}, 7 * time.Second},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := &http.Response{Header: http.Header{}}
-			if tc.header != "" {
-				resp.Header.Set("Retry-After", tc.header)
+			for k, v := range tc.headers {
+				resp.Header.Set(k, v)
 			}
 			got := retryDelay(resp)
 			if got != tc.expected {
