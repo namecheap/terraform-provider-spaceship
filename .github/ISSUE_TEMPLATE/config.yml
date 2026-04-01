@@ -1,8 +1,1 @@
 blank_issues_enabled: true
-contact_links:
-  - name: Spaceship API Documentation
-    url: https://docs.spaceship.dev/
-    about: Official Spaceship API reference
-  - name: Terraform Documentation
-    url: https://developer.hashicorp.com/terraform/docs
-    about: General Terraform questions and documentation
