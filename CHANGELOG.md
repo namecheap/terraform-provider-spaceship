@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.17](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.16...v0.0.17) (2026-04-01)
+
+
+### Bug Fixes
+
+* trigger release with latest updates ([#32](https://github.com/namecheap/terraform-provider-spaceship/issues/32)) ([bf34a00](https://github.com/namecheap/terraform-provider-spaceship/commit/bf34a00e3a2c70f78859a6c6c3488b9384b83eea))
+
 ## [0.0.16](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.15...v0.0.16) (2026-03-28)
 
 
