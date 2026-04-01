@@ -1,0 +1,52 @@
+name: Feature Request
+description: Suggest a new feature or enhancement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an improvement! Please search [existing issues](https://github.com/namecheap/terraform-provider-spaceship/issues) before filing a new one.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the feature or enhancement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: Why is this feature needed? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Proposed Terraform Configuration
+      description: How would the feature look in a Terraform configuration?
+      render: hcl
+
+  - type: textarea
+    id: api
+    attributes:
+      label: Spaceship API Reference
+      description: Link to the relevant [Spaceship API documentation](https://docs.spaceship.dev/) if applicable.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Anything else (alternatives considered, related issues, screenshots).
+
+  - type: dropdown
+    id: implement
+    attributes:
+      label: Would you like to implement this?
+      options:
+        - "No"
+        - "Yes"
+      default: 0
