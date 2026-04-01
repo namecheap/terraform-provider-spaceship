@@ -4,7 +4,21 @@ on:
     push:
         branches:
             - master
+        paths-ignore:
+            - "**.md"
+            - "LICENSE"
+            - "CLAUDE.md"
+            - "AGENTS.md"
+            - ".github/ISSUE_TEMPLATE/**"
+            - ".github/pull_request_template.md"
     pull_request:
+        paths-ignore:
+            - "**.md"
+            - "LICENSE"
+            - "CLAUDE.md"
+            - "AGENTS.md"
+            - ".github/ISSUE_TEMPLATE/**"
+            - ".github/pull_request_template.md"
 
 jobs:
     check:

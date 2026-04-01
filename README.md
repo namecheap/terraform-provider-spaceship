@@ -2,6 +2,13 @@
 
 # Spaceship Terraform Provider
 
+[![CI](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/ci.yml/badge.svg)](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/codeql.yml/badge.svg)](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/namecheap/terraform-provider-spaceship)](https://github.com/namecheap/terraform-provider-spaceship/releases)
+[![Terraform Registry](https://img.shields.io/badge/terraform-registry-blueviolet)](https://registry.terraform.io/providers/namecheap/spaceship)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/namecheap/terraform-provider-spaceship)](go.mod)
+[![License](https://img.shields.io/github/license/namecheap/terraform-provider-spaceship)](LICENSE)
+
 This repository contains a Terraform provider that manages domain settings and DNS records for domains hosted with [Spaceship](https://spaceship.com/).
 
 ## Features

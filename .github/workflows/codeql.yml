@@ -4,7 +4,23 @@ on:
     push:
         branches:
             - master
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - "LICENSE"
+            - "CLAUDE.md"
+            - "AGENTS.md"
+            - ".github/ISSUE_TEMPLATE/**"
+            - ".github/pull_request_template.md"
     pull_request:
+        paths-ignore:
+            - "**.md"
+            - "docs/**"
+            - "LICENSE"
+            - "CLAUDE.md"
+            - "AGENTS.md"
+            - ".github/ISSUE_TEMPLATE/**"
+            - ".github/pull_request_template.md"
     schedule:
         - cron: "0 6 * * 1"
 
