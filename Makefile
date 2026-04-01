@@ -20,7 +20,7 @@ testacc:
 	@if [[ -z "$$SPACESHIP_TEST_DOMAIN" ]]; then \
 		echo "SPACESHIP_TEST_DOMAIN must be set"; exit 1; \
 	fi
-	go test -run TestAcc ./internal/provider -v
+	go test -run TestAcc ./internal/provider -v -timeout 20m
 
 .PHONY: docs
 docs:
