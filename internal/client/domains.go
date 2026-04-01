@@ -72,10 +72,9 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 
 	endpoint := c.endpointURL([]string{"domains", domain}, nil)
 
-	// overcome insane API rate limiting
-	// by using alternative endpoint that does the same
-	// but has 60x times higher limits
-	statusCode, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo)
+	// Skip retry on 429 — this function has its own fallback to the domain
+	// list endpoint which has 60x higher rate limits.
+	statusCode, err := c.doJSONOnce(ctx, http.MethodGet, endpoint, nil, &domainInfo)
 	if statusCode == http.StatusTooManyRequests {
 		domainList, _ := c.GetDomainList(ctx)
 

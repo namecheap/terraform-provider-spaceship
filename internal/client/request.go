@@ -18,6 +18,16 @@ const (
 )
 
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload any, out any) (int, error) {
+	return c.doJSONWithRetries(ctx, method, endpoint, payload, out, maxRetries)
+}
+
+// doJSONOnce performs a single HTTP request without retrying on 429.
+// Use this when the caller has its own fallback logic for rate limits.
+func (c *Client) doJSONOnce(ctx context.Context, method, endpoint string, payload any, out any) (int, error) {
+	return c.doJSONWithRetries(ctx, method, endpoint, payload, out, 1)
+}
+
+func (c *Client) doJSONWithRetries(ctx context.Context, method, endpoint string, payload any, out any, retries int) (int, error) {
 	var bodyBytes []byte
 	if payload != nil {
 		data, err := json.Marshal(payload)
@@ -27,7 +37,7 @@ func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload an
 		bodyBytes = data
 	}
 
-	for attempt := range maxRetries {
+	for attempt := range retries {
 		var body io.Reader
 		if bodyBytes != nil {
 			body = bytes.NewReader(bodyBytes)
@@ -48,7 +58,7 @@ func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload an
 			return 0, fmt.Errorf("execute request: %w", err)
 		}
 
-		if resp.StatusCode == http.StatusTooManyRequests && attempt < maxRetries-1 {
+		if resp.StatusCode == http.StatusTooManyRequests && attempt < retries-1 {
 			_ = resp.Body.Close()
 
 			delay := retryDelay(resp)
