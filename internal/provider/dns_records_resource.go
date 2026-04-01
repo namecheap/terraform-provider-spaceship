@@ -1020,7 +1020,7 @@ func recordValueSignature(record client.DNSRecord) string {
 	case "ALIAS":
 		write(strings.ToLower(record.AliasName))
 	case "CAA":
-		write(intToString(record.Flag), strings.ToLower(record.Tag), record.Value)
+		write(intToString(record.Flag), strings.ToLower(record.Tag), strings.ToLower(record.Value))
 	case "CNAME":
 		write(strings.ToLower(record.CName))
 	case "HTTPS":
