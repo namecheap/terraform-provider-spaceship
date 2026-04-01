@@ -3,12 +3,12 @@
 page_title: "spaceship_dns_records Resource - spaceship"
 subcategory: ""
 description: |-
-  Manages the full DNS record set for a Spaceship-managed domain. The Spaceship API updates records as a batch, so Terraform replaces the entire set on each apply.
+  Manages custom DNS records for a Spaceship-managed domain. Only records in the custom DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched. On each apply, the provider computes a diff and only deletes removed records and upserts new or changed ones.
 ---
 
 # spaceship_dns_records (Resource)
 
-Manages the full DNS record set for a Spaceship-managed domain. The Spaceship API updates records as a batch, so Terraform replaces the entire set on each apply.
+Manages custom DNS records for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched. On each apply, the provider computes a diff and only deletes removed records and upserts new or changed ones.
 
 ## Example Usage
 
@@ -58,7 +58,7 @@ resource "spaceship_dns_records" "example" {
 ### Required
 
 - `domain` (String) The domain name to manage (for example `example.com`). The domain must already exist in the Spaceship account.
-- `records` (Attributes List) DNS records that should be configured for the domain. Each apply replaces the complete set of records. (see [below for nested schema](#nestedatt--records))
+- `records` (Attributes List) DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected. (see [below for nested schema](#nestedatt--records))
 
 ### Optional
 
