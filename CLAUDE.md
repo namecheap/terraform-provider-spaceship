@@ -1,5 +1,3 @@
-# CLAUDE.md
-
 ## Commands
 
 ```bash
