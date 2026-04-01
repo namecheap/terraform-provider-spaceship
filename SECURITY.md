@@ -24,8 +24,3 @@ vulnerabilities in the Spaceship platform or API, please contact
 
 Security fixes are applied to the latest release only. We recommend always
 using the most recent version of the provider.
-
-| Version | Supported |
-|---------|-----------|
-| Latest  | Yes       |
-| < Latest | No       |
