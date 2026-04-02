@@ -68,6 +68,22 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 	}
 }
 
+func TestRecordValueSignature_CAAValueCaseInsensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "LetsEncrypt.org"}
+	r2 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}
+	if recordValueSignature(r1) != recordValueSignature(r2) {
+		t.Error("expected case-insensitive match for CAA value")
+	}
+}
+
+func TestRecordValueSignature_TXTValueCaseSensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=DKIM1; p=ABC"}
+	r2 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=dkim1; p=abc"}
+	if recordValueSignature(r1) == recordValueSignature(r2) {
+		t.Error("expected case-sensitive match for TXT value")
+	}
+}
+
 func TestRecordValueSignature_CaseInsensitive(t *testing.T) {
 	r1 := client.DNSRecord{Type: "A", Name: "@", Address: "1.2.3.4"}
 	r2 := client.DNSRecord{Type: "a", Name: "@", Address: "1.2.3.4"}
