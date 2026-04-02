@@ -1,7 +1,6 @@
 {
   "release-type": "simple",
   "include-v-in-tag": true,
-  "skip-github-release": true,
   "packages": {
     ".": {}
   }
