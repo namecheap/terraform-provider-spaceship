@@ -31,6 +31,54 @@ func TestGetDNSRecords_SinglePage(t *testing.T) {
 	}
 }
 
+func TestGetDNSRecords_FiltersOutNonCustomGroups(t *testing.T) {
+	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"type": "A", "name": "@", "ttl": 3600, "address": "1.2.3.4", "group": map[string]any{"type": "custom"}},
+				{"type": "A", "name": "*", "ttl": 3600, "address": "15.197.162.184", "group": map[string]any{"type": "product"}},
+				{"type": "A", "name": "www", "ttl": 3600, "address": "5.6.7.8", "group": map[string]any{"type": "custom"}},
+				{"type": "NS", "name": "@", "ttl": 3600, "nameserver": "ns1.example.com", "group": map[string]any{"type": "personalNS"}},
+			},
+			"total": 4,
+		})
+	})
+
+	records, err := c.GetDNSRecords(t.Context(), "example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected 2 custom records, got %d", len(records))
+	}
+	if records[0].Address != "1.2.3.4" {
+		t.Errorf("expected first record address 1.2.3.4, got %q", records[0].Address)
+	}
+	if records[1].Address != "5.6.7.8" {
+		t.Errorf("expected second record address 5.6.7.8, got %q", records[1].Address)
+	}
+}
+
+func TestGetDNSRecords_KeepsRecordsWithoutGroup(t *testing.T) {
+	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"type": "A", "name": "@", "ttl": 3600, "address": "1.2.3.4"},
+				{"type": "TXT", "name": "@", "ttl": 3600, "value": "v=spf1"},
+			},
+			"total": 2,
+		})
+	})
+
+	records, err := c.GetDNSRecords(t.Context(), "example.com")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records (no group = kept), got %d", len(records))
+	}
+}
+
 func TestGetDNSRecords_Pagination(t *testing.T) {
 	callCount := 0
 	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -130,6 +178,49 @@ func TestDeleteDNSRecords_NotFoundIgnored(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("expected 404 to be ignored, got: %v", err)
+	}
+}
+
+func TestFilterCustomDNSRecords(t *testing.T) {
+	records := []DNSRecord{
+		{Type: "A", Name: "@", Address: "1.1.1.1", Group: &RecordGroup{Type: "custom"}},
+		{Type: "A", Name: "*", Address: "15.197.162.184", Group: &RecordGroup{Type: "product"}},
+		{Type: "TXT", Name: "@", Value: "v=spf1"},
+		{Type: "NS", Name: "@", Nameserver: "ns1.example.com", Group: &RecordGroup{Type: "personalNS"}},
+		{Type: "MX", Name: "@", Exchange: "mail.example.com", Group: &RecordGroup{Type: "custom"}},
+	}
+
+	filtered := filterCustomDNSRecords(records)
+	if len(filtered) != 3 {
+		t.Fatalf("expected 3 records (2 custom + 1 nil group), got %d", len(filtered))
+	}
+	if filtered[0].Address != "1.1.1.1" {
+		t.Errorf("expected first record to be custom A, got address %q", filtered[0].Address)
+	}
+	if filtered[1].Value != "v=spf1" {
+		t.Errorf("expected second record to be ungrouped TXT, got value %q", filtered[1].Value)
+	}
+	if filtered[2].Exchange != "mail.example.com" {
+		t.Errorf("expected third record to be custom MX, got exchange %q", filtered[2].Exchange)
+	}
+}
+
+func TestFilterCustomDNSRecords_AllFiltered(t *testing.T) {
+	records := []DNSRecord{
+		{Type: "A", Name: "@", Address: "15.197.162.184", Group: &RecordGroup{Type: "product"}},
+		{Type: "NS", Name: "@", Nameserver: "ns1.example.com", Group: &RecordGroup{Type: "personalNS"}},
+	}
+
+	filtered := filterCustomDNSRecords(records)
+	if len(filtered) != 0 {
+		t.Fatalf("expected 0 records, got %d", len(filtered))
+	}
+}
+
+func TestFilterCustomDNSRecords_Empty(t *testing.T) {
+	filtered := filterCustomDNSRecords(nil)
+	if len(filtered) != 0 {
+		t.Fatalf("expected 0 records for nil input, got %d", len(filtered))
 	}
 }
 

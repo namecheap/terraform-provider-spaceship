@@ -68,6 +68,36 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 	}
 }
 
+func TestRecordValueSignature_CAAValueCaseInsensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "LetsEncrypt.org"}
+	r2 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}
+	if recordValueSignature(r1) != recordValueSignature(r2) {
+		t.Error("expected case-insensitive match for CAA value")
+	}
+}
+
+func TestRecordValueSignature_SvcParamsCaseInsensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
+	r2 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
+	if recordValueSignature(r1) != recordValueSignature(r2) {
+		t.Error("expected case-insensitive match for HTTPS SvcParams")
+	}
+
+	r3 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
+	r4 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
+	if recordValueSignature(r3) != recordValueSignature(r4) {
+		t.Error("expected case-insensitive match for SVCB SvcParams")
+	}
+}
+
+func TestRecordValueSignature_TXTValueCaseSensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=DKIM1; p=ABC"}
+	r2 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=dkim1; p=abc"}
+	if recordValueSignature(r1) == recordValueSignature(r2) {
+		t.Error("expected case-sensitive match for TXT value")
+	}
+}
+
 func TestRecordValueSignature_CaseInsensitive(t *testing.T) {
 	r1 := client.DNSRecord{Type: "A", Name: "@", Address: "1.2.3.4"}
 	r2 := client.DNSRecord{Type: "a", Name: "@", Address: "1.2.3.4"}
@@ -150,6 +180,30 @@ func TestDiffDNSRecords_DuplicateDesired(t *testing.T) {
 	_, toUpsert := diffDNSRecords(existing, desired)
 	if len(toUpsert) != 1 {
 		t.Errorf("expected deduplication to 1 upsert, got %d", len(toUpsert))
+	}
+}
+
+func TestDiffDNSRecords_DoesNotDeleteFilteredRecords(t *testing.T) {
+	// Simulates the scenario after GetDNSRecords filters out non-custom records.
+	// The existing slice only contains custom records (product/personalNS already removed).
+	// The diff should only delete custom records not in the desired set.
+	existing := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.2.3.4", TTL: 3600, Group: &client.RecordGroup{Type: "custom"}},
+		{Type: "TXT", Name: "@", Value: "old-txt", TTL: 3600, Group: &client.RecordGroup{Type: "custom"}},
+	}
+	desired := []client.DNSRecord{
+		{Type: "A", Name: "@", Address: "1.2.3.4", TTL: 3600},
+	}
+
+	toDelete, toUpsert := diffDNSRecords(existing, desired)
+	if len(toDelete) != 1 {
+		t.Errorf("expected 1 deletion (old TXT), got %d", len(toDelete))
+	}
+	if len(toDelete) > 0 && toDelete[0].Value != "old-txt" {
+		t.Errorf("expected deleted record to be old TXT, got %+v", toDelete[0])
+	}
+	if len(toUpsert) != 0 {
+		t.Errorf("expected 0 upserts (A record unchanged), got %d", len(toUpsert))
 	}
 }
 

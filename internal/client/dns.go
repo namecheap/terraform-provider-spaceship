@@ -103,9 +103,14 @@ func (p *PortValue) UnmarshalJSON(data []byte) error {
 const (
 	maxListPageSize     = 500
 	defaultRecordsOrder = "type"
+
+	// DNSGroupCustom is the group type for records managed via the external API.
+	// Records in other groups (e.g. URL redirect) are owned by Spaceship features
+	// and must not be touched by the Terraform provider.
+	DNSGroupCustom = "custom"
 )
 
-// fetches DNS records for the supplied domain name.
+// GetDNSRecords fetches custom-group DNS records for the supplied domain name. Records in other groups (product, personalNS) are filtered out.
 func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord, error) {
 	var (
 		result []DNSRecord
@@ -141,7 +146,21 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 		skip += maxListPageSize
 
 	}
-	return result, nil
+	return filterCustomDNSRecords(result), nil
+}
+
+// filterCustomDNSRecords returns only records whose group type is "custom"
+// (or that have no group at all, for backwards compatibility with ungrouped zones).
+// Records belonging to Spaceship-managed groups (e.g. URL redirect) are excluded
+// so the provider does not attempt to manage them.
+func filterCustomDNSRecords(records []DNSRecord) []DNSRecord {
+	filtered := make([]DNSRecord, 0, len(records))
+	for _, r := range records {
+		if r.Group == nil || r.Group.Type == DNSGroupCustom {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 // UpsertDNSRecords creates or updated DNS records for the supplied domain
@@ -166,7 +185,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 	return nil
 }
 
-// DeleteDNSRecords removed the specified DNS records.
+// DeleteDNSRecords removes the specified DNS records.
 func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []DNSRecord) error {
 	if len(records) == 0 {
 		return nil
@@ -183,7 +202,7 @@ func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []
 	return nil
 }
 
-// ClearDNSRecords removed all DNS records that aree managed through Terraform for the domain
+// ClearDNSRecords removes all custom-group DNS records for the domain. Records in other groups (product, personalNS) are not affected.
 func (c *Client) ClearDNSRecords(ctx context.Context, domain string, force bool) error {
 	records, err := c.GetDNSRecords(ctx, domain)
 	if err != nil {

@@ -169,7 +169,7 @@ func (r *dnsRecordsResource) Metadata(_ context.Context, req resource.MetadataRe
 
 func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages the full DNS record set for a Spaceship-managed domain. The Spaceship API updates records as a batch, so Terraform replaces the entire set on each apply.",
+		MarkdownDescription: "Manages custom DNS records for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched. On each apply, the provider computes a diff and only deletes removed records and upserts new or changed ones.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Computed:            true,
@@ -198,7 +198,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"records": schema.ListNestedAttribute{
-				MarkdownDescription: "DNS records that should be configured for the domain. Each apply replaces the complete set of records.",
+				MarkdownDescription: "DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected.",
 				Required:            true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
@@ -1020,12 +1020,12 @@ func recordValueSignature(record client.DNSRecord) string {
 	case "ALIAS":
 		write(strings.ToLower(record.AliasName))
 	case "CAA":
-		write(intToString(record.Flag), strings.ToLower(record.Tag), record.Value)
+		write(intToString(record.Flag), strings.ToLower(record.Tag), strings.ToLower(record.Value))
 	case "CNAME":
 		write(strings.ToLower(record.CName))
 	case "HTTPS":
 		// TODO looks like a bug  when svc prirotity is present in https record
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), record.SvcParams, portValueSignature(record.Port), strings.ToLower(record.Scheme))
+		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "MX":
 		write(strings.ToLower(record.Exchange), intToString(record.Preference))
 	case "NS":
@@ -1035,7 +1035,7 @@ func recordValueSignature(record client.DNSRecord) string {
 	case "SRV":
 		write(strings.ToLower(record.Service), strings.ToLower(record.Protocol), intToString(record.Priority), intToString(record.Weight))
 	case "SVCB":
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), record.SvcParams, portValueSignature(record.Port), strings.ToLower(record.Scheme))
+		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "TLSA":
 		normalized := strings.ReplaceAll(strings.ToLower(record.AssociationData), " ", "")
 		write(portValueSignature(record.Port), strings.ToLower(record.Protocol), intToString(record.Usage), intToString(record.Selector), intToString(record.Matching), normalized)
