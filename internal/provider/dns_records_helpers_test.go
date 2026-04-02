@@ -76,6 +76,20 @@ func TestRecordValueSignature_CAAValueCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestRecordValueSignature_SvcParamsCaseInsensitive(t *testing.T) {
+	r1 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
+	r2 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
+	if recordValueSignature(r1) != recordValueSignature(r2) {
+		t.Error("expected case-insensitive match for HTTPS SvcParams")
+	}
+
+	r3 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
+	r4 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
+	if recordValueSignature(r3) != recordValueSignature(r4) {
+		t.Error("expected case-insensitive match for SVCB SvcParams")
+	}
+}
+
 func TestRecordValueSignature_TXTValueCaseSensitive(t *testing.T) {
 	r1 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=DKIM1; p=ABC"}
 	r2 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=dkim1; p=abc"}
