@@ -110,7 +110,7 @@ const (
 	DNSGroupCustom = "custom"
 )
 
-// fetches DNS records for the supplied domain name.
+// GetDNSRecords fetches custom-group DNS records for the supplied domain name. Records in other groups (product, personalNS) are filtered out.
 func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord, error) {
 	var (
 		result []DNSRecord
@@ -185,7 +185,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 	return nil
 }
 
-// DeleteDNSRecords removed the specified DNS records.
+// DeleteDNSRecords removes the specified DNS records.
 func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []DNSRecord) error {
 	if len(records) == 0 {
 		return nil
@@ -202,7 +202,7 @@ func (c *Client) DeleteDNSRecords(ctx context.Context, domain string, records []
 	return nil
 }
 
-// ClearDNSRecords removed all DNS records that aree managed through Terraform for the domain
+// ClearDNSRecords removes all custom-group DNS records for the domain. Records in other groups (product, personalNS) are not affected.
 func (c *Client) ClearDNSRecords(ctx context.Context, domain string, force bool) error {
 	records, err := c.GetDNSRecords(ctx, domain)
 	if err != nil {
