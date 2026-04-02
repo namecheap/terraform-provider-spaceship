@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.18](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.17...v0.0.18) (2026-04-02)
+
+
+### Bug Fixes
+
+* correct doc comments for DNS client functions ([18e1d06](https://github.com/namecheap/terraform-provider-spaceship/commit/18e1d06b3dca21c34c87f707748fec42894bef0d))
+* filter DNS records to only manage custom group records ([3a874f8](https://github.com/namecheap/terraform-provider-spaceship/commit/3a874f8e00f32240fabe88566fd13112acb9f132)), closes [#21](https://github.com/namecheap/terraform-provider-spaceship/issues/21)
+* filter out only custom dns records ([#36](https://github.com/namecheap/terraform-provider-spaceship/issues/36)) ([46435fa](https://github.com/namecheap/terraform-provider-spaceship/commit/46435fa4df3b85ff8697c9cb8596c1b6e97f0935))
+* lowercase SvcParams in HTTPS/SVCB record signature ([74c8e82](https://github.com/namecheap/terraform-provider-spaceship/commit/74c8e8286c525ce8d80ba31187cd010ac1cc88a9))
+* use case-insensitive comparison for CAA record value in diff ([a33a27e](https://github.com/namecheap/terraform-provider-spaceship/commit/a33a27ec2e2fcfee761d1691f33e3efdf3408bab))
+
 ## [0.0.17](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.16...v0.0.17) (2026-04-01)
 
 
