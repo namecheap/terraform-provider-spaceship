@@ -1025,7 +1025,7 @@ func recordValueSignature(record client.DNSRecord) string {
 		write(strings.ToLower(record.CName))
 	case "HTTPS":
 		// TODO looks like a bug  when svc prirotity is present in https record
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), record.SvcParams, portValueSignature(record.Port), strings.ToLower(record.Scheme))
+		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "MX":
 		write(strings.ToLower(record.Exchange), intToString(record.Preference))
 	case "NS":
@@ -1035,7 +1035,7 @@ func recordValueSignature(record client.DNSRecord) string {
 	case "SRV":
 		write(strings.ToLower(record.Service), strings.ToLower(record.Protocol), intToString(record.Priority), intToString(record.Weight))
 	case "SVCB":
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), record.SvcParams, portValueSignature(record.Port), strings.ToLower(record.Scheme))
+		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "TLSA":
 		normalized := strings.ReplaceAll(strings.ToLower(record.AssociationData), " ", "")
 		write(portValueSignature(record.Port), strings.ToLower(record.Protocol), intToString(record.Usage), intToString(record.Selector), intToString(record.Matching), normalized)
