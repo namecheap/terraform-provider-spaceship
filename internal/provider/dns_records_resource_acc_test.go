@@ -12,6 +12,7 @@ import (
 	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
 func TestAccDNSRecords_basicTypes(t *testing.T) {
@@ -346,6 +347,161 @@ func TestAccDNSRecords_numericPortInExistingZone(t *testing.T) {
 		},
 		CheckDestroy: resource.ComposeTestCheckFunc(
 			testAccCheckDNSRecordAbsent(domain, "CNAME", cnameName),
+		),
+	})
+}
+
+// TestAccDNSRecords_existingRecordsDeletedOnCreate verifies that when DNS
+// records already exist on the API before the Terraform resource is created,
+// the Create operation deletes the pre-existing records that are not in the
+// configuration. After the first apply, only the configured records remain
+// and the pre-existing records are gone from the API.
+func TestAccDNSRecords_existingRecordsDeletedOnCreate(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	resourceName := "spaceship_dns_records.test"
+	managedName := fmt.Sprintf("%s-managed", prefix)
+	preExistingName := fmt.Sprintf("%s-preexist", prefix)
+
+	preExistingRecord := client.DNSRecord{
+		Type:    "A",
+		Name:    preExistingName,
+		TTL:     3600,
+		Address: "198.51.100.99",
+	}
+
+	// Pre-seed a record before Terraform runs.
+	preConfig := func() {
+		testClient, err := testAccClient()
+		if err != nil {
+			t.Fatalf("failed to create test client: %v", err)
+		}
+		if err := testClient.UpsertDNSRecords(context.Background(), domain, true, []client.DNSRecord{preExistingRecord}); err != nil {
+			t.Fatalf("failed to pre-seed record: %v", err)
+		}
+	}
+
+	// Clean up the pre-seeded record after the test.
+	t.Cleanup(func() {
+		testClient, err := testAccClient()
+		if err != nil {
+			return
+		}
+		_ = testClient.DeleteDNSRecords(context.Background(), domain, []client.DNSRecord{preExistingRecord})
+	})
+
+	// Terraform config only manages a different record.
+	managedRecords := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: managedName,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"address": "198.51.100.50",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Step 1: First apply with pre-existing record on the API.
+				// Create fetches existing records, diffs against config,
+				// deletes the pre-existing record, and upserts the managed one.
+				// After apply, only the managed record should be in state.
+				PreConfig: preConfig,
+				Config:    testAccDNSRecordsConfig(domain, managedRecords),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "A"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.name", managedName),
+					resource.TestCheckResourceAttr(resourceName, "records.0.address", "198.51.100.50"),
+					testAccCheckDNSRecordAbsent(domain, "A", preExistingName),
+				),
+			},
+			{
+				// Step 2: Re-apply the same config. Plan should be empty
+				// because state already matches config exactly.
+				Config: testAccDNSRecordsConfig(domain, managedRecords),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "A", managedName),
+			testAccCheckDNSRecordAbsent(domain, "A", preExistingName),
+		),
+	})
+}
+
+// TestAccDNSRecords_matchingRecordsNoChanges verifies that when the Terraform
+// configuration exactly matches the real DNS state, a second plan produces no
+// changes (empty plan).
+func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+
+	resourceName := "spaceship_dns_records.test"
+	host := fmt.Sprintf("%s-stable", prefix)
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"address": "198.51.100.77",
+			},
+		},
+		{
+			Type: "TXT",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"value": "stable-check",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				// Step 1: Create the records.
+				Config: testAccDNSRecordsConfig(domain, records),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
+				),
+			},
+			{
+				// Step 2: Re-apply the identical config. Plan should be empty
+				// (no changes) because state matches config exactly.
+				Config: testAccDNSRecordsConfig(domain, records),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+			},
+		},
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "A", host),
+			testAccCheckDNSRecordAbsent(domain, "TXT", host),
 		),
 	})
 }

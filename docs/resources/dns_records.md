@@ -58,11 +58,11 @@ resource "spaceship_dns_records" "example" {
 ### Required
 
 - `domain` (String) The domain name to manage (for example `example.com`). The domain must already exist in the Spaceship account.
-- `records` (Attributes List) DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected. (see [below for nested schema](#nestedatt--records))
 
 ### Optional
 
 - `force` (Boolean) Force Spaceship to apply the DNS update even if conflicts are detected. The Spaceship API requires this flag when overwriting existing records.
+- `records` (Attributes List) DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected. (see [below for nested schema](#nestedatt--records))
 
 ### Read-Only
 

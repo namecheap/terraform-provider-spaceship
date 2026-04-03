@@ -199,7 +199,8 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			},
 			"records": schema.ListNestedAttribute{
 				MarkdownDescription: "DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected.",
-				Required:            true,
+				Optional:            true,
+				Computed:            true,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
