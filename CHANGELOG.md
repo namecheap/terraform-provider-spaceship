@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.19](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.18...v0.0.19) (2026-04-03)
+
+
+### Bug Fixes
+
+* make records optional+computed and add initial fetching acceptance tests ([#42](https://github.com/namecheap/terraform-provider-spaceship/issues/42)) ([f5c81d9](https://github.com/namecheap/terraform-provider-spaceship/commit/f5c81d996bcf83ff1947688fc537dc1a17b0034f))
+
 ## [0.0.18](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.17...v0.0.18) (2026-04-02)
 
 
