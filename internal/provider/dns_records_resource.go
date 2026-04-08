@@ -191,10 +191,13 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 			"force": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "Force Spaceship to apply the DNS update even if conflicts are detected. The Spaceship API requires this flag when overwriting existing records.",
+				MarkdownDescription: "Deprecated: this attribute has no effect. The provider always applies DNS updates with force enabled.",
 				Default:             booldefault.StaticBool(true),
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.Bool{
+					deprecatedBoolValidator("The \"force\" attribute is deprecated and has no effect. The provider always applies DNS updates with force enabled. This attribute will be removed or reworked in a future version."),
 				},
 			},
 			"records": schema.ListNestedAttribute{
@@ -1073,4 +1076,34 @@ func boolOrDefault(value types.Bool, fallback bool) bool {
 		return fallback
 	}
 	return value.ValueBool()
+}
+
+// deprecatedBoolWarning is a validator that emits a warning when a deprecated
+// bool attribute is explicitly configured.
+type deprecatedBoolWarning struct {
+	message string
+}
+
+func deprecatedBoolValidator(message string) validator.Bool {
+	return deprecatedBoolWarning{message: message}
+}
+
+func (v deprecatedBoolWarning) Description(_ context.Context) string {
+	return v.message
+}
+
+func (v deprecatedBoolWarning) MarkdownDescription(ctx context.Context) string {
+	return v.Description(ctx)
+}
+
+func (v deprecatedBoolWarning) ValidateBool(_ context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
+	// Only warn when the user explicitly set the value in config.
+	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
+		return
+	}
+	resp.Diagnostics.Append(diag.NewAttributeWarningDiagnostic(
+		req.Path,
+		"Deprecated Attribute",
+		v.message,
+	))
 }
