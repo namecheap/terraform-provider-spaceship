@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.20](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.19...v0.0.20) (2026-04-08)
+
+
+### Bug Fixes
+
+* add warning for using force param ([#45](https://github.com/namecheap/terraform-provider-spaceship/issues/45)) ([5269d12](https://github.com/namecheap/terraform-provider-spaceship/commit/5269d120b847cda361c77700f80fb9bd033baaa8))
+
 ## [0.0.19](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.18...v0.0.19) (2026-04-03)
 
 
