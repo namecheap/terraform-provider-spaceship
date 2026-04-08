@@ -61,7 +61,7 @@ resource "spaceship_dns_records" "example" {
 
 ### Optional
 
-- `force` (Boolean) Force Spaceship to apply the DNS update even if conflicts are detected. The Spaceship API requires this flag when overwriting existing records.
+- `force` (Boolean) Deprecated: this attribute has no effect. The provider always applies DNS updates with force enabled.
 - `records` (Attributes List) DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected. (see [below for nested schema](#nestedatt--records))
 
 ### Read-Only
