@@ -58,6 +58,13 @@ jobs:
                   path: coverage.out
                   retention-days: 30
 
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v6
+              with:
+                  files: coverage.out
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  fail_ci_if_error: false
+
             - name: Validate Documentation
               run: |
                   make docs
