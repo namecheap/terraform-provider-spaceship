@@ -3,14 +3,9 @@ package records
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/dlclark/regexp2"
 )
 
-var (
-	srvServicePattern  = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
-	srvHostnamePattern = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, regexp2.None)
-)
+var srvServicePattern = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
 
 type SRVRecord struct {
 	Type     string
@@ -55,27 +50,18 @@ func (r *SRVRecord) ValidateTarget() error {
 	if len(r.Target) < 1 || len(r.Target) > 253 {
 		return fmt.Errorf("must be between 1 and 253 characters, got %d", len(r.Target))
 	}
-	if matched, _ := srvHostnamePattern.MatchString(r.Target); !matched {
+	if matched, _ := hostnamePattern.MatchString(r.Target); !matched {
 		return fmt.Errorf("must be a valid hostname (e.g. 'server.example.com' or '@'), got %q", r.Target)
 	}
 	return nil
 }
 
 func (r *SRVRecord) ValidateName() error {
-	if len(r.Name) < 1 || len(r.Name) > 253 {
-		return fmt.Errorf("must be between 1 and 253 characters, got %d", len(r.Name))
-	}
-	if matched, _ := srvHostnamePattern.MatchString(r.Name); !matched {
-		return fmt.Errorf("must be a valid hostname (e.g. 'myhost' or '@'), got %q", r.Name)
-	}
-	return nil
+	return ValidateName(r.Name)
 }
 
 func (r *SRVRecord) ValidateTTL() error {
-	if r.TTL < 60 || r.TTL > 3600 {
-		return fmt.Errorf("must be between 60 and 3600, got %d", r.TTL)
-	}
-	return nil
+	return ValidateTTL(r.TTL)
 }
 
 // Validate checks all fields and returns all errors found.

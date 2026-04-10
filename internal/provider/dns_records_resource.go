@@ -210,6 +210,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 				NestedObject: schema.NestedAttributeObject{
 					Validators: []validator.Object{
+						records.AValidator(),
 						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
