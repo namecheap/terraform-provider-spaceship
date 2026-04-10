@@ -1,18 +1,21 @@
-package provider
+package records
 
 import (
 	"context"
-	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-)
 
-var srvServicePattern = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
+	clientrecords "terraform-provider-spaceship/internal/client/records"
+)
 
 type srvRecordValidator struct{}
 
 var _ validator.Object = &srvRecordValidator{}
+
+func SRVValidator() validator.Object {
+	return &srvRecordValidator{}
+}
 
 func (v *srvRecordValidator) Description(_ context.Context) string {
 	return "validates that SRV records contain all required fields: service, protocol, priority, weight, port_number, and target"
@@ -38,7 +41,8 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 		return
 	}
 
-	// Validate service: required, 2-63 chars, pattern _[a-zA-Z0-9-]+
+	rec := &clientrecords.SRVRecord{}
+
 	serviceAttr, _ := attrs["service"].(types.String)
 	if serviceAttr.IsNull() || serviceAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -47,23 +51,16 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"The 'service' field is required for SRV records.",
 		)
 	} else {
-		val := serviceAttr.ValueString()
-		if len(val) < 2 || len(val) > 63 {
+		rec.Service = serviceAttr.ValueString()
+		if err := rec.ValidateService(); err != nil {
 			resp.Diagnostics.AddAttributeError(
 				req.Path.AtName("service"),
 				"Invalid Service Value",
-				"The 'service' field must be between 2 and 63 characters for SRV records.",
-			)
-		} else if !srvServicePattern.MatchString(val) {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("service"),
-				"Invalid Service Format",
-				"The 'service' field must start with '_' and contain only alphanumeric characters or hyphens (e.g. '_sip', '_ldap').",
+				err.Error(),
 			)
 		}
 	}
 
-	// Validate protocol: required, 2-63 chars, pattern _[a-zA-Z0-9-]+
 	protocolAttr, _ := attrs["protocol"].(types.String)
 	if protocolAttr.IsNull() || protocolAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -72,23 +69,16 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"The 'protocol' field is required for SRV records.",
 		)
 	} else {
-		val := protocolAttr.ValueString()
-		if len(val) < 2 || len(val) > 63 {
+		rec.Protocol = protocolAttr.ValueString()
+		if err := rec.ValidateProtocol(); err != nil {
 			resp.Diagnostics.AddAttributeError(
 				req.Path.AtName("protocol"),
 				"Invalid Protocol Value",
-				"The 'protocol' field must be between 2 and 63 characters for SRV records.",
-			)
-		} else if !srvServicePattern.MatchString(val) {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("protocol"),
-				"Invalid Protocol Format",
-				"The 'protocol' field must start with '_' and contain only alphanumeric characters or hyphens (e.g. '_tcp', '_udp').",
+				err.Error(),
 			)
 		}
 	}
 
-	// Validate priority: required, 0-65535
 	priorityAttr, _ := attrs["priority"].(types.Int64)
 	if priorityAttr.IsNull() || priorityAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -96,9 +86,17 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Missing Required Field",
 			"The 'priority' field is required for SRV records.",
 		)
+	} else {
+		rec.Priority = uint16(priorityAttr.ValueInt64())
+		if err := rec.ValidatePriority(); err != nil {
+			resp.Diagnostics.AddAttributeError(
+				req.Path.AtName("priority"),
+				"Invalid Priority Value",
+				err.Error(),
+			)
+		}
 	}
 
-	// Validate weight: required, 0-65535
 	weightAttr, _ := attrs["weight"].(types.Int64)
 	if weightAttr.IsNull() || weightAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -106,9 +104,17 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Missing Required Field",
 			"The 'weight' field is required for SRV records.",
 		)
+	} else {
+		rec.Weight = uint16(weightAttr.ValueInt64())
+		if err := rec.ValidateWeight(); err != nil {
+			resp.Diagnostics.AddAttributeError(
+				req.Path.AtName("weight"),
+				"Invalid Weight Value",
+				err.Error(),
+			)
+		}
 	}
 
-	// Validate port_number: required, 1-65535
 	portNumberAttr, _ := attrs["port_number"].(types.Int64)
 	if portNumberAttr.IsNull() || portNumberAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -116,9 +122,17 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Missing Required Field",
 			"The 'port_number' field is required for SRV records.",
 		)
+	} else {
+		rec.Port = uint16(portNumberAttr.ValueInt64())
+		if err := rec.ValidatePort(); err != nil {
+			resp.Diagnostics.AddAttributeError(
+				req.Path.AtName("port_number"),
+				"Invalid Port Value",
+				err.Error(),
+			)
+		}
 	}
 
-	// Validate target: required, 1-253 chars
 	targetAttr, _ := attrs["target"].(types.String)
 	if targetAttr.IsNull() || targetAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
@@ -127,12 +141,12 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"The 'target' field is required for SRV records.",
 		)
 	} else {
-		val := targetAttr.ValueString()
-		if len(val) < 1 || len(val) > 253 {
+		rec.Target = targetAttr.ValueString()
+		if err := rec.ValidateTarget(); err != nil {
 			resp.Diagnostics.AddAttributeError(
 				req.Path.AtName("target"),
 				"Invalid Target Value",
-				"The 'target' field must be between 1 and 253 characters for SRV records.",
+				err.Error(),
 			)
 		}
 	}

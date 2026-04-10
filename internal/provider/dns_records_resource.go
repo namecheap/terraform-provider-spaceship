@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"terraform-provider-spaceship/internal/client"
+	"terraform-provider-spaceship/internal/provider/records"
 
 	"github.com/dlclark/regexp2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -209,7 +210,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 				NestedObject: schema.NestedAttributeObject{
 					Validators: []validator.Object{
-						&srvRecordValidator{},
+						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
