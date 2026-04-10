@@ -86,15 +86,6 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Missing Required Field",
 			"The 'priority' field is required for SRV records.",
 		)
-	} else {
-		rec.Priority = uint16(priorityAttr.ValueInt64())
-		if err := rec.ValidatePriority(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("priority"),
-				"Invalid Priority Value",
-				err.Error(),
-			)
-		}
 	}
 
 	weightAttr, _ := attrs["weight"].(types.Int64)
@@ -104,15 +95,6 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Missing Required Field",
 			"The 'weight' field is required for SRV records.",
 		)
-	} else {
-		rec.Weight = uint16(weightAttr.ValueInt64())
-		if err := rec.ValidateWeight(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("weight"),
-				"Invalid Weight Value",
-				err.Error(),
-			)
-		}
 	}
 
 	portNumberAttr, _ := attrs["port_number"].(types.Int64)

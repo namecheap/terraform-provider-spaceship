@@ -44,22 +44,8 @@ func (r *SRVRecord) ValidateProtocol() error {
 	return nil
 }
 
-func (r *SRVRecord) ValidatePriority() error {
-	if r.Priority > 65535 {
-		return fmt.Errorf("must be between 0 and 65535, got %d", r.Priority)
-	}
-	return nil
-}
-
-func (r *SRVRecord) ValidateWeight() error {
-	if r.Weight > 65535 {
-		return fmt.Errorf("must be between 0 and 65535, got %d", r.Weight)
-	}
-	return nil
-}
-
 func (r *SRVRecord) ValidatePort() error {
-	if r.Port < 1 || r.Port > 65535 {
+	if r.Port < 1 {
 		return fmt.Errorf("must be between 1 and 65535, got %d", r.Port)
 	}
 	return nil
@@ -98,8 +84,6 @@ func (r *SRVRecord) Validate() []error {
 	validators := []func() error{
 		r.ValidateService,
 		r.ValidateProtocol,
-		r.ValidatePriority,
-		r.ValidateWeight,
 		r.ValidatePort,
 		r.ValidateTarget,
 		r.ValidateName,
