@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.21](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.20...v0.0.21) (2026-04-14)
+
+
+### Bug Fixes
+
+* **ci:** use default GITHUB_TOKEN for PR title check ([#52](https://github.com/namecheap/terraform-provider-spaceship/issues/52)) ([6317463](https://github.com/namecheap/terraform-provider-spaceship/commit/6317463d1d6ab686d25fd3448b4bf6d2f4b22d2c))
+
 ## [0.0.20](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.19...v0.0.20) (2026-04-08)
 
 
