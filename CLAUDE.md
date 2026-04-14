@@ -31,6 +31,10 @@ After making changes, follow this order:
 - Internal design notes live in `internal/docs/`.
 - Provider reads `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET` env vars or inline HCL attributes.
 
+## Git privacy
+
+Before creating git commits, verify the current `git config user.email` is a GitHub noreply address (matching `*@users.noreply.github.com`). If it is not, look up the user's GitHub ID and username via `gh api user` and set it to `<id>+<username>@users.noreply.github.com` using `git config user.email`.
+
 ## Key design rules
 
 - **DNS records are scoped to the custom group**: The API returns records across three DNS groups: `custom`, `product`, and `personalNS`. The provider only manages `custom` group records. Do not touch records in other groups.
