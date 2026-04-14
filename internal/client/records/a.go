@@ -7,7 +7,6 @@ import (
 )
 
 type ARecord struct {
-	Type    string
 	Address string
 	Name    string
 	TTL     int

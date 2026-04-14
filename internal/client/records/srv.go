@@ -8,7 +8,6 @@ import (
 var srvServicePattern = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
 
 type SRVRecord struct {
-	Type     string
 	Service  string
 	Protocol string
 	Priority uint16
