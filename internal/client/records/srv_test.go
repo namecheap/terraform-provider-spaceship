@@ -96,16 +96,69 @@ func TestSRVRecord_ValidateProtocol(t *testing.T) {
 	}
 }
 
+func TestSRVRecord_ValidatePriority(t *testing.T) {
+	tests := []struct {
+		name     string
+		priority int
+		wantErr  bool
+	}{
+		{"valid", 10, false},
+		{"min valid", 0, false},
+		{"max valid", 65535, false},
+		{"negative", -1, true},
+		{"too high", 65536, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := validSRVRecord()
+			rec.Priority = tt.priority
+			err := rec.ValidatePriority()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePriority(%d) error = %v, wantErr = %v", tt.priority, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSRVRecord_ValidateWeight(t *testing.T) {
+	tests := []struct {
+		name    string
+		weight  int
+		wantErr bool
+	}{
+		{"valid", 60, false},
+		{"min valid", 0, false},
+		{"max valid", 65535, false},
+		{"negative", -1, true},
+		{"too high", 65536, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := validSRVRecord()
+			rec.Weight = tt.weight
+			err := rec.ValidateWeight()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateWeight(%d) error = %v, wantErr = %v", tt.weight, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestSRVRecord_ValidatePort(t *testing.T) {
 	tests := []struct {
 		name    string
-		port    uint16
+		port    int
 		wantErr bool
 	}{
 		{"valid", 5060, false},
 		{"min valid", 1, false},
 		{"max valid", 65535, false},
 		{"zero", 0, true},
+		{"negative", -1, true},
+		{"too high", 65536, true},
+		{"wrapping value", 131073, true},
 	}
 
 	for _, tt := range tests {
@@ -180,7 +233,7 @@ func TestSRVRecord_ValidateTTL(t *testing.T) {
 		ttl     int
 		wantErr bool
 	}{
-		{"valid", 3600, false},
+		{"valid", 3500, false},
 		{"min valid", 60, false},
 		{"max valid", 3600, false},
 		{"too low", 59, true},

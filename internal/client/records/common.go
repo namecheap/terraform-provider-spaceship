@@ -13,7 +13,11 @@ func ValidateName(name string) error {
 	if len(name) < 1 || len(name) > 253 {
 		return fmt.Errorf("must be between 1 and 253 characters, got %d", len(name))
 	}
-	if matched, _ := hostnamePattern.MatchString(name); !matched {
+	matched, err := hostnamePattern.MatchString(name)
+	if err != nil {
+		return fmt.Errorf("hostname pattern match failed: %w", err)
+	}
+	if !matched {
 		return fmt.Errorf("must be a valid hostname (e.g. 'myhost' or '@'), got %q", name)
 	}
 	return nil

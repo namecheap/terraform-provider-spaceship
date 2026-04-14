@@ -82,7 +82,7 @@ func TestARecord_ValidateTTL(t *testing.T) {
 		ttl     int
 		wantErr bool
 	}{
-		{"valid", 3600, false},
+		{"valid", 3500, false},
 		{"min valid", 60, false},
 		{"max valid", 3600, false},
 		{"too low", 59, true},

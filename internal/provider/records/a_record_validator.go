@@ -25,6 +25,8 @@ func (v *aRecordValidator) MarkdownDescription(ctx context.Context) string {
 	return v.Description(ctx)
 }
 
+// ValidateObject checks A record-specific fields only.
+// Name and TTL are validated by schema-level attribute validators in the resource schema.
 func (v *aRecordValidator) ValidateObject(ctx context.Context, req validator.ObjectRequest, resp *validator.ObjectResponse) {
 	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
 		return

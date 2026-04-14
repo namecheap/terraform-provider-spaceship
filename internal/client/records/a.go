@@ -12,11 +12,8 @@ type ARecord struct {
 	TTL     int
 }
 
-// ValidateAddress checks that the address is a valid IPv4 address up to 15 characters.
+// ValidateAddress checks that the address is a valid IPv4 address.
 func (r *ARecord) ValidateAddress() error {
-	if len(r.Address) > 15 {
-		return fmt.Errorf("must be at most 15 characters, got %d", len(r.Address))
-	}
 	ip := net.ParseIP(r.Address)
 	if ip == nil || strings.Contains(r.Address, ":") {
 		return fmt.Errorf("must be a valid IPv4 address, got %q", r.Address)
@@ -24,10 +21,12 @@ func (r *ARecord) ValidateAddress() error {
 	return nil
 }
 
+// ValidateName checks that the record name is a valid hostname.
 func (r *ARecord) ValidateName() error {
 	return ValidateName(r.Name)
 }
 
+// ValidateTTL checks that the TTL is within the allowed range.
 func (r *ARecord) ValidateTTL() error {
 	return ValidateTTL(r.TTL)
 }
