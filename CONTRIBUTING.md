@@ -87,6 +87,19 @@ make testacc
 6. Ensure CI passes. Acceptance tests run automatically when secrets are
    available.
 
+### Git Email Privacy
+
+To keep your personal email out of the public git history, consider using a GitHub noreply address.
+You can enable this in [GitHub Settings → Emails](https://github.com/settings/emails) by checking **"Keep my email addresses private"**. Your noreply address follows the format `<id>+<username>@users.noreply.github.com` and is shown on that page.
+
+To use it for this repo:
+
+```shell
+$ git config user.email "YOUR_ID+YOUR_USERNAME@users.noreply.github.com"
+```
+
+This is optional — use whichever email you prefer.
+
 ### Commit Messages
 
 Use [Conventional Commits](https://www.conventionalcommits.org/) format:
