@@ -276,7 +276,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						},
 						"scheme": schema.StringAttribute{
 							Optional:            true,
-							MarkdownDescription: "Scheme for HTTPS/SVCB/TLSA records (for exampel `_https`, `_tcp`)",
+							MarkdownDescription: "Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)",
 							Validators: []validator.String{
 								stringvalidator.RegexMatches(schemeLabelPattern, "must start with '_' and contain alphanumeric or '-' characters"),
 							},
