@@ -45,8 +45,14 @@ func (v *aRecordValidator) ValidateObject(ctx context.Context, req validator.Obj
 
 	rec := &clientrecords.ARecord{}
 
-	addressAttr, _ := attrs["address"].(types.String)
-	if addressAttr.IsNull() || addressAttr.IsUnknown() {
+	addressAttr, ok := attrs["address"].(types.String)
+	if !ok {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("address"),
+			"Invalid Field Type",
+			"The 'address' field must be a string for A records.",
+		)
+	} else if addressAttr.IsNull() || addressAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("address"),
 			"Missing Required Field",
