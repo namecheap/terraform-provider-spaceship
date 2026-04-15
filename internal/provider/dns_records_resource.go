@@ -92,12 +92,10 @@ type dnsRecordsResource struct {
 }
 
 type dnsRecordsResourceModel struct {
-	ID     types.String `tfsdk:"id"`
-	Domain types.String `tfsdk:"domain"`
-	// what is force?
-	// TODO
-	Force   types.Bool `tfsdk:"force"`
-	Records types.List `tfsdk:"records"`
+	ID      types.String `tfsdk:"id"`
+	Domain  types.String `tfsdk:"domain"`
+	Force   types.Bool   `tfsdk:"force"`
+	Records types.List   `tfsdk:"records"`
 }
 
 type dnsRecordModel struct {
@@ -212,6 +210,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					Validators: []validator.Object{
 						records.AValidator(),
 						records.SRVValidator(),
+						records.AAAAValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -432,7 +431,7 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 
 	if len(toUpsert) > 0 {
 		if err := r.client.UpsertDNSRecords(ctx, plan.Domain.ValueString(), force, toUpsert); err != nil {
-			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Fail;ed to apply DNS records: %s", err))
+			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to apply DNS records: %s", err))
 			return
 		}
 	}
