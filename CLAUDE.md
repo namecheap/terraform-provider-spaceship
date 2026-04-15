@@ -31,6 +31,10 @@ After making changes, follow this order:
 - Internal design notes live in `internal/docs/`.
 - Provider reads `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET` env vars or inline HCL attributes.
 
+## Git privacy
+
+Before creating git commits, check that `git config user.email` is set. If it is not configured, suggest the contributor set one. Do not override an already-configured email.
+
 ## Key design rules
 
 - **DNS records are scoped to the custom group**: The API returns records across three DNS groups: `custom`, `product`, and `personalNS`. The provider only manages `custom` group records. Do not touch records in other groups.
