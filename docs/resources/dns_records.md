@@ -92,7 +92,7 @@ Optional:
 - `preference` (Number) Preference value for MX records (0-65535).
 - `priority` (Number) Priority for SRV records (0-65535).
 - `protocol` (String) Protocol label for SRV/TLSA records (e.g. `_tcp`).
-- `scheme` (String) Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)
+- `scheme` (String) Scheme for HTTPS/SVCB/TLSA records (for exampel `_https`, `_tcp`)
 - `selector` (Number) Selector value for TLSA records (0-255).
 - `service` (String) Service label for SRV records (for example `_sip`).
 - `svc_params` (String) SvcParams string for HTTPS/SVCB records.
