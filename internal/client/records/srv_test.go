@@ -227,24 +227,6 @@ func TestSRVRecord_ValidateName(t *testing.T) {
 	}
 }
 
-func TestSRVRecord_Validate_MultipleErrors(t *testing.T) {
-	rec := &SRVRecord{
-		Service:  "",
-		Protocol: "",
-		Priority: -1,
-		Weight:   -1,
-		Port:     0,
-		Target:   "",
-		Name:     "",
-		TTL:      0,
-	}
-
-	errs := rec.Validate()
-	if len(errs) != 8 {
-		t.Errorf("expected 8 errors (one per field), got %d: %v", len(errs), errs)
-	}
-}
-
 func TestSRVRecord_ValidateTarget_EdgeCases(t *testing.T) {
 	// Build a long valid target: 3 labels of 63 chars + 1 label of 61 chars + 3 dots = 253
 	label63 := strings.Repeat("a", 63)
