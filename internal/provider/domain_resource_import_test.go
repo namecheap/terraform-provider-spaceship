@@ -1,7 +1,13 @@
 package provider
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
@@ -38,4 +44,20 @@ resource "spaceship_domain" "test" {
 			},
 		},
 	})
+}
+
+// mockDomainAPIReadOnly creates a simple deterministic mock that always
+// returns the same domain info for GET requests. No state mutation.
+func mockDomainAPIReadOnly(t *testing.T, domain client.DomainInfo) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/domains/") {
+			_ = json.NewEncoder(w).Encode(domain)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(server.Close)
+	return server
 }
