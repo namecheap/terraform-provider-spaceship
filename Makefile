@@ -2,11 +2,11 @@ SHELL := /bin/bash
 
 .PHONY: test
 test:
-	go test -run 'Test[^Acc]' ./...
+	go test -skip 'TestAcc' ./...
 
 .PHONY: test-cover
 test-cover:
-	go test -run 'Test[^Acc]' -coverprofile=coverage.out -covermode=atomic ./...
+	go test -skip 'TestAcc' -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
 .PHONY: testacc
