@@ -227,6 +227,52 @@ func TestSRVRecord_ValidateName(t *testing.T) {
 	}
 }
 
+func TestSRVRecord_Validate_MultipleErrors(t *testing.T) {
+	rec := &SRVRecord{
+		Service:  "",
+		Protocol: "",
+		Priority: -1,
+		Weight:   -1,
+		Port:     0,
+		Target:   "",
+		Name:     "",
+		TTL:      0,
+	}
+
+	errs := rec.Validate()
+	if len(errs) != 8 {
+		t.Errorf("expected 8 errors (one per field), got %d: %v", len(errs), errs)
+	}
+}
+
+func TestSRVRecord_ValidateTarget_EdgeCases(t *testing.T) {
+	// Build a long valid target: 3 labels of 63 chars + 1 label of 61 chars + 3 dots = 253
+	label63 := strings.Repeat("a", 63)
+	label61 := strings.Repeat("b", 61)
+	longValid := label63 + "." + label63 + "." + label63 + "." + label61
+
+	tests := []struct {
+		name    string
+		target  string
+		wantErr bool
+	}{
+		{"root dot", ".", true},
+		{"long valid target at 253", longValid, false},
+		{"consecutive dots", "..", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := validSRVRecord()
+			rec.Target = tt.target
+			err := rec.ValidateTarget()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateTarget(%q [len=%d]) error = %v, wantErr = %v", tt.target, len(tt.target), err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestSRVRecord_ValidateTTL(t *testing.T) {
 	tests := []struct {
 		name    string

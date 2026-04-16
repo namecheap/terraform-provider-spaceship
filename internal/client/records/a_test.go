@@ -76,6 +76,19 @@ func TestARecord_ValidateName(t *testing.T) {
 	}
 }
 
+func TestARecord_Validate_MultipleErrors(t *testing.T) {
+	rec := &ARecord{
+		Address: "not-an-ip",
+		Name:    "",
+		TTL:     0,
+	}
+
+	errs := rec.Validate()
+	if len(errs) != 3 {
+		t.Errorf("expected 3 errors, got %d: %v", len(errs), errs)
+	}
+}
+
 func TestARecord_ValidateTTL(t *testing.T) {
 	tests := []struct {
 		name    string
