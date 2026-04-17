@@ -1,6 +1,7 @@
 package records
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestALIASRecord_ValidateAliasName(t *testing.T) {
 		{"apex rejected", "@", true},
 		{"wildcard rejected", "*", true},
 		{"empty", "", true},
-		{"too long", string(make([]byte, 254)), true},
+		{"too long", strings.Repeat("a", 254), true},
 		{"starts with dot", ".invalid", true},
 	}
 
@@ -58,7 +59,7 @@ func TestALIASRecord_ValidateName(t *testing.T) {
 		{"valid wildcard", "*", false},
 		{"valid subdomain", "sub.domain", false},
 		{"empty", "", true},
-		{"too long", string(make([]byte, 254)), true},
+		{"too long", strings.Repeat("a", 254), true},
 		{"starts with dot", ".invalid", true},
 	}
 
