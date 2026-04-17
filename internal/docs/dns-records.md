@@ -26,6 +26,10 @@ The `PUT /dns/records/{domain}` endpoint matches existing records by **type + na
 
 The provider's `recordValueSignature()` function follows the same rules. All fields are lowercased in the signature except TXT `value`, ensuring the provider's diff logic agrees with the API about what constitutes "the same record".
 
+### Record type notes
+
+- **ALIAS**: Resolves a canonical (true) domain name. Implements CNAME-like behavior for the zone apex where CNAME is not allowed. The `aliasName` field is a hostname (1-253 chars, `hostNameValue` pattern).
+
 ### Data fields per record type
 
 | Type  | Data fields used for matching                          |

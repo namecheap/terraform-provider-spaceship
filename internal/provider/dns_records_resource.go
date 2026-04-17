@@ -209,8 +209,9 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				NestedObject: schema.NestedAttributeObject{
 					Validators: []validator.Object{
 						records.AValidator(),
-						records.SRVValidator(),
 						records.AAAAValidator(),
+						records.ALIASValidator(),
+						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -245,7 +246,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						},
 						"alias_name": schema.StringAttribute{
 							Optional:            true,
-							MarkdownDescription: "Alias target for ALIAS records.",
+							MarkdownDescription: "Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.",
 						},
 						"cname": schema.StringAttribute{
 							Optional:            true,

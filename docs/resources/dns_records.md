@@ -37,6 +37,12 @@ resource "spaceship_dns_records" "example" {
       preference = 10
     },
     {
+      type       = "ALIAS"
+      name       = "@"
+      ttl        = 3600
+      alias_name = "origin.example.com"
+    },
+    {
       type  = "CNAME"
       name  = "www"
       ttl   = 3600
@@ -79,7 +85,7 @@ Required:
 Optional:
 
 - `address` (String) IPv4 or IPv6 address for A and AAAA records
-- `alias_name` (String) Alias target for ALIAS records.
+- `alias_name` (String) Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.
 - `association_data` (String) Association data (hex) for TLSA records.
 - `cname` (String) Canonical name for CNAME records.
 - `exchange` (String) Mail exchange host for MX records.
