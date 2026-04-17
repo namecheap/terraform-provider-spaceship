@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.20...v0.1.0) (2026-04-17)
+
+
+### Features
+
+* add validators and tests for alias record ([#61](https://github.com/namecheap/terraform-provider-spaceship/issues/61)) ([fbbd85c](https://github.com/namecheap/terraform-provider-spaceship/commit/fbbd85c5a5cb42b6b1173b946d824052f6bf6967))
+
+
+### Bug Fixes
+
+* add validation for a record ([#50](https://github.com/namecheap/terraform-provider-spaceship/issues/50)) ([aced141](https://github.com/namecheap/terraform-provider-spaceship/commit/aced141d509db52a4d3d42c0ee6f070c9350db08))
+* add validation for aaaa record ([#58](https://github.com/namecheap/terraform-provider-spaceship/issues/58)) ([3ec57e4](https://github.com/namecheap/terraform-provider-spaceship/commit/3ec57e44d1d5b5ceba68f8ea111df7b5093b4e91))
+* address code quality findings from AI scan ([#57](https://github.com/namecheap/terraform-provider-spaceship/issues/57)) ([83eeda2](https://github.com/namecheap/terraform-provider-spaceship/commit/83eeda2f1c0e4a570101d0c5e88c67bb6226b85e))
+* **ci:** use default GITHUB_TOKEN for PR title check ([#52](https://github.com/namecheap/terraform-provider-spaceship/issues/52)) ([6317463](https://github.com/namecheap/terraform-provider-spaceship/commit/6317463d1d6ab686d25fd3448b4bf6d2f4b22d2c))
+
 ## [0.0.20](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.19...v0.0.20) (2026-04-08)
 
 
