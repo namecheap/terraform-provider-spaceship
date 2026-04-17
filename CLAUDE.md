@@ -35,6 +35,16 @@ After making changes, follow this order:
 
 Before creating git commits, check that `git config user.email` is set. If it is not configured, suggest the contributor set one. Do not override an already-configured email.
 
+## Testing strategy
+
+This provider uses a **two-layer** testing approach. Do not duplicate coverage between layers.
+
+- **Client-layer unit tests** (`internal/client/`) — Test API calls, HTTP serialization, pagination, error mapping, and record validation logic. These use `httptest` mock servers and run fast.
+- **Provider-layer unit tests** (`internal/provider/`) — Test Terraform-specific concerns that don't exist at the client layer: schema validation with Terraform types, state management, import lifecycle, provider configuration, and diff/reconciliation logic. Do **not** re-test client-layer logic (e.g., don't spin up an httptest server just to verify that `if err != nil` adds a diagnostic).
+- **Acceptance tests** (`*_acc_test.go`) — Test end-to-end Terraform lifecycle (plan/apply/destroy/import) against the real Spaceship API. These are the authoritative tests for "does it work."
+
+When adding tests, ask: "Is this testing something unique to this layer?" If the answer is no, the test belongs elsewhere or doesn't need to exist. See `internal/docs/testing.md` for detailed guidelines.
+
 ## Key design rules
 
 - **DNS records are scoped to the custom group**: The API returns records across three DNS groups: `custom`, `product`, and `personalNS`. The provider only manages `custom` group records. Do not touch records in other groups.

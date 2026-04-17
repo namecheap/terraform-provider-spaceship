@@ -1,6 +1,9 @@
 .env
 .DS_Store
 terraform-provider-spaceship
+coverage.out
+coverage_new.out
+*.coverprofile
 
 # Claude Code local settings
 .claude/settings.local.json
