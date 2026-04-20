@@ -1031,7 +1031,6 @@ func recordValueSignature(record client.DNSRecord) string {
 	case "CNAME":
 		write(strings.ToLower(record.CName))
 	case "HTTPS":
-		// TODO looks like a bug  when svc prirotity is present in https record
 		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "MX":
 		write(strings.ToLower(record.Exchange), intToString(record.Preference))
