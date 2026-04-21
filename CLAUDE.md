@@ -50,3 +50,13 @@ When adding tests, ask: "Is this testing something unique to this layer?" If the
 - **DNS records are scoped to the custom group**: The API returns records across three DNS groups: `custom`, `product`, and `personalNS`. The provider only manages `custom` group records. Do not touch records in other groups.
 - **DNS record matching mirrors the API**: The API matches records by type + name + data using case-insensitive comparison, **except** TXT values which are case-sensitive. The provider's diff logic must follow the same rules.
 - **Rate-limit fallback**: The domain info endpoint falls back to the domain list API on HTTP 429 — preserve this pattern if modifying client code.
+
+## Adding a DNS record type validator
+
+Per-record validators follow a fixed three-file pattern. Copy an existing type (A, AAAA, ALIAS, CAA, SRV) rather than inventing a shape:
+
+1. **Client struct + `Validate*` methods** in `internal/client/records/<type>.go` with unit tests in `<type>_test.go`. Mirror API-documented constraints only — do not invent stricter rules. Use shared helpers `ValidateName` / `ValidateTTL` from `common.go`.
+2. **Provider-layer `validator.Object`** in `internal/provider/records/<type>_record_validator.go`. The validator runs against every record in the list and must short-circuit when `type != "<TYPE>"`. Only validate type-specific fields — `name` and `ttl` already have schema-level validators on the attribute.
+3. **Register the validator** in the `Validators` slice on the `records` nested block in `internal/provider/dns_records_resource.go`. Nothing enforces that every supported type has a registration — a missing one silently skips validation.
+
+Acc tests (`<type>_record_validator_acc_test.go`) own API edge cases: unusual values, update/delete+upsert paths, case-sensitivity round-trips, same-host multiplicity. The `plancheck.ExpectEmptyPlan()` on a re-apply step is the strongest cheap signal that the full config → write → read → state cycle converges.

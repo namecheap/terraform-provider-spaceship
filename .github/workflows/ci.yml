@@ -37,6 +37,11 @@ jobs:
                   version: v2.11
                   args: --timeout=3m
 
+            - name: Set up Terraform
+              uses: hashicorp/setup-terraform@v3
+              with:
+                  terraform_wrapper: false
+
             - name: Unit Test with Coverage
               run: make test-cover
 
@@ -110,6 +115,12 @@ jobs:
               uses: actions/setup-go@v6
               with:
                   go-version-file: go.mod
+
+            - name: Set up Terraform
+              if: ${{ steps.acc_secrets.outputs.has_secrets == 'true' }}
+              uses: hashicorp/setup-terraform@v3
+              with:
+                  terraform_wrapper: false
 
             - name: Acceptance Tests
               if: ${{ steps.acc_secrets.outputs.has_secrets == 'true' }}
