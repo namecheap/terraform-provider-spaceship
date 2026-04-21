@@ -258,13 +258,17 @@ func TestAccDNSRecords_caaRecordImportPreExisting(t *testing.T) {
 		}
 	}
 
-	// Clean up the pre-seeded record after the test.
+	// Clean up the pre-seeded record after the test. Log failures so
+	// the next run doesn't silently collide on the deterministic host.
 	t.Cleanup(func() {
 		testClient, err := testAccClient()
 		if err != nil {
+			t.Logf("cleanup: failed to create test client: %v", err)
 			return
 		}
-		_ = testClient.DeleteDNSRecords(context.Background(), domain, []client.DNSRecord{preExistingRecord})
+		if err := testClient.DeleteDNSRecords(context.Background(), domain, []client.DNSRecord{preExistingRecord}); err != nil {
+			t.Logf("cleanup: failed to delete pre-seeded CAA record: %v", err)
+		}
 	})
 
 	// Terraform config matches the pre-seeded record exactly.
