@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.1.0...v0.2.0) (2026-04-21)
+
+
+### Features
+
+* add validation with tests for cname record ([#64](https://github.com/namecheap/terraform-provider-spaceship/issues/64)) ([79c6856](https://github.com/namecheap/terraform-provider-spaceship/commit/79c68561cf375a346da2cdb680960e33447d0cb9))
+* add validators and tests for caa record ([#62](https://github.com/namecheap/terraform-provider-spaceship/issues/62)) ([56d9c24](https://github.com/namecheap/terraform-provider-spaceship/commit/56d9c2474618cf05c21d19a1c6ef7c302e4f1aac))
+
 ## [0.1.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.20...v0.1.0) (2026-04-17)
 
 
