@@ -23,49 +23,131 @@ func httpsHost(suffix string) string {
 	return fmt.Sprintf("%s-https-%s", prefix, suffix)
 }
 
-// Verifies that a ServiceMode HTTPS record with port and scheme round-trips
-// through create, import, and destroy.
-func TestAccDNSRecords_httpsRecord(t *testing.T) {
+// Verifies plan-time rejections for HTTPS: port without scheme, non-_https
+// scheme, target_name="@" (apex), and target_name="*" (wildcard).
+func TestAccDNSRecords_httpsValidation(t *testing.T) {
+	testAccPreCheck(t)
+	domain := testAccDomainValue()
+
+	svcTarget := fmt.Sprintf("svc.%s", domain)
+
+	cases := []struct {
+		suffix      string
+		stringAttrs map[string]string
+		errRegex    string
+	}{
+		{
+			suffix: "portnoscheme",
+			stringAttrs: map[string]string{
+				"target_name": svcTarget,
+				"port":        "_443",
+			},
+			errRegex: "Invalid Scheme Value",
+		},
+		{
+			suffix: "badscheme",
+			stringAttrs: map[string]string{
+				"target_name": svcTarget,
+				"port":        "_443",
+				"scheme":      "_http",
+			},
+			errRegex: "Invalid Scheme Value",
+		},
+		{
+			suffix:      "apextarget",
+			stringAttrs: map[string]string{"target_name": "@"},
+			errRegex:    "Invalid TargetName Value",
+		},
+		{
+			suffix:      "wildtarget",
+			stringAttrs: map[string]string{"target_name": "*"},
+			errRegex:    "Invalid TargetName Value",
+		},
+	}
+
+	steps := make([]resource.TestStep, 0, len(cases))
+	for _, tc := range cases {
+		records := []testAccDNSRecord{
+			{
+				Type:        "HTTPS",
+				Name:        httpsHost(tc.suffix),
+				TTL:         intPointer(3600),
+				IntAttrs:    map[string]int{"svc_priority": 1},
+				StringAttrs: tc.stringAttrs,
+			},
+		}
+		steps = append(steps, resource.TestStep{
+			Config:      testAccDNSRecordsConfig(domain, records),
+			ExpectError: regexp.MustCompile(tc.errRegex),
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps:                    steps,
+	})
+}
+
+// Verifies HTTPS ServiceMode lifecycle: create, update target_name
+// (delete+upsert path — target is in the diff signature), update TTL (upsert
+// only — TTL is not in the signature), empty re-plan, and import.
+func TestAccDNSRecords_httpsCreateAndUpdate(t *testing.T) {
 	testAccPreCheck(t)
 
 	domain := testAccDomainValue()
-	host := httpsHost("basic")
+	host := httpsHost("lifecycle")
+	resourceName := "spaceship_dns_records.test"
 
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
+	mkRecord := func(targetHost string, ttl int) []testAccDNSRecord {
+		return []testAccDNSRecord{{
+			Type:     "HTTPS",
+			Name:     host,
+			TTL:      intPointer(ttl),
+			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
+				"target_name": fmt.Sprintf("%s.%s", targetHost, domain),
 				"svc_params":  "alpn=h2",
 				"port":        "_443",
 				"scheme":      "_https",
 			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-	checks := []resource.TestCheckFunc{
-		resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
-		resource.TestCheckResourceAttr(resourceName, "records.0.type", "HTTPS"),
-		resource.TestCheckResourceAttr(resourceName, "records.0.name", host),
-		resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "1"),
-		resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc.%s", domain)),
-		resource.TestCheckResourceAttr(resourceName, "records.0.svc_params", "alpn=h2"),
-		resource.TestCheckResourceAttr(resourceName, "records.0.port", "_443"),
-		resource.TestCheckResourceAttr(resourceName, "records.0.scheme", "_https"),
+		}}
 	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check:  resource.ComposeTestCheckFunc(checks...),
+				Config: testAccDNSRecordsConfig(domain, mkRecord("svc1", 3600)),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "HTTPS"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.name", host),
+					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc1.%s", domain)),
+					resource.TestCheckResourceAttr(resourceName, "records.0.port", "_443"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.scheme", "_https"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.ttl", "3600"),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, mkRecord("svc2", 3600)),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc2.%s", domain)),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, mkRecord("svc2", 600)),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.ttl", "600"),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, mkRecord("svc2", 600)),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
 			},
 			{
 				ResourceName:            resourceName,
@@ -78,48 +160,63 @@ func TestAccDNSRecords_httpsRecord(t *testing.T) {
 	})
 }
 
-// Verifies an AliasMode HTTPS record (svc_priority=0, target_name=".")
-// round-trips cleanly and a re-apply produces an empty plan.
-func TestAccDNSRecords_httpsRecordAliasMode(t *testing.T) {
+// Verifies AliasMode (svc_priority=0, target_name=".") stability and the
+// transition AliasMode → ServiceMode, which is a delete+upsert because both
+// svc_priority and target_name are in the diff signature.
+func TestAccDNSRecords_httpsAliasModeLifecycle(t *testing.T) {
 	testAccPreCheck(t)
 
 	domain := testAccDomainValue()
 	host := httpsHost("alias")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 0,
-			},
-			StringAttrs: map[string]string{
-				"target_name": ".",
-			},
-		},
-	}
-
 	resourceName := "spaceship_dns_records.test"
+
+	aliasMode := []testAccDNSRecord{{
+		Type:        "HTTPS",
+		Name:        host,
+		TTL:         intPointer(3600),
+		IntAttrs:    map[string]int{"svc_priority": 0},
+		StringAttrs: map[string]string{"target_name": "."},
+	}}
+
+	serviceMode := []testAccDNSRecord{{
+		Type:     "HTTPS",
+		Name:     host,
+		TTL:      intPointer(3600),
+		IntAttrs: map[string]int{"svc_priority": 1},
+		StringAttrs: map[string]string{
+			"target_name": fmt.Sprintf("svc.%s", domain),
+			"svc_params":  "alpn=h2",
+		},
+	}}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDNSRecordsConfig(domain, records),
+				Config: testAccDNSRecordsConfig(domain, aliasMode),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "0"),
 					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", "."),
 				),
 			},
 			{
-				// Re-apply must be a no-op — AliasMode with a dot target is
-				// a common pattern and should not drift.
-				Config: testAccDNSRecordsConfig(domain, records),
+				Config: testAccDNSRecordsConfig(domain, aliasMode),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, serviceMode),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc.%s", domain)),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, serviceMode),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
 			},
 		},
@@ -127,113 +224,83 @@ func TestAccDNSRecords_httpsRecordAliasMode(t *testing.T) {
 	})
 }
 
-// Verifies that missing svc_priority is rejected at plan time.
-func TestAccDNSRecords_httpsRecordMissingSvcPriorityFailsPlan(t *testing.T) {
+// Verifies six independent edge scenarios coexisting in one config: apex
+// name, boundary svc_priority=65535, wildcard port "*", high-range port
+// _64999, mixed-case svc_params (case-insensitive matching), and multiple
+// priorities on the same host.
+func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 	testAccPreCheck(t)
 
 	domain := testAccDomainValue()
+	maxPrioHost := httpsHost("maxprio")
+	wildPortHost := httpsHost("wildport")
+	highPortHost := httpsHost("highport")
+	multiHost := httpsHost("multi")
+	resourceName := "spaceship_dns_records.test"
 
 	records := []testAccDNSRecord{
 		{
-			Type: "HTTPS",
-			Name: httpsHost("nopriority"),
-			TTL:  intPointer(3600),
+			Type:     "HTTPS",
+			Name:     "@",
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
+				"svc_params":  "alpn=h2,h3",
 			},
 		},
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Missing Required Field"),
-			},
-		},
-	})
-}
-
-// Verifies that missing target_name is rejected at plan time.
-func TestAccDNSRecords_httpsRecordMissingTargetNameFailsPlan(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-
-	records := []testAccDNSRecord{
 		{
-			Type: "HTTPS",
-			Name: httpsHost("notarget"),
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-		},
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Missing Required Field"),
-			},
-		},
-	})
-}
-
-// Verifies that setting port without scheme is rejected at plan time —
-// HTTPS records require scheme="_https" whenever port is specified.
-func TestAccDNSRecords_httpsRecordPortWithoutSchemeFailsPlan(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: httpsHost("noscheme"),
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
+			Type:     "HTTPS",
+			Name:     maxPrioHost,
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 65535},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
-				"port":        "_443",
+				"svc_params":  "ALPN=H2", // mixed-case, verifies case-insensitive matching on re-plan
 			},
 		},
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Invalid Scheme Value"),
-			},
-		},
-	})
-}
-
-// Verifies that a non-'_https' scheme is rejected at plan time.
-func TestAccDNSRecords_httpsRecordInvalidSchemeFailsPlan(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-
-	records := []testAccDNSRecord{
 		{
-			Type: "HTTPS",
-			Name: httpsHost("badscheme"),
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
+			Type:     "HTTPS",
+			Name:     wildPortHost,
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
-				"port":        "_443",
-				"scheme":      "_http",
+				"svc_params":  "alpn=h2",
+				"port":        "*",
+				"scheme":      "_https",
+			},
+		},
+		{
+			Type:     "HTTPS",
+			Name:     highPortHost,
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 1},
+			StringAttrs: map[string]string{
+				"target_name": fmt.Sprintf("svc.%s", domain),
+				"svc_params":  "alpn=h2",
+				"port":        "_64999",
+				"scheme":      "_https",
+			},
+		},
+		{
+			Type:     "HTTPS",
+			Name:     multiHost,
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 1},
+			StringAttrs: map[string]string{
+				"target_name": fmt.Sprintf("svc1.%s", domain),
+				"svc_params":  "alpn=h2",
+			},
+		},
+		{
+			Type:     "HTTPS",
+			Name:     multiHost,
+			TTL:      intPointer(3600),
+			IntAttrs: map[string]int{"svc_priority": 2},
+			StringAttrs: map[string]string{
+				"target_name": fmt.Sprintf("svc2.%s", domain),
+				"svc_params":  "alpn=h3",
 			},
 		},
 	}
@@ -242,42 +309,89 @@ func TestAccDNSRecords_httpsRecordInvalidSchemeFailsPlan(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Invalid Scheme Value"),
+				Config: testAccDNSRecordsConfig(domain, records),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "6"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.name", "@"),
+					resource.TestCheckResourceAttr(resourceName, "records.1.svc_priority", "65535"),
+					resource.TestCheckResourceAttr(resourceName, "records.2.port", "*"),
+					resource.TestCheckResourceAttr(resourceName, "records.3.port", "_64999"),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, records),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
 			},
 		},
+		CheckDestroy: resource.ComposeAggregateTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", "@"),
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", maxPrioHost),
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", wildPortHost),
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", highPortHost),
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", multiHost),
+		),
 	})
 }
 
-// Verifies that target_name="@" is rejected at plan time — the API requires
-// an FQDN or the literal ".", not the apex placeholder.
-func TestAccDNSRecords_httpsRecordInvalidTargetNameFailsPlan(t *testing.T) {
+// Verifies HTTPS coexists with an A record on the same host (type is part
+// of recordKey so same-name cross-type records must not collide), and that
+// removing HTTPS from config while keeping A exercises the Update delete
+// path distinct from resource destroy.
+func TestAccDNSRecords_httpsRecordComposition(t *testing.T) {
 	testAccPreCheck(t)
 
 	domain := testAccDomainValue()
+	host := httpsHost("compose")
+	resourceName := "spaceship_dns_records.test"
 
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: httpsHost("badtarget"),
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": "@",
-			},
+	httpsRecord := testAccDNSRecord{
+		Type:     "HTTPS",
+		Name:     host,
+		TTL:      intPointer(3600),
+		IntAttrs: map[string]int{"svc_priority": 1},
+		StringAttrs: map[string]string{
+			"target_name": fmt.Sprintf("svc.%s", domain),
+			"svc_params":  "alpn=h2",
 		},
 	}
+	aRecord := testAccDNSRecord{
+		Type:        "A",
+		Name:        host,
+		TTL:         intPointer(3600),
+		StringAttrs: map[string]string{"address": "1.2.3.4"},
+	}
+
+	withBoth := []testAccDNSRecord{httpsRecord, aRecord}
+	onlyA := []testAccDNSRecord{aRecord}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Invalid TargetName Value"),
+				Config: testAccDNSRecordsConfig(domain, withBoth),
+				Check:  resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, withBoth),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, onlyA),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "records.0.type", "A"),
+					testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
+				),
 			},
 		},
+		CheckDestroy: resource.ComposeAggregateTestCheckFunc(
+			testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
+			testAccCheckDNSRecordAbsent(domain, "A", host),
+		),
 	})
 }
 
@@ -299,7 +413,6 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 		SvcParams:   "alpn=h2",
 	}
 
-	// Seed the record via the API before Terraform runs.
 	preConfig := func() {
 		testClient, err := testAccClient()
 		if err != nil {
@@ -310,7 +423,6 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 		}
 	}
 
-	// Clean up the pre-seeded record after the test.
 	t.Cleanup(func() {
 		testClient, err := testAccClient()
 		if err != nil {
@@ -343,8 +455,6 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
-				// Step 1: Apply with the pre-existing record already on the
-				// API. Terraform should adopt it without changes.
 				PreConfig: preConfig,
 				Config:    testAccDNSRecordsConfig(domain, records),
 				Check: resource.ComposeTestCheckFunc(
@@ -357,8 +467,6 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 				),
 			},
 			{
-				// Step 2: Re-apply. Plan should be empty since state already
-				// matches configuration and API.
 				Config: testAccDNSRecordsConfig(domain, records),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
@@ -367,7 +475,6 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 				},
 			},
 			{
-				// Step 3: Import and verify.
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
@@ -375,656 +482,5 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 			},
 		},
 		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that changing target_name works. The diff signature keys HTTPS
-// on svc_priority+target_name+svc_params+port+scheme, so a target change
-// is a delete+upsert, not an in-place update.
-func TestAccDNSRecords_httpsRecordUpdateTargetName(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("update")
-
-	initialRecords := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc1.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-	}
-
-	updatedRecords := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc2.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, initialRecords),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc1.%s", domain)),
-				),
-			},
-			{
-				// Same host, new target → old record should be deleted and
-				// new one upserted. Final state has only the new record.
-				Config: testAccDNSRecordsConfig(domain, updatedRecords),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc2.%s", domain)),
-				),
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that svc_params matching is case-insensitive end-to-end: a
-// mixed-case value should re-apply to an empty plan, regardless of how the
-// API persists the casing.
-func TestAccDNSRecords_httpsRecordSvcParamsCaseInsensitive(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("case")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "ALPN=H2",
-			},
-		},
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-			},
-			{
-				// If the API normalizes casing server-side and returns
-				// something different, this will surface as drift.
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that two HTTPS records on the same host with different
-// svc_priority values coexist. Real-world HTTPS config often pairs a
-// priority-0 AliasMode record with higher-priority ServiceMode alternatives.
-func TestAccDNSRecords_httpsRecordMultiplePrioritiesSameHost(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("multi")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc1.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 2,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc2.%s", domain),
-				"svc_params":  "alpn=h3",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that svc_priority=65535 (uint16 max) round-trips without being
-// silently coerced to a lower value.
-func TestAccDNSRecords_httpsRecordBoundarySvcPriority(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("maxprio")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 65535,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "65535"),
-				),
-			},
-			{
-				// Re-apply with max priority must be a no-op.
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that port="*" (the wildcard port form) is accepted by the API
-// and round-trips. The client spec lists "*" as a valid alternative to the
-// "_NNNN" underscored port form.
-func TestAccDNSRecords_httpsRecordWildcardPort(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("wildport")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-				"port":        "*",
-				"scheme":      "_https",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.port", "*"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.scheme", "_https"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that an HTTPS record at the zone apex (name="@") round-trips.
-// Apex HTTPS records are common in modern deployments (ECH, HTTP/3 hints).
-func TestAccDNSRecords_httpsRecordApexName(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: "@",
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2,h3",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.name", "@"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.svc_params", "alpn=h2,h3"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", "@"),
-	})
-}
-
-// Verifies transition from AliasMode (priority=0, target=".") to ServiceMode
-// (priority=1, real FQDN). Since both svc_priority and target_name are in the
-// diff signature, this forces a delete+upsert, not an in-place update.
-func TestAccDNSRecords_httpsRecordAliasToServiceModeUpdate(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("modexchg")
-
-	aliasMode := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 0,
-			},
-			StringAttrs: map[string]string{
-				"target_name": ".",
-			},
-		},
-	}
-
-	serviceMode := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, aliasMode),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "0"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", "."),
-				),
-			},
-			{
-				// AliasMode → ServiceMode: old record deleted, new one upserted.
-				Config: testAccDNSRecordsConfig(domain, serviceMode),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.svc_priority", "1"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.target_name", fmt.Sprintf("svc.%s", domain)),
-				),
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that changing only the TTL triggers an upsert without changing
-// record identity. recordValueSignature excludes TTL, so the diff skip-check
-// (signature match AND TTL match) must catch TTL-only differences.
-func TestAccDNSRecords_httpsRecordTTLUpdate(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("ttl")
-
-	base := testAccDNSRecord{
-		Type: "HTTPS",
-		Name: host,
-		IntAttrs: map[string]int{
-			"svc_priority": 1,
-		},
-		StringAttrs: map[string]string{
-			"target_name": fmt.Sprintf("svc.%s", domain),
-			"svc_params":  "alpn=h2",
-		},
-	}
-	initial := base
-	initial.TTL = intPointer(3600)
-	updated := base
-	updated.TTL = intPointer(600)
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, []testAccDNSRecord{initial}),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.ttl", "3600"),
-				),
-			},
-			{
-				// Same identity fields, only TTL differs → record is upserted
-				// but count stays at 1. Re-applying must converge to empty.
-				Config: testAccDNSRecordsConfig(domain, []testAccDNSRecord{updated}),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.ttl", "600"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, []testAccDNSRecord{updated}),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that an HTTPS record and an A record on the same host coexist.
-// recordKey includes the record type, so same-name records of different
-// types must not conflict in the diff logic.
-func TestAccDNSRecords_httpsRecordCoexistsWithA(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("coexist")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-		{
-			Type: "A",
-			Name: host,
-			TTL:  intPointer(3600),
-			StringAttrs: map[string]string{
-				"address": "1.2.3.4",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: resource.ComposeTestCheckFunc(
-			testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-			testAccCheckDNSRecordAbsent(domain, "A", host),
-		),
-	})
-}
-
-// Verifies that removing an HTTPS record from the config (while leaving the
-// resource in place) deletes it from the API. Exercises the Update delete
-// path, which is distinct from resource destroy.
-func TestAccDNSRecords_httpsRecordRemovedFromConfig(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	httpsName := httpsHost("removed")
-	aName := httpsHost("kept")
-
-	withHTTPS := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: httpsName,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-			},
-		},
-		{
-			Type: "A",
-			Name: aName,
-			TTL:  intPointer(3600),
-			StringAttrs: map[string]string{
-				"address": "1.2.3.4",
-			},
-		},
-	}
-
-	withoutHTTPS := []testAccDNSRecord{
-		{
-			Type: "A",
-			Name: aName,
-			TTL:  intPointer(3600),
-			StringAttrs: map[string]string{
-				"address": "1.2.3.4",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, withHTTPS),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "2"),
-				),
-			},
-			{
-				// Remove HTTPS from config. The A record stays; HTTPS should
-				// be deleted from the API.
-				Config: testAccDNSRecordsConfig(domain, withoutHTTPS),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "records.0.type", "A"),
-					testAccCheckDNSRecordAbsent(domain, "HTTPS", httpsName),
-				),
-			},
-		},
-		CheckDestroy: resource.ComposeTestCheckFunc(
-			testAccCheckDNSRecordAbsent(domain, "HTTPS", httpsName),
-			testAccCheckDNSRecordAbsent(domain, "A", aName),
-		),
-	})
-}
-
-// Verifies that a port in the 60000-65535 range round-trips. The API spec's
-// underscoredPort regex rejects many valid ports in this range (e.g.
-// _64999); this pins down that 1-65535 is actually accepted end-to-end.
-func TestAccDNSRecords_httpsRecordPortInHighRange(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-	host := httpsHost("highport")
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: host,
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": fmt.Sprintf("svc.%s", domain),
-				"svc_params":  "alpn=h2",
-				"port":        "_64999",
-				"scheme":      "_https",
-			},
-		},
-	}
-
-	resourceName := "spaceship_dns_records.test"
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr(resourceName, "records.0.port", "_64999"),
-				),
-			},
-			{
-				Config: testAccDNSRecordsConfig(domain, records),
-				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: []plancheck.PlanCheck{
-						plancheck.ExpectEmptyPlan(),
-					},
-				},
-			},
-		},
-		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
-	})
-}
-
-// Verifies that target_name="*" is rejected at plan time. Mirrors the
-// target_name="@" case but exercises the wildcard branch of the reject list.
-func TestAccDNSRecords_httpsRecordWildcardTargetFailsPlan(t *testing.T) {
-	testAccPreCheck(t)
-
-	domain := testAccDomainValue()
-
-	records := []testAccDNSRecord{
-		{
-			Type: "HTTPS",
-			Name: httpsHost("wildtarget"),
-			TTL:  intPointer(3600),
-			IntAttrs: map[string]int{
-				"svc_priority": 1,
-			},
-			StringAttrs: map[string]string{
-				"target_name": "*",
-			},
-		},
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
-		Steps: []resource.TestStep{
-			{
-				Config:      testAccDNSRecordsConfig(domain, records),
-				ExpectError: regexp.MustCompile("Invalid TargetName Value"),
-			},
-		},
 	})
 }
