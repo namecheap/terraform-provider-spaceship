@@ -136,8 +136,8 @@ func (v *httpsRecordValidator) ValidateObject(ctx context.Context, req validator
 			"Invalid Field Type",
 			"The 'scheme' field must be a string for HTTPS records.",
 		)
-	} else {
-		if !schemeAttr.IsNull() && !schemeAttr.IsUnknown() {
+	} else if !schemeAttr.IsUnknown() {
+		if !schemeAttr.IsNull() {
 			rec.Scheme = schemeAttr.ValueString()
 		}
 		if err := rec.ValidateScheme(); err != nil {
