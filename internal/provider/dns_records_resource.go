@@ -213,6 +213,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						records.ALIASValidator(),
 						records.CAAValidator(),
 						records.CNAMEValidator(),
+						records.MXValidator(),
 						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
