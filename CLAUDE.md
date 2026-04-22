@@ -60,3 +60,7 @@ Per-record validators follow a fixed three-file pattern. Copy an existing type (
 3. **Register the validator** in the `Validators` slice on the `records` nested block in `internal/provider/dns_records_resource.go`. Nothing enforces that every supported type has a registration — a missing one silently skips validation.
 
 Acc tests (`<type>_record_validator_acc_test.go`) own API edge cases: unusual values, update/delete+upsert paths, case-sensitivity round-trips, same-host multiplicity. The `plancheck.ExpectEmptyPlan()` on a re-apply step is the strongest cheap signal that the full config → write → read → state cycle converges.
+
+## Release process
+
+Releases are semi-manual and maintainer-gated: merges to `master` accumulate into a release-please "Release PR"; a maintainer merges that PR to cut a tag, and GoReleaser publishes the binary. See [RELEASE.md](RELEASE.md) for the full flow, including the manual Terraform Registry resync that is occasionally required.
