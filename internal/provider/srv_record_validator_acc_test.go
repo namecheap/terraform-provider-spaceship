@@ -97,3 +97,87 @@ func TestAccDNSRecords_srvMissingRequiredFieldsFailsPlan(t *testing.T) {
 		},
 	})
 }
+
+// Verifies that target="@" is rejected at plan time. The API returns 422
+// "target is not a valid domain name" at apply time (empirically confirmed),
+// so the client-layer validator short-circuits with a plan-time error.
+func TestAccDNSRecords_srvRecordApexTargetFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+	host := fmt.Sprintf("%s-srv-apextarget", prefix)
+
+	records := []testAccDNSRecord{
+		{
+			Type: "SRV",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"service":  "_sip",
+				"protocol": "_tcp",
+				"target":   "@",
+			},
+			IntAttrs: map[string]int{
+				"priority":    10,
+				"weight":      60,
+				"port_number": 5060,
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Invalid Target Value"),
+			},
+		},
+	})
+}
+
+// Verifies that target="*" is rejected at plan time. Same rationale as the
+// apex test: API returns 422 at apply time, plan-time rejection is the
+// correct UX.
+func TestAccDNSRecords_srvRecordWildcardTargetFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	prefix := os.Getenv("SPACESHIP_TEST_RECORD_PREFIX")
+	if prefix == "" {
+		prefix = "tfacc"
+	}
+	host := fmt.Sprintf("%s-srv-wildtarget", prefix)
+
+	records := []testAccDNSRecord{
+		{
+			Type: "SRV",
+			Name: host,
+			TTL:  intPointer(3600),
+			StringAttrs: map[string]string{
+				"service":  "_sip",
+				"protocol": "_tcp",
+				"target":   "*",
+			},
+			IntAttrs: map[string]int{
+				"priority":    10,
+				"weight":      60,
+				"port_number": 5060,
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Invalid Target Value"),
+			},
+		},
+	})
+}

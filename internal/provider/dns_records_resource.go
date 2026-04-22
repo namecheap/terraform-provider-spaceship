@@ -214,6 +214,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						records.CAAValidator(),
 						records.HTTPSValidator(),
 						records.CNAMEValidator(),
+						records.MXValidator(),
 						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
@@ -303,9 +304,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"preference": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Preference value for MX records (0-65535).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 65535),
-							},
 						},
 						"nameserver": schema.StringAttribute{
 							Optional:            true,
