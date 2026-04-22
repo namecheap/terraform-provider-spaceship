@@ -118,6 +118,14 @@ chore: bump Go version to 1.25.8
 - Small, focused PRs are easier to review and more likely to be merged quickly.
 - If changes are requested, push follow-up commits to the same branch.
 
+### After Your PR Merges
+
+Merging to `master` does not immediately publish a new provider version.
+Merged changes accumulate in a long-lived "Release PR" opened by
+[release-please](https://github.com/googleapis/release-please), and a
+maintainer merges that PR when there is enough change to justify a new
+binary. See [RELEASE.md](RELEASE.md) for the full flow.
+
 ## Code Organization
 
 ```

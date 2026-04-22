@@ -212,6 +212,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						records.AAAAValidator(),
 						records.ALIASValidator(),
 						records.CAAValidator(),
+						records.HTTPSValidator(),
 						records.CNAMEValidator(),
 						records.MXValidator(),
 						records.SRVValidator(),
@@ -287,9 +288,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"svc_priority": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Service priority for HTTPS/SVCB records (0-65535).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 65535),
-							},
 						},
 						"target_name": schema.StringAttribute{
 							Optional:            true,
