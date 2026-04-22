@@ -181,8 +181,8 @@ func TestSRVRecord_ValidateTarget(t *testing.T) {
 	}{
 		{"valid hostname", "sipserver.example.com", false},
 		{"valid single char", "a", false},
-		{"valid apex", "@", false},
-		{"valid wildcard", "*", false},
+		{"apex rejected", "@", true},
+		{"wildcard rejected", "*", true},
 		{"empty", "", true},
 		{"too long", strings.Repeat("a", 254), true},
 		{"max length", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63), false},

@@ -64,8 +64,14 @@ func (r *SRVRecord) ValidatePort() error {
 	return nil
 }
 
-// ValidateTarget checks that the target is a valid hostname between 1 and 253 characters.
+// ValidateTarget checks that the target is a valid domain name.
+// "@" and "*" are rejected: runtime API returns 422 "target is not a valid
+// domain name" for those values (empirically confirmed), even though the
+// hostNameValue schema in the API docs formally admits them.
 func (r *SRVRecord) ValidateTarget() error {
+	if r.Target == "@" || r.Target == "*" {
+		return fmt.Errorf("must be a valid domain name, got %q", r.Target)
+	}
 	if len(r.Target) < 1 || len(r.Target) > 253 {
 		return fmt.Errorf("must be between 1 and 253 characters, got %d", len(r.Target))
 	}
@@ -74,7 +80,7 @@ func (r *SRVRecord) ValidateTarget() error {
 		return fmt.Errorf("hostname pattern match failed: %w", err)
 	}
 	if !matched {
-		return fmt.Errorf("must be a valid hostname (e.g. 'server.example.com' or '@'), got %q", r.Target)
+		return fmt.Errorf("must be a valid hostname (e.g. 'server.example.com'), got %q", r.Target)
 	}
 	return nil
 }
