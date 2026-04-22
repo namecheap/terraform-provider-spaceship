@@ -2,10 +2,8 @@ package records
 
 import (
 	"fmt"
-	"regexp"
+	"strconv"
 )
-
-var httpsPortPattern = regexp.MustCompile(`^_(6[0-5]{2}[0-3][0-5]|[1-5]?([0-9]){2,4}|[1-9]?)$`)
 
 // HTTPSRecord represents an HTTPS DNS record (RFC 9460).
 // HTTPS records deliver configuration information for accessing a service via HTTPS.
@@ -53,16 +51,20 @@ func (r *HTTPSRecord) ValidateSvcParams() error {
 // ValidatePort checks that port, when set, is either "*" or an underscore
 // followed by a port number 1-65535. Port is optional for HTTPS records.
 func (r *HTTPSRecord) ValidatePort() error {
-	if r.Port == "" {
+	if r.Port == "" || r.Port == "*" {
 		return nil
 	}
-	if r.Port == "*" {
-		return nil
+	if r.Port[0] != '_' {
+		return fmt.Errorf("must be '*' or '_N' where N is 1-65535, got %q", r.Port)
 	}
-	if len(r.Port) < 2 || len(r.Port) > 6 {
-		return fmt.Errorf("must be '*' or an underscore followed by a port number (2-6 chars), got %d", len(r.Port))
+	suffix := r.Port[1:]
+	for _, c := range suffix {
+		if c < '0' || c > '9' {
+			return fmt.Errorf("must be '*' or '_N' where N is 1-65535, got %q", r.Port)
+		}
 	}
-	if !httpsPortPattern.MatchString(r.Port) {
+	n, err := strconv.Atoi(suffix)
+	if err != nil || n < 1 || n > 65535 {
 		return fmt.Errorf("must be '*' or '_N' where N is 1-65535, got %q", r.Port)
 	}
 	return nil

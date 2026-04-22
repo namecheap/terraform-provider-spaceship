@@ -947,6 +947,56 @@ func TestAccDNSRecords_httpsRecordRemovedFromConfig(t *testing.T) {
 	})
 }
 
+// Verifies that a port in the 60000-65535 range round-trips. The API spec's
+// underscoredPort regex rejects many valid ports in this range (e.g.
+// _64999); this pins down that 1-65535 is actually accepted end-to-end.
+func TestAccDNSRecords_httpsRecordPortInHighRange(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+	host := httpsHost("highport")
+
+	records := []testAccDNSRecord{
+		{
+			Type: "HTTPS",
+			Name: host,
+			TTL:  intPointer(3600),
+			IntAttrs: map[string]int{
+				"svc_priority": 1,
+			},
+			StringAttrs: map[string]string{
+				"target_name": fmt.Sprintf("svc.%s", domain),
+				"svc_params":  "alpn=h2",
+				"port":        "_64999",
+				"scheme":      "_https",
+			},
+		},
+	}
+
+	resourceName := "spaceship_dns_records.test"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccDNSRecordsConfig(domain, records),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "records.0.port", "_64999"),
+				),
+			},
+			{
+				Config: testAccDNSRecordsConfig(domain, records),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+			},
+		},
+		CheckDestroy: testAccCheckDNSRecordAbsent(domain, "HTTPS", host),
+	})
+}
+
 // Verifies that target_name="*" is rejected at plan time. Mirrors the
 // target_name="@" case but exercises the wildcard branch of the reject list.
 func TestAccDNSRecords_httpsRecordWildcardTargetFailsPlan(t *testing.T) {

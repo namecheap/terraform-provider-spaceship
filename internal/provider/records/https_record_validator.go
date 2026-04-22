@@ -112,7 +112,13 @@ func (v *httpsRecordValidator) ValidateObject(ctx context.Context, req validator
 	}
 
 	portAttr, ok := attrs["port"].(types.String)
-	if ok && !portAttr.IsNull() && !portAttr.IsUnknown() {
+	if !ok {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("port"),
+			"Invalid Field Type",
+			"The 'port' field must be a string for HTTPS records.",
+		)
+	} else if !portAttr.IsNull() && !portAttr.IsUnknown() {
 		rec.Port = portAttr.ValueString()
 		if err := rec.ValidatePort(); err != nil {
 			resp.Diagnostics.AddAttributeError(
@@ -124,14 +130,22 @@ func (v *httpsRecordValidator) ValidateObject(ctx context.Context, req validator
 	}
 
 	schemeAttr, ok := attrs["scheme"].(types.String)
-	if ok && !schemeAttr.IsNull() && !schemeAttr.IsUnknown() {
-		rec.Scheme = schemeAttr.ValueString()
-	}
-	if err := rec.ValidateScheme(); err != nil {
+	if !ok {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("scheme"),
-			"Invalid Scheme Value",
-			err.Error(),
+			"Invalid Field Type",
+			"The 'scheme' field must be a string for HTTPS records.",
 		)
+	} else {
+		if !schemeAttr.IsNull() && !schemeAttr.IsUnknown() {
+			rec.Scheme = schemeAttr.ValueString()
+		}
+		if err := rec.ValidateScheme(); err != nil {
+			resp.Diagnostics.AddAttributeError(
+				req.Path.AtName("scheme"),
+				"Invalid Scheme Value",
+				err.Error(),
+			)
+		}
 	}
 }
