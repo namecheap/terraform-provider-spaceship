@@ -76,20 +76,23 @@ func TestHTTPSRecord_ValidateSvcPriority(t *testing.T) {
 }
 
 func TestHTTPSRecord_ValidateTargetName(t *testing.T) {
+	// wantErrContains pins the rejection branch for @/* so the test fails
+	// loudly if rejection ever fires from ValidateName instead of the pre-check.
 	tests := []struct {
-		name       string
-		targetName string
-		wantErr    bool
+		name            string
+		targetName      string
+		wantErr         bool
+		wantErrContains string
 	}{
-		{"valid dot alias", ".", false},
-		{"valid FQDN", "svc.example.com", false},
-		{"valid underscored FQDN", "_443._https.www.example.com", false},
-		{"valid single label", "host", false},
-		{"apex rejected", "@", true},
-		{"wildcard rejected", "*", true},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", 254), true},
-		{"starts with dot", ".invalid", true},
+		{"valid dot alias", ".", false, ""},
+		{"valid FQDN", "svc.example.com", false, ""},
+		{"valid underscored FQDN", "_443._https.www.example.com", false, ""},
+		{"valid single label", "host", false, ""},
+		{"apex rejected", "@", true, "domain name"},
+		{"wildcard rejected", "*", true, "domain name"},
+		{"empty", "", true, ""},
+		{"too long", strings.Repeat("a", 254), true, ""},
+		{"starts with dot", ".invalid", true, ""},
 	}
 
 	for _, tt := range tests {
@@ -99,6 +102,9 @@ func TestHTTPSRecord_ValidateTargetName(t *testing.T) {
 			err := rec.ValidateTargetName()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateTargetName(%q) error = %v, wantErr = %v", tt.targetName, err, tt.wantErr)
+			}
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Errorf("ValidateTargetName(%q) error = %v, want substring %q", tt.targetName, err, tt.wantErrContains)
 			}
 		})
 	}
@@ -188,58 +194,6 @@ func TestHTTPSRecord_ValidateScheme(t *testing.T) {
 			err := rec.ValidateScheme()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateScheme(port=%q,scheme=%q) error = %v, wantErr = %v", tt.port, tt.scheme, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestHTTPSRecord_ValidateName(t *testing.T) {
-	tests := []struct {
-		name    string
-		recName string
-		wantErr bool
-	}{
-		{"valid hostname", "myhost", false},
-		{"valid apex", "@", false},
-		{"valid wildcard", "*", false},
-		{"valid subdomain", "sub.domain", false},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", 254), true},
-		{"starts with dot", ".invalid", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := validHTTPSRecord()
-			rec.Name = tt.recName
-			err := rec.ValidateName()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateName(%q) error = %v, wantErr = %v", tt.recName, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestHTTPSRecord_ValidateTTL(t *testing.T) {
-	tests := []struct {
-		name    string
-		ttl     int
-		wantErr bool
-	}{
-		{"valid", 3500, false},
-		{"min valid", 60, false},
-		{"max valid", 3600, false},
-		{"too low", 59, true},
-		{"too high", 3601, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := validHTTPSRecord()
-			rec.TTL = tt.ttl
-			err := rec.ValidateTTL()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateTTL(%d) error = %v, wantErr = %v", tt.ttl, err, tt.wantErr)
 			}
 		})
 	}

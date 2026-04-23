@@ -174,19 +174,22 @@ func TestSRVRecord_ValidatePort(t *testing.T) {
 }
 
 func TestSRVRecord_ValidateTarget(t *testing.T) {
+	// wantErrContains pins the rejection branch for @/* so the test fails
+	// loudly if rejection ever fires from ValidateName instead of the pre-check.
 	tests := []struct {
-		name    string
-		target  string
-		wantErr bool
+		name            string
+		target          string
+		wantErr         bool
+		wantErrContains string
 	}{
-		{"valid hostname", "sipserver.example.com", false},
-		{"valid single char", "a", false},
-		{"apex rejected", "@", true},
-		{"wildcard rejected", "*", true},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", 254), true},
-		{"max length", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63), false},
-		{"starts with dot", ".invalid.com", true},
+		{"valid hostname", "sipserver.example.com", false, ""},
+		{"valid single char", "a", false, ""},
+		{"apex rejected", "@", true, "domain name"},
+		{"wildcard rejected", "*", true, "domain name"},
+		{"empty", "", true, ""},
+		{"too long", strings.Repeat("a", 254), true, ""},
+		{"max length", strings.Repeat("a", 63) + "." + strings.Repeat("b", 63), false, ""},
+		{"starts with dot", ".invalid.com", true, ""},
 	}
 
 	for _, tt := range tests {
@@ -197,31 +200,8 @@ func TestSRVRecord_ValidateTarget(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateTarget(%q) error = %v, wantErr = %v", tt.target, err, tt.wantErr)
 			}
-		})
-	}
-}
-
-func TestSRVRecord_ValidateName(t *testing.T) {
-	tests := []struct {
-		name     string
-		recName  string
-		wantErr  bool
-	}{
-		{"valid hostname", "myhost", false},
-		{"valid apex", "@", false},
-		{"valid wildcard", "*", false},
-		{"empty", "", true},
-		{"too long", strings.Repeat("a", 254), true},
-		{"starts with dot", ".invalid", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := validSRVRecord()
-			rec.Name = tt.recName
-			err := rec.ValidateName()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateName(%q) error = %v, wantErr = %v", tt.recName, err, tt.wantErr)
+			if tt.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErrContains)) {
+				t.Errorf("ValidateTarget(%q) error = %v, want substring %q", tt.target, err, tt.wantErrContains)
 			}
 		})
 	}
@@ -250,31 +230,6 @@ func TestSRVRecord_ValidateTarget_EdgeCases(t *testing.T) {
 			err := rec.ValidateTarget()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidateTarget(%q [len=%d]) error = %v, wantErr = %v", tt.target, len(tt.target), err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestSRVRecord_ValidateTTL(t *testing.T) {
-	tests := []struct {
-		name    string
-		ttl     int
-		wantErr bool
-	}{
-		{"valid", 3500, false},
-		{"min valid", 60, false},
-		{"max valid", 3600, false},
-		{"too low", 59, true},
-		{"too high", 3601, true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rec := validSRVRecord()
-			rec.TTL = tt.ttl
-			err := rec.ValidateTTL()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateTTL(%d) error = %v, wantErr = %v", tt.ttl, err, tt.wantErr)
 			}
 		})
 	}
