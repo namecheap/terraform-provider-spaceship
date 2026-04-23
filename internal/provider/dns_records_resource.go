@@ -215,6 +215,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						records.HTTPSValidator(),
 						records.CNAMEValidator(),
 						records.MXValidator(),
+						records.NSValidator(),
 						records.SRVValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
