@@ -207,9 +207,6 @@ func TestSRVRecord_ValidateTarget(t *testing.T) {
 	}
 }
 
-// Shared hostname (Name) edge cases live in common_test.go.
-// Per-type ValidateName wiring is covered by TestSRVRecord_Validate_ValidRecord.
-
 func TestSRVRecord_ValidateTarget_EdgeCases(t *testing.T) {
 	// Build a long valid target: 3 labels of 63 chars + 1 label of 61 chars + 3 dots = 253
 	label63 := strings.Repeat("a", 63)
@@ -237,6 +234,3 @@ func TestSRVRecord_ValidateTarget_EdgeCases(t *testing.T) {
 		})
 	}
 }
-
-// Shared TTL edge cases live in common_test.go.
-// Per-type ValidateTTL wiring is covered by TestSRVRecord_Validate_ValidRecord.

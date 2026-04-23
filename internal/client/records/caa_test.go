@@ -117,6 +117,3 @@ func TestCAARecord_ValidateValue(t *testing.T) {
 		})
 	}
 }
-
-// Shared hostname (Name) and TTL edge cases live in common_test.go.
-// Per-type ValidateName / ValidateTTL wiring is covered by TestCAARecord_Validate_ValidRecord.

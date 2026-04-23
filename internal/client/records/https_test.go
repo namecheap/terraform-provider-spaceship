@@ -198,6 +198,3 @@ func TestHTTPSRecord_ValidateScheme(t *testing.T) {
 		})
 	}
 }
-
-// Shared hostname (Name) and TTL edge cases live in common_test.go.
-// Per-type ValidateName / ValidateTTL wiring is covered by TestHTTPSRecord_Validate_ValidRecord.

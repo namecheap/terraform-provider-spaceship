@@ -92,6 +92,3 @@ func TestMXRecord_ValidatePreference(t *testing.T) {
 		})
 	}
 }
-
-// Shared hostname (Name) and TTL edge cases live in common_test.go.
-// Per-type ValidateName / ValidateTTL wiring is covered by TestMXRecord_Validate_ValidRecord.

@@ -5,6 +5,13 @@ import (
 	"testing"
 )
 
+// Shared hostname (Name) and TTL edge cases for all record types live in this
+// file. Per-type _test.go files cover only fields unique to that record type
+// (AliasName, CAA tag/flags/value, SRV target/priority/weight/port, etc.).
+// Whether each type's Validate() actually invokes ValidateName / ValidateTTL
+// is not asserted at the client layer; the full write → read round-trip in
+// acceptance tests is the backstop for that wiring.
+
 func TestValidateName(t *testing.T) {
 	// Build a valid hostname of exactly 253 characters:
 	// 3 labels of 63 chars + 1 label of 61 chars + 3 dots = 253
@@ -27,7 +34,6 @@ func TestValidateName(t *testing.T) {
 		{"exact max length 253", name253, false},
 		{"empty", "", true},
 		{"over max length 254", name254, true},
-		{"too long", strings.Repeat("a", 254), true},
 		{"starts with dot", ".invalid", true},
 	}
 
