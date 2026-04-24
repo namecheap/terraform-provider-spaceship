@@ -4,7 +4,8 @@
 go build .                                              # Build
 make test                                               # Unit tests (excludes acceptance)
 go test -run TestFunctionName ./internal/provider       # Single unit test
-golangci-lint run ./...                                 # Lint
+make lint                                               # Lint (linters + formatter check)
+make fmt                                                # Auto-fix formatting
 make docs                                               # Generate docs
 make docs-validate                                      # Validate docs match schema
 
@@ -19,7 +20,7 @@ go test -run TestAccFunctionName ./internal/provider -v # Single acceptance test
 After making changes, follow this order:
 
 1. **Unit tests** — `make test` (or `go test -run TestName ./internal/provider` for a specific test)
-2. **Lint** — `golangci-lint run ./...`
+2. **Lint** — `make lint` (fails on lint rules or unformatted files; run `make fmt` to auto-fix formatting)
 3. **Build** — `go build .`
 4. **Acceptance tests** — run only when the user explicitly asks. These hit real APIs and modify real DNS records.
 

@@ -35,7 +35,6 @@ jobs:
               uses: golangci/golangci-lint-action@v9
               with:
                   version: v2.11
-                  args: --timeout=3m
 
             - name: Set up Terraform
               uses: hashicorp/setup-terraform@v3
