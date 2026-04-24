@@ -28,13 +28,13 @@ func TestSRVRecord_Validate_ValidRecord(t *testing.T) {
 func TestSRVRecord_Validate_BoundaryValues(t *testing.T) {
 	rec := &SRVRecord{
 		Name:     "@",
-		Service:  "_s",       // min 2 chars
-		Protocol: "_u",       // min 2 chars
-		Priority: 0,          // min
-		Weight:   0,          // min
-		Port:     1,          // min
-		Target:   "a",        // min 1 char
-		TTL:      60,         // min
+		Service:  "_s", // min 2 chars
+		Protocol: "_u", // min 2 chars
+		Priority: 0,    // min
+		Weight:   0,    // min
+		Port:     1,    // min
+		Target:   "a",  // min 1 char
+		TTL:      60,   // min
 	}
 	if errs := rec.Validate(); len(errs) > 0 {
 		t.Errorf("expected no errors for boundary values, got: %v", errs)

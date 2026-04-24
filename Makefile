@@ -22,6 +22,14 @@ testacc:
 	fi
 	go test -run TestAcc ./internal/provider -v
 
+.PHONY: lint
+lint:
+	golangci-lint run ./...
+
+.PHONY: fmt
+fmt:
+	golangci-lint fmt ./...
+
 .PHONY: docs
 docs:
 	@go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@latest

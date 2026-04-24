@@ -84,4 +84,3 @@ func domainInfoContactChecks() resource.TestCheckFunc {
 func domainInfoSuspensionChecks() resource.TestCheckFunc {
 	return expectListCount(domainInfoDataSourceName, "suspensions.#", 0)
 }
-
