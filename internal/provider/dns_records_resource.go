@@ -33,11 +33,6 @@ var (
 	_ resource.ResourceWithConfigure   = &dnsRecordsResource{}
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
 
-	// todo double check from api specs
-	// extend schema with what is present in provider for each record
-	// copy description from api into terraform provider
-	portStringPattern      = regexp.MustCompile(`^(\*|_[0-9]{1,5})$`)
-	schemeLabelPattern     = regexp.MustCompile(`^_[A-Za-z0-9-]+$`)
 	tlsaAssociationPattern = regexp.MustCompile(`^[0-9a-fA-F]{2}(\s?[0-9a-fA-F]{2})*$`)
 	recordNamePattern      = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
@@ -217,6 +212,7 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						records.MXValidator(),
 						records.NSValidator(),
 						records.SRVValidator(),
+						records.SVCBValidator(),
 					},
 					Attributes: map[string]schema.Attribute{
 						"type": schema.StringAttribute{
@@ -275,16 +271,10 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"port": schema.StringAttribute{
 							Optional:            true,
 							MarkdownDescription: "Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).",
-							Validators: []validator.String{
-								stringvalidator.RegexMatches(portStringPattern, "must be '*' or an underscore followed by digits. "),
-							},
 						},
 						"scheme": schema.StringAttribute{
 							Optional:            true,
 							MarkdownDescription: "Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)",
-							Validators: []validator.String{
-								stringvalidator.RegexMatches(schemeLabelPattern, "must start with '_' and contain alphanumeric or '-' characters"),
-							},
 						},
 						"svc_priority": schema.Int64Attribute{
 							Optional:            true,
@@ -321,9 +311,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"protocol": schema.StringAttribute{
 							Optional:            true,
 							MarkdownDescription: "Protocol label for SRV/TLSA records (e.g. `_tcp`).",
-							Validators: []validator.String{
-								stringvalidator.RegexMatches(schemeLabelPattern, "must start with '_' and contain alphanumeric or '-' characters"),
-							},
 						},
 						"priority": schema.Int64Attribute{
 							Optional:            true,
