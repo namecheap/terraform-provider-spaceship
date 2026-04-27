@@ -34,6 +34,7 @@ func TestPTRRecord_ValidatePointer(t *testing.T) {
 		{"valid single label", "myhost", false, ""},
 		{"apex rejected", "@", true, "domain name"},
 		{"wildcard rejected", "*", true, "domain name"},
+		{"wildcard prefix rejected", "*.example.com", true, "domain name"},
 		{"empty", "", true, ""},
 		{"too long", strings.Repeat("a", 254), true, ""},
 		{"starts with dot", ".invalid", true, ""},

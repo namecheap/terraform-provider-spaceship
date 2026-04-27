@@ -1,6 +1,9 @@
 package records
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // PTRRecord represents a PTR DNS record.
 // PTR records map an IP address to its corresponding domain name in a reverse
@@ -17,7 +20,7 @@ type PTRRecord struct {
 // "@" and "*" are rejected: a PTR target must be a real hostname, not the
 // apex placeholder or a wildcard.
 func (r *PTRRecord) ValidatePointer() error {
-	if r.Pointer == "@" || r.Pointer == "*" {
+	if r.Pointer == "@" || r.Pointer == "*" || strings.HasPrefix(r.Pointer, "*") {
 		return fmt.Errorf("must be a valid domain name, got %q", r.Pointer)
 	}
 	return ValidateName(r.Pointer)
