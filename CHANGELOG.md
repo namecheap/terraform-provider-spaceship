@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.1.0...v0.2.0) (2026-04-27)
+
+
+### Features
+
+* add validation and tests for https record ([#65](https://github.com/namecheap/terraform-provider-spaceship/issues/65)) ([fc4fd50](https://github.com/namecheap/terraform-provider-spaceship/commit/fc4fd5049858a9dad473f7d82206f86cfe59b3b8))
+* add validation and tests for svcb record ([#72](https://github.com/namecheap/terraform-provider-spaceship/issues/72)) ([d24b060](https://github.com/namecheap/terraform-provider-spaceship/commit/d24b060ccb439d90a500c4e4790ea36d4914d078))
+* add validation for mx record ([#66](https://github.com/namecheap/terraform-provider-spaceship/issues/66)) ([c4e9bdd](https://github.com/namecheap/terraform-provider-spaceship/commit/c4e9bdd41bd9130f9e8eb3a568ebac9f09c49cf9))
+* add validation for ns records ([#70](https://github.com/namecheap/terraform-provider-spaceship/issues/70)) ([a1edbd5](https://github.com/namecheap/terraform-provider-spaceship/commit/a1edbd58b0a2f5f65ff11f4e89db63d5236ec470))
+* add validation for ptr records ([#71](https://github.com/namecheap/terraform-provider-spaceship/issues/71)) ([6785211](https://github.com/namecheap/terraform-provider-spaceship/commit/6785211d01da00248dede1002d43329487a2a47d))
+* add validation with tests for cname record ([#64](https://github.com/namecheap/terraform-provider-spaceship/issues/64)) ([79c6856](https://github.com/namecheap/terraform-provider-spaceship/commit/79c68561cf375a346da2cdb680960e33447d0cb9))
+* add validators and tests for caa record ([#62](https://github.com/namecheap/terraform-provider-spaceship/issues/62)) ([56d9c24](https://github.com/namecheap/terraform-provider-spaceship/commit/56d9c2474618cf05c21d19a1c6ef7c302e4f1aac))
+
 ## [0.1.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.0.20...v0.1.0) (2026-04-17)
 
 
