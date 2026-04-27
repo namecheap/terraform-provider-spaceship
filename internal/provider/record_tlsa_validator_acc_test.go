@@ -31,9 +31,8 @@ func tlsaHost(suffix string) string {
 }
 
 // Verifies plan-time rejections for TLSA: bad port format, bad protocol,
-// usage out of range, uppercase association_data (rejected by the client
-// validator even though the schema regex would accept it), and missing
-// required fields.
+// association_data with leading whitespace (rejected by both client regex
+// and API), and missing required fields.
 func TestAccDNSRecords_tlsaValidation(t *testing.T) {
 	testAccPreCheck(t)
 	domain := testAccDomainValue()
@@ -65,14 +64,15 @@ func TestAccDNSRecords_tlsaValidation(t *testing.T) {
 			errRegex: "Invalid Protocol Value",
 		},
 		{
-			suffix: "uppercaseassoc",
+			suffix: "leadingspaceassoc",
 			stringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
-				"association_data": "7F83B1657FF1FC53B92DC18148A1D65DFC2D4B1FA3D677284ADDD200126D9069",
+				"association_data": " " + tlsaAssocA,
 			},
 			intAttrs: map[string]int{"usage": 2, "selector": 1, "matching": 1},
-			errRegex: "Invalid AssociationData Value",
+			// Schema-level regex rejects this before our object validator runs.
+			errRegex: "must be a hex string",
 		},
 		{
 			suffix: "missingport",

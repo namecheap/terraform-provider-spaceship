@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-
-	"github.com/dlclark/regexp2"
 )
 
 var (
-	tlsaProtocolPattern    = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
-	tlsaAssociationPattern = regexp2.MustCompile(`^(?!\s)(\s?[0-9a-f]{2})+$`, regexp2.None)
+	tlsaProtocolPattern        = regexp.MustCompile(`^_[a-zA-Z0-9-]+$`)
+	tlsaAssociationDataPattern = regexp.MustCompile(`^[0-9a-fA-F]{2}(\s?[0-9a-fA-F]{2})*$`)
 )
 
 // TLSARecord represents a TLSA DNS record (RFC 6698).
@@ -86,18 +84,19 @@ func (r *TLSARecord) ValidateMatching() error {
 }
 
 // ValidateAssociationData checks that the certificate association data is
-// 64-65535 lowercase hex characters, paired into bytes and optionally
-// separated by single whitespace characters, with no leading whitespace.
+// 64-65535 hex characters (any case), paired into bytes and optionally
+// separated by single whitespace characters. The leading-pair anchor
+// structurally rejects leading whitespace; the trailing-pair anchor
+// structurally rejects trailing whitespace; `\s?` rejects double-separators
+// and CRLF. Empirically aligned with the Spaceship API (verified via
+// direct probe — the spec doc's lowercase-only rule is more restrictive
+// than the API actually enforces).
 func (r *TLSARecord) ValidateAssociationData() error {
 	if len(r.AssociationData) < 64 || len(r.AssociationData) > 65535 {
 		return fmt.Errorf("must be between 64 and 65535 characters, got %d", len(r.AssociationData))
 	}
-	matched, err := tlsaAssociationPattern.MatchString(r.AssociationData)
-	if err != nil {
-		return fmt.Errorf("association data pattern match failed: %w", err)
-	}
-	if !matched {
-		return fmt.Errorf("must be lowercase hex byte pairs optionally separated by single spaces, got %q", r.AssociationData)
+	if !tlsaAssociationDataPattern.MatchString(r.AssociationData) {
+		return fmt.Errorf("must be hex byte pairs optionally separated by single spaces, got %q", r.AssociationData)
 	}
 	return nil
 }

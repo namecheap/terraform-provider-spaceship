@@ -181,20 +181,26 @@ func TestTLSARecord_ValidateMatching(t *testing.T) {
 func TestTLSARecord_ValidateAssociationData(t *testing.T) {
 	// 32 lowercase hex byte pairs separated by single spaces = 95 chars.
 	spaced := strings.TrimSpace(strings.Repeat("ab ", 32))
+	// 65535-char input: a single space pushes the total up by one over an
+	// otherwise-even hex stream, so the inclusive upper bound is reachable.
+	upperBound := "ab " + strings.Repeat("ab", 32766)
 
 	tests := []struct {
 		name    string
 		data    string
 		wantErr bool
 	}{
+		{"valid lowercase 64", strings.Repeat("ab", 32), false},
 		{"valid sha256 digest", validTLSAAssociation, false},
+		{"valid uppercase", strings.ToUpper(validTLSAAssociation), false},
+		{"valid mixed case", "Ab" + validTLSAAssociation[2:], false},
 		{"valid spaced byte pairs", spaced, false},
-		{"valid max length", strings.Repeat("ab", 32767), false},
+		{"valid max length 65534", strings.Repeat("ab", 32767), false},
+		{"valid max length 65535", upperBound, false},
 		{"empty", "", true},
-		{"too short", strings.Repeat("ab", 31), true},
-		{"too long", strings.Repeat("ab", 32768), true},
-		{"uppercase rejected", strings.ToUpper(validTLSAAssociation), true},
-		{"mixed case rejected", "Ab" + validTLSAAssociation[2:], true},
+		{"too short 62", strings.Repeat("ab", 31), true},
+		{"too short 63", strings.Repeat("ab", 31) + "a", true},
+		{"too long 65536", strings.Repeat("ab", 32768), true},
 		{"non-hex char", strings.Repeat("zz", 32), true},
 		{"odd hex length", validTLSAAssociation + "a", true},
 		{"leading space", " " + validTLSAAssociation, true},
