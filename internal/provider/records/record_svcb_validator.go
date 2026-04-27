@@ -121,6 +121,7 @@ func (v *svcbRecordValidator) ValidateObject(ctx context.Context, req validator.
 	} else if !portAttr.IsNull() && !portAttr.IsUnknown() {
 		rec.Port = portAttr.ValueString()
 		if err := rec.ValidatePort(); err != nil {
+			rec.Port = ""
 			resp.Diagnostics.AddAttributeError(
 				req.Path.AtName("port"),
 				"Invalid Port Value",
