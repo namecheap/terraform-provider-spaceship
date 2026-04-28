@@ -71,8 +71,7 @@ func TestAccDNSRecords_tlsaValidation(t *testing.T) {
 				"association_data": " " + tlsaAssocA,
 			},
 			intAttrs: map[string]int{"usage": 2, "selector": 1, "matching": 1},
-			// Schema-level regex rejects this before our object validator runs.
-			errRegex: "must be a hex string",
+			errRegex: "must be hex byte pairs",
 		},
 		{
 			suffix: "missingport",
