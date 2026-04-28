@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"terraform-provider-spaceship/internal/client"
@@ -33,8 +32,7 @@ var (
 	_ resource.ResourceWithConfigure   = &dnsRecordsResource{}
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
 
-	tlsaAssociationPattern = regexp.MustCompile(`^[0-9a-fA-F]{2}(\s?[0-9a-fA-F]{2})*$`)
-	recordNamePattern      = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
+	recordNamePattern = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
 
 // validators
@@ -222,7 +220,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 							Required:            true,
 							MarkdownDescription: "DNS record type(A, AAAA, ALIAS, CAA, CNAME, HTTPS, MX, NS, PTR, SRV, SVCB, TLSA, TXT).",
 							Validators: []validator.String{
-								// TODO export to one var and reuse
 								stringvalidator.OneOf("A", "AAAA", "ALIAS", "CAA", "CNAME", "HTTPS", "MX", "NS", "PTR", "SRV", "SVCB", "TLSA", "TXT"),
 							},
 						},
@@ -234,7 +231,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 								recordNameValidator(),
 							},
 						},
-						// double check all fields
 						"ttl": schema.Int64Attribute{
 							Optional:            true,
 							Computed:            true,
@@ -259,9 +255,6 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"flag": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Flag for CAA records (0 or 128).",
-							Validators: []validator.Int64{
-								int64validator.OneOf(0, 128),
-							},
 						},
 						"tag": schema.StringAttribute{
 							Optional:            true,
@@ -318,23 +311,14 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"priority": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Priority for SRV records (0-65535).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 65535),
-							},
 						},
 						"weight": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Weight for SRV records (0-65535).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 65535),
-							},
 						},
 						"port_number": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Port for SRV records (1-65535).",
-							Validators: []validator.Int64{
-								int64validator.Between(1, 65535),
-							},
 						},
 						"target": schema.StringAttribute{
 							Optional:            true,
@@ -343,30 +327,18 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 						"usage": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Usage value for TLSA records (0-255).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 255),
-							},
 						},
 						"selector": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Selector value for TLSA records (0-255).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 255),
-							},
 						},
 						"matching": schema.Int64Attribute{
 							Optional:            true,
 							MarkdownDescription: "Matching type for TLSA records (0-255).",
-							Validators: []validator.Int64{
-								int64validator.Between(0, 255),
-							},
 						},
 						"association_data": schema.StringAttribute{
 							Optional:            true,
 							MarkdownDescription: "Association data (hex) for TLSA records.",
-							Validators: []validator.String{
-								stringvalidator.RegexMatches(tlsaAssociationPattern, "must be a hex string (optionally spaced)"),
-							},
 						},
 					},
 				},
