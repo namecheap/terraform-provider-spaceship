@@ -1,0 +1,37 @@
+name: Tag Release
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+
+permissions: {}
+
+jobs:
+  tag:
+    if: >-
+      github.event.pull_request.merged &&
+      startsWith(github.event.pull_request.head.ref, 'release-please--')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App Token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SPS_RELEASE_APP_ID }}
+          private-key: ${{ secrets.SPS_RELEASE_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+
+      - name: Create and push tag
+        run: |
+          VERSION=$(jq -r '."."' .release-please-manifest.json)
+          TAG="v${VERSION}"
+          echo "::notice::Creating tag ${TAG}"
+          git tag "${TAG}"
+          git push origin "${TAG}"
