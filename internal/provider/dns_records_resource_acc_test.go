@@ -506,10 +506,22 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 	})
 }
 
+// TODO leave only 1
+// pug in some common place
+
+//TODO
+// try to find similar other dublicates in code
 func intPointerClient(v int) *int {
 	return &v
 }
+func intPointer(v int) *int {
+	return &v
+}
+func intPtr(v int) *int {
+	return &v
+}
 
+// TODO why it exists?
 type testAccDNSRecord struct {
 	Type        string
 	Name        string
@@ -574,6 +586,4 @@ provider "spaceship" {}
 `
 }
 
-func intPointer(v int) *int {
-	return &v
-}
+

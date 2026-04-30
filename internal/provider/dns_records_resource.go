@@ -6,10 +6,8 @@ import (
 	"strings"
 
 	"terraform-provider-spaceship/internal/client"
-	"terraform-provider-spaceship/internal/provider/records"
 
 	"github.com/dlclark/regexp2"
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -18,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -35,6 +32,7 @@ var (
 	recordNamePattern = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
 
+// TODO move this validator in separate file?
 // validators
 func recordNameValidator() validator.String {
 	return &recordNameValidatorImpl{}
@@ -92,11 +90,17 @@ type dnsRecordsResourceModel struct {
 }
 
 type dnsRecordModel struct {
+	//Type of the record
 	Type            types.String `tfsdk:"type"`
+	// Name of the record
 	Name            types.String `tfsdk:"name"`
 	TTL             types.Int64  `tfsdk:"ttl"`
+	// Address
 	Address         types.String `tfsdk:"address"`
+	// Alias name for alias record
 	AliasName       types.String `tfsdk:"alias_name"`
+	//TODO
+	//add descriptions for other records
 	CName           types.String `tfsdk:"cname"`
 	Flag            types.Int64  `tfsdk:"flag"`
 	Tag             types.String `tfsdk:"tag"`
@@ -200,147 +204,8 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					listplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
-					Validators: []validator.Object{
-						records.AValidator(),
-						records.AAAAValidator(),
-						records.ALIASValidator(),
-						records.CAAValidator(),
-						records.HTTPSValidator(),
-						records.CNAMEValidator(),
-						records.MXValidator(),
-						records.NSValidator(),
-						records.PTRValidator(),
-						records.SRVValidator(),
-						records.SVCBValidator(),
-						records.TLSAValidator(),
-						records.TXTValidator(),
-					},
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Required:            true,
-							MarkdownDescription: "DNS record type(A, AAAA, ALIAS, CAA, CNAME, HTTPS, MX, NS, PTR, SRV, SVCB, TLSA, TXT).",
-							Validators: []validator.String{
-								stringvalidator.OneOf("A", "AAAA", "ALIAS", "CAA", "CNAME", "HTTPS", "MX", "NS", "PTR", "SRV", "SVCB", "TLSA", "TXT"),
-							},
-						},
-						"name": schema.StringAttribute{
-							Required:            true,
-							MarkdownDescription: "Record host. Use `@` for the zone apex.",
-							Validators: []validator.String{
-								stringvalidator.LengthBetween(1, 253),
-								recordNameValidator(),
-							},
-						},
-						"ttl": schema.Int64Attribute{
-							Optional:            true,
-							Computed:            true,
-							MarkdownDescription: "Record TTL in seconds. Defaults to 3600 if omitted.",
-							Default:             int64default.StaticInt64(3600),
-							Validators: []validator.Int64{
-								int64validator.Between(60, 3600),
-							},
-						},
-						"address": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "IPv4 or IPv6 address for A and AAAA records",
-						},
-						"alias_name": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.",
-						},
-						"cname": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Canonical name for CNAME records.",
-						},
-						"flag": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Flag for CAA records (0 or 128).",
-						},
-						"tag": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Tag for CAA records (e.g. `issue`)",
-						},
-						"value": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Generic value field used by several record types (CAA, TXT).",
-						},
-						"port": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).",
-						},
-						"scheme": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)",
-						},
-						"svc_priority": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Service priority for HTTPS/SVCB records (0-65535).",
-						},
-						"target_name": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Target name for HTTPS/SVCB records.",
-						},
-						"svc_params": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "SvcParams string for HTTPS/SVCB records.",
-						},
-						"exchange": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Mail exchange host for MX records.",
-						},
-						"preference": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Preference value for MX records (0-65535).",
-						},
-						"nameserver": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Nameserver host for NS records.",
-						},
-						"pointer": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Pointer target for PTR records.",
-						},
-						"service": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Service label for SRV records (for example `_sip`).",
-						},
-						"protocol": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Protocol label for SRV/TLSA records (e.g. `_tcp`).",
-						},
-						"priority": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Priority for SRV records (0-65535).",
-						},
-						"weight": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Weight for SRV records (0-65535).",
-						},
-						"port_number": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Port for SRV records (1-65535).",
-						},
-						"target": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Target host for SRV records.",
-						},
-						"usage": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Usage value for TLSA records (0-255).",
-						},
-						"selector": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Selector value for TLSA records (0-255).",
-						},
-						"matching": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Matching type for TLSA records (0-255).",
-						},
-						"association_data": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Association data (hex) for TLSA records.",
-						},
-					},
+					Validators: recordTypeObjectValidators(),
+					Attributes: recordAttributes(),
 				},
 			},
 		},
@@ -581,6 +446,7 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 			continue
 		}
 
+		// TODO
 		// why it is not coming from default value from terraform schema in one place?
 		ttl := int64(3600)
 		if !item.TTL.IsNull() && !item.TTL.IsUnknown() {
@@ -595,6 +461,8 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 
 		valid := true
 
+		//TODO
+		//looks like some common code
 		getString := func(value types.String, attrName string) (string, bool) {
 			if value.IsNull() || value.IsUnknown() {
 				return "", false
@@ -618,6 +486,8 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 			return int(value.ValueInt64()), true
 		}
 
+		//TODO
+		// how this all works with separate validators?
 		switch recordType {
 		case "A", "AAAA":
 			if addr, ok := requireString(item.Address, "address", "Rerocrds of this type require the `address` attributes."); ok {
@@ -922,6 +792,8 @@ func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []
 	return toDelete, toUpsert
 }
 
+//TODO
+// reuse in dns_record
 func recordKey(record client.DNSRecord) string {
 	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name) + "|" + recordValueSignature(record)
 }
@@ -1039,6 +911,9 @@ func boolOrDefault(value types.Bool, fallback bool) bool {
 	}
 	return value.ValueBool()
 }
+
+// TODO
+// move to some other file
 
 // deprecatedBoolWarning is a validator that emits a warning when a deprecated
 // bool attribute is explicitly configured.

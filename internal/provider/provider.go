@@ -18,6 +18,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
+//TODO why it is in provider and not hidden in client instead?
+// For acceptnace tests?
 const defaultBaseURL = "https://spaceship.dev/api/v1"
 
 func baseURL() string {
@@ -120,6 +122,7 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		)
 		return
 	}
+	// TODO looks like it is convention
 	//map of any type could be improved at least in this case?
 	// or it will not work for empty interface?
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{
@@ -134,6 +137,7 @@ func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		NewDNSRecordsResource,
 		NewDomainResource,
+		NewDNSRecordResource,
 	}
 }
 
@@ -144,6 +148,7 @@ func (p *spaceshipProvider) DataSources(_ context.Context) []func() datasource.D
 	}
 }
 
+//TODO move to some common space?
 func resolveString(value types.String, envVar string) string {
 	if !value.IsNull() && !value.IsUnknown() {
 		return value.ValueString()

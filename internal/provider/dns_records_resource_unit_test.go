@@ -352,6 +352,4 @@ func TestRecordValueSignatureTLSA(t *testing.T) {
 	}
 }
 
-func intPtr(v int) *int {
-	return &v
-}
+
