@@ -149,6 +149,20 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 	return filterCustomDNSRecords(result), nil
 }
 
+func (c *Client) GetSpecificDNSRecord(ctx context.Context, domain string, recoredType string, recordName string) (DNSRecord, error) {
+	records, err := c.GetDNSRecords(ctx, domain)
+	if err != nil {
+		return DNSRecord{}, err
+	}
+	for _, record := range records {
+		if record.Type == recoredType && record.Name == recordName {
+			return record, nil
+		}
+	}
+	return DNSRecord{}, fmt.Errorf("Not found")
+
+}
+
 // filterCustomDNSRecords returns only records whose group type is "custom"
 // (or that have no group at all, for backwards compatibility with ungrouped zones).
 // Records belonging to Spaceship-managed groups (e.g. URL redirect) are excluded
@@ -172,7 +186,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
 
 	payload := struct {
-		Force bool        `json:"force"` // where it comes from?
+		Force bool        `json:"force"`
 		Items []DNSRecord `json:"items"`
 	}{
 		Force: force,
@@ -183,6 +197,52 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 		return err
 	}
 	return nil
+}
+
+// Creates DNS record
+func (c *Client) CreateDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
+	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
+
+	records := []DNSRecord{record}
+
+	payload := struct {
+		Items []DNSRecord `json:"items"`
+	}{
+		Items: records,
+	}
+
+	if _, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
+// 	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
+
+// 	records := []DNSRecord{record}
+
+// 	payload := struct {
+// 		Items []DNSRecord `json:"items"`
+// 	}{
+// 		Items: records,
+// 	}
+
+// 	if _, err := c.doJSON(ctx, http.MethodDelete, endpoint, payload, nil); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
+
+func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
+	records := []DNSRecord{record}
+
+	err := c.DeleteDNSRecords(ctx, domain, records)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
 
 // DeleteDNSRecords removes the specified DNS records.
