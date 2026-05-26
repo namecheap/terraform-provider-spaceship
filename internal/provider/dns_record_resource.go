@@ -75,7 +75,7 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.",
+		MarkdownDescription: "Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.\n\n> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.",
 		Attributes:          attrs,
 	}
 }

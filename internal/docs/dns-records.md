@@ -66,3 +66,14 @@ On `Create` and `Update`, the provider:
 The upsert API itself is also incremental: it matches incoming records against existing ones by type + name + data. If a match is found, only the TTL is updated. If no match is found, a new record is created. Unmentioned records are not deleted by the upsert call — that's why the provider sends a separate `DELETE` for removed records.
 
 On `Delete`, the provider calls `ClearDNSRecords` which fetches all custom records and deletes them in a single request.
+
+## Resource overlap (single vs multi)
+
+The provider exposes two resources for managing DNS records on a domain:
+
+- `spaceship_dns_record` — manages a single record at a time.
+- `spaceship_dns_records` — manages the entire custom-records list for a domain.
+
+These are **not safe to mix on the same domain**. The multi-record resource takes ownership of the full custom group: on every apply it deletes any record present in the live zone but absent from its `records` list. A sibling `spaceship_dns_record` resource managing a record on the same domain will see that record silently destroyed the next time the multi-record resource reconciles.
+
+The collision is one-directional. The singular resource only touches the record it owns; it never deletes anything else.

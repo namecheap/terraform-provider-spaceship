@@ -351,5 +351,3 @@ func TestRecordValueSignatureTLSA(t *testing.T) {
 		t.Fatalf("expected TLSA signatures to match despite spacing and case differences")
 	}
 }
-
-

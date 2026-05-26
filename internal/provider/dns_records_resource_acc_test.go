@@ -509,7 +509,7 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 // TODO leave only 1
 // pug in some common place
 
-//TODO
+// TODO
 // try to find similar other dublicates in code
 func intPointerClient(v int) *int {
 	return &v
@@ -585,5 +585,3 @@ func testAccProviderOnlyConfig() string {
 provider "spaceship" {}
 `
 }
-
-

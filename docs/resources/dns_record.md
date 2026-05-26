@@ -4,11 +4,14 @@ page_title: "spaceship_dns_record Resource - spaceship"
 subcategory: ""
 description: |-
   Manages a single DNS record for a Spaceship-managed domain. Only records in the custom DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
+  **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
 ---
 
 # spaceship_dns_record (Resource)
 
 Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
+
+> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
 
 ## Example Usage
 
@@ -16,6 +19,11 @@ Manages a single DNS record for a Spaceship-managed domain. Only records in the 
 # Manage a single DNS record. Use this when you want to manage records
 # one-by-one. To own the entire custom record set for a domain in a single
 # resource, use spaceship_dns_records instead.
+#
+# Caution: do not mix this resource with spaceship_dns_records for the same
+# domain. The plural resource will delete any record not in its list,
+# including records created by this singular resource. Pick one or the
+# other per domain.
 #
 # The Spaceship API has no "update record data" operation: it matches records
 # by (type, name, data). Changing any field other than `ttl` therefore forces
