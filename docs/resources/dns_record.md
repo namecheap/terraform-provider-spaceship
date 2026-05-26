@@ -4,14 +4,11 @@ page_title: "spaceship_dns_record Resource - spaceship"
 subcategory: ""
 description: |-
   Manages a single DNS record for a Spaceship-managed domain. Only records in the custom DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
-  **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
 ---
 
 # spaceship_dns_record (Resource)
 
 Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
-
-> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
 
 ## Example Usage
 

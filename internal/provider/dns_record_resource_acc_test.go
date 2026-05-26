@@ -388,31 +388,38 @@ func TestAccDNSRecord_SVCB_lifecycle(t *testing.T) {
 // TLSA: association_data is normalized to lowercase in the signature (see
 // dns_match.go). Using lowercase hex in the HCL keeps state, ID, and signature
 // in sync so ImportStateVerify in step 5 doesn't trip on case mismatches.
+//
+// The values are 64 hex chars apiece — the size of a SHA-256 hash, which is
+// the minimum the per-type validator (records.TLSAValidator) accepts.
+// Anything shorter fails at plan time with "must be between 64 and 65535
+// characters" once the ConfigValidators adapter is in place.
 func TestAccDNSRecord_TLSA_lifecycle(t *testing.T) {
 	prefix := testAccRecordPrefix()
 	resourceName := "spaceship_dns_record.test"
+	initialAssoc := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
+	changedAssoc := "1122334455667788991122334455667788991122334455667788991122334455"
 	testAccDNSRecordLifecycle(t, testAccRecordLifecycleCase{
 		recordType: "TLSA",
 		recordName: prefix + "-tlsa",
-		initialDataHCL: `port             = "_443"
+		initialDataHCL: fmt.Sprintf(`port             = "_443"
   protocol         = "_tcp"
   usage            = 2
   selector         = 1
   matching         = 1
-  association_data = "aabb"`,
-		changedDataHCL: `port             = "_443"
+  association_data = %q`, initialAssoc),
+		changedDataHCL: fmt.Sprintf(`port             = "_443"
   protocol         = "_tcp"
   usage            = 2
   selector         = 1
   matching         = 1
-  association_data = "ccdd"`,
-		initialDataSig: "_443|_tcp|2|1|1|aabb",
-		changedDataSig: "_443|_tcp|2|1|1|ccdd",
+  association_data = %q`, changedAssoc),
+		initialDataSig: "_443|_tcp|2|1|1|" + initialAssoc,
+		changedDataSig: "_443|_tcp|2|1|1|" + changedAssoc,
 		initialChecks: []resource.TestCheckFunc{
-			resource.TestCheckResourceAttr(resourceName, "association_data", "aabb"),
+			resource.TestCheckResourceAttr(resourceName, "association_data", initialAssoc),
 		},
 		changedChecks: []resource.TestCheckFunc{
-			resource.TestCheckResourceAttr(resourceName, "association_data", "ccdd"),
+			resource.TestCheckResourceAttr(resourceName, "association_data", changedAssoc),
 		},
 	})
 }
