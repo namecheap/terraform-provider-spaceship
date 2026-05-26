@@ -18,7 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
-//TODO why it is in provider and not hidden in client instead?
+// TODO why it is in provider and not hidden in client instead?
 // For acceptnace tests?
 const defaultBaseURL = "https://spaceship.dev/api/v1"
 
@@ -148,7 +148,7 @@ func (p *spaceshipProvider) DataSources(_ context.Context) []func() datasource.D
 	}
 }
 
-//TODO move to some common space?
+// TODO move to some common space?
 func resolveString(value types.String, envVar string) string {
 	if !value.IsNull() && !value.IsUnknown() {
 		return value.ValueString()

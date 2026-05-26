@@ -347,7 +347,7 @@ func TestRecordValueSignatureTLSA(t *testing.T) {
 		AssociationData: "7f83b1657ff1fc53",
 	}
 
-	if recordValueSignature(rec1) != recordValueSignature(rec2) {
+	if client.RecordValueSignature(rec1) != client.RecordValueSignature(rec2) {
 		t.Fatalf("expected TLSA signatures to match despite spacing and case differences")
 	}
 }

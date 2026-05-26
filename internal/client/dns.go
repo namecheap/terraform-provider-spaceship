@@ -3,10 +3,12 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -149,18 +151,25 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 	return filterCustomDNSRecords(result), nil
 }
 
-func (c *Client) GetSpecificDNSRecord(ctx context.Context, domain string, recoredType string, recordName string) (DNSRecord, error) {
+var ErrRecordNotFound = errors.New("record not found")
+
+// FindDNSRecord locates a single record in the domain's custom group by its
+// API identity: type, name, and the type-specific data signature (the same
+// signature returned by RecordValueSignature). Matching uses RecordKey, which
+// applies the API's case rules (TYPE upper, name lower, type-specific lowering).
+// Returns ErrRecordNotFound when no record matches.
+func (c *Client) FindDNSRecord(ctx context.Context, domain, recordType, name, signature string) (DNSRecord, error) {
 	records, err := c.GetDNSRecords(ctx, domain)
 	if err != nil {
 		return DNSRecord{}, err
 	}
+	target := strings.ToUpper(recordType) + "|" + strings.ToLower(name) + "|" + signature
 	for _, record := range records {
-		if record.Type == recoredType && record.Name == recordName {
+		if RecordKey(record) == target {
 			return record, nil
 		}
 	}
-	return DNSRecord{}, fmt.Errorf("Not found")
-
+	return DNSRecord{}, ErrRecordNotFound
 }
 
 // filterCustomDNSRecords returns only records whose group type is "custom"
@@ -199,7 +208,17 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 	return nil
 }
 
-// Creates DNS record
+// CreateDNSRecord adds a single custom DNS record to the domain.
+//
+// This calls the upsert endpoint (PUT /dns/records/{domain}) and is therefore
+// **idempotent for records with matching (type, name, data)**: a call against
+// an already-existing identical record is a no-op (or TTL update), not an
+// error. This property is what lets the singular dns_record resource's Create
+// transparently adopt pre-existing matching records without explicit
+// adopt-on-create logic. Verified by TestAccDNSRecord_createWhenIdenticalExists.
+//
+// Conflict cases (e.g. CNAME with a different target at the same hostname)
+// still return 422 because they violate API-level uniqueness constraints.
 func (c *Client) CreateDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
 	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
 

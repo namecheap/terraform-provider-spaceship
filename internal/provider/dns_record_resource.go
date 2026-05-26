@@ -2,13 +2,17 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
+	"strings"
 	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -41,7 +45,7 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	attrs := map[string]schema.Attribute{
 		"id": schema.StringAttribute{
 			Computed:            true,
-			MarkdownDescription: "Composite identifier (`domain/type/name/data`) for this record.",
+			MarkdownDescription: "Composite identifier with the form `domain/TYPE/name/<data-signature>`. The data signature is a normalized representation of the record's type-specific fields (lowercased, pipe-separated) and is the same key used internally for record matching. Stable across updates that don't change identity (e.g. TTL changes).",
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.UseStateForUnknown(),
 			},
@@ -59,9 +63,37 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	}
 	maps.Copy(attrs, recordAttributes())
 
+	// The Spaceship API has no "update record data" operation — records are
+	// matched by (type, name, data), so changing any of those produces a new
+	// record. Every attribute except `ttl` triggers Replace; `ttl` is the sole
+	// in-place mutable field and is handled by Update via the upsert endpoint.
+	for attrName, attr := range attrs {
+		if attrName == "id" || attrName == "ttl" {
+			continue
+		}
+		attrs[attrName] = withRequiresReplace(attr)
+	}
+
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.",
 		Attributes:          attrs,
+	}
+}
+
+// withRequiresReplace appends a RequiresReplace plan modifier to a schema
+// attribute. Used during Schema() construction to mark identity-bearing
+// attributes — any change forces destroy+create because the Spaceship API
+// cannot mutate record data in place.
+func withRequiresReplace(attr schema.Attribute) schema.Attribute {
+	switch a := attr.(type) {
+	case schema.StringAttribute:
+		a.PlanModifiers = append(a.PlanModifiers, stringplanmodifier.RequiresReplace())
+		return a
+	case schema.Int64Attribute:
+		a.PlanModifiers = append(a.PlanModifiers, int64planmodifier.RequiresReplace())
+		return a
+	default:
+		return attr
 	}
 }
 
@@ -91,11 +123,6 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	domain := plan.Domain.ValueString()
-	recordType := plan.Type.ValueString()
-	name := plan.Name.ValueString()
-
-	// how to create any other record field?
-	address := plan.Address.ValueString()
 
 	//todo why it is needed
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -103,24 +130,21 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	//adopt on creation?
-	//existingRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	// No "fetch existing record before creating" / adopt-on-create logic here
+	// by design: the API's upsert endpoint (used by CreateDNSRecord below) is
+	// idempotent for records with matching (type, name, data) — see the
+	// docstring on client.CreateDNSRecord. A matching pre-existing record is
+	// transparently adopted; only conflict cases (e.g. CNAME with a different
+	// target at the same hostname) error, and `terraform import` is the right
+	// path for those. Verified by TestAccDNSRecord_createWhenIdenticalExists.
 
-	//TODO
-	//how recordKey() func could be reused here?
-
-	// TODO fetch before creation
-	// record, err := r.client.GetSpecificDNSRecord(ctx, domain, recordType, name)
-	// if err != nil {
-	// 	resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("failed to read existing DNS records: %s", err))
-	// 	return
-	// }
-
-	record := client.DNSRecord{
-		Type:    recordType,
-		Name:    name,
-		TTL:     3600,
-		Address: address,
+	// modelToDNSRecord handles every supported record type: A, AAAA, ALIAS,
+	// CAA, CNAME, HTTPS, MX, NS, PTR, SRV, SVCB, TLSA, TXT. It emits attribute
+	// diagnostics for any missing per-type required field.
+	record, recordDiags := modelToDNSRecord(plan.dnsRecordModel, path.Empty())
+	resp.Diagnostics.Append(recordDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	if err := r.client.CreateDNSRecord(ctx, domain, record); err != nil {
@@ -128,14 +152,29 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	//todo change to composite key
-	plan.ID = types.StringValue(domain)
-	plan.Domain = types.StringValue(domain)
-	plan.Type = types.StringValue(recordType)
-	plan.Address = types.StringValue(address)
+	// Only `id` is computed — every other attribute came from the user's plan
+	// and is already populated on `plan`. Setting other fields here would
+	// corrupt state for record types whose data field isn't `address` (e.g.
+	// a CNAME record would get plan.Address overwritten to "").
+	plan.ID = types.StringValue(recordID(domain, record))
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
+}
+
+// recordID builds the Terraform identifier for a single DNS record.
+// Format: domain/TYPE/name/<recordValueSignature>
+// The signature is the same one used by recordKey() for in-memory diffing,
+// so the ID is unique for any (domain, type, name, data) tuple the API
+// treats as distinct. SplitN(id, "/", 4) recovers the segments — the data
+// signature is last so it may safely contain "/" (e.g. inside a TXT value).
+func recordID(domain string, record client.DNSRecord) string {
+	return strings.Join([]string{
+		domain,
+		strings.ToUpper(record.Type),
+		strings.ToLower(record.Name),
+		client.RecordValueSignature(record),
+	}, "/")
 }
 
 func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -151,16 +190,15 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 	}
 
 	domain := state.Domain.ValueString()
-	recordType := state.Type.ValueString()
-	name := state.Name.ValueString()
-	// how to create any other record field?
 
-	address := state.Address.ValueString()
-	record := client.DNSRecord{
-		Type:    recordType,
-		Name:    name,
-		TTL:     3600,
-		Address: address,
+	// Build the API record from full state (which Read has hydrated from the
+	// API). Every record type is supported via the shared model→record helper.
+	// Note: the API matches records by (type, name, data) for delete — TTL is
+	// not part of the match key, so its value here is irrelevant for matching.
+	record, recordDiags := modelToDNSRecord(state.dnsRecordModel, path.Empty())
+	resp.Diagnostics.Append(recordDiags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	if err := r.client.DeleteDNSRecord(ctx, domain, record); err != nil {
@@ -173,12 +211,109 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *dnsRecordResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please ensure the provider block is present.")
+		return
+	}
 
+	var state dnsRecordResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	domain, recordType, name, signature, ok := parseRecordID(state.ID.ValueString())
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Invalid resource ID",
+			fmt.Sprintf("Expected format domain/TYPE/name/<signature>, got %q", state.ID.ValueString()),
+		)
+		return
+	}
+
+	record, err := r.client.FindDNSRecord(ctx, domain, recordType, name, signature)
+	if errors.Is(err, client.ErrRecordNotFound) {
+		// Record no longer exists in the custom group — drop it from state so
+		// Terraform will plan a recreate on the next apply.
+		resp.State.RemoveResource(ctx)
+		return
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to find DNS record for %s: %s", domain, err))
+		return
+	}
+
+	state.Domain = types.StringValue(domain)
+	hydrateRecordModel(&state.dnsRecordModel, record)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.client == nil {
+		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please ensure the provider block is present.")
+		return
+	}
 
+	// Schema marks every non-ttl attribute RequiresReplace, so Update only
+	// runs when ttl is the only field that changed. Re-fetch the record by
+	// identity to recover its full data, mutate the ttl, and re-upsert.
+	var plan, state dnsRecordResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	domain, recordType, name, signature, ok := parseRecordID(state.ID.ValueString())
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Invalid resource ID",
+			fmt.Sprintf("Expected format domain/TYPE/name/<signature>, got %q", state.ID.ValueString()),
+		)
+		return
+	}
+
+	record, err := r.client.FindDNSRecord(ctx, domain, recordType, name, signature)
+	if errors.Is(err, client.ErrRecordNotFound) {
+		resp.Diagnostics.AddError(
+			"DNS record not found",
+			"The DNS record being updated no longer exists in the custom group. Run `terraform refresh` to reconcile state.",
+		)
+		return
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to look up DNS record for %s: %s", domain, err))
+		return
+	}
+
+	record.TTL = int(plan.TTL.ValueInt64())
+
+	if err := r.client.CreateDNSRecord(ctx, domain, record); err != nil {
+		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update DNS record TTL: %s", err))
+		return
+	}
+
+	// Data signature unchanged, so the composite ID remains stable.
+	plan.ID = state.ID
+	hydrateRecordModel(&plan.dnsRecordModel, record)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *dnsRecordResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	// The import string is the full composite ID (domain/TYPE/name/<signature>).
+	// Passthrough writes it to state.ID; Terraform then calls Read which parses
+	// the ID and hydrates the rest of the attributes.
+	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// parseRecordID is the inverse of recordID. It returns the components needed
+// to locate a record via the Spaceship API. The signature segment is the last
+// part of the ID and may itself contain "/" (e.g. inside a TXT value), so the
+// split uses a limit of 4 to keep the data segment intact.
+func parseRecordID(id string) (domain, recordType, name, signature string, ok bool) {
+	parts := strings.SplitN(id, "/", 4)
+	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return "", "", "", "", false
+	}
+	return parts[0], parts[1], parts[2], parts[3], true
 }
