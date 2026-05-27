@@ -36,7 +36,7 @@ func TestAccDNSRecords_ptrRecord(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"pointer": pointer,
 			},
@@ -85,7 +85,7 @@ func TestAccDNSRecords_ptrRecordCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:        "PTR",
 			Name:        host,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"pointer": target},
 		}}
 	}
@@ -134,7 +134,7 @@ func TestAccDNSRecords_ptrRecordApexTargetFailsPlan(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: ptrHost("apex"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"pointer": "@",
 			},
@@ -162,7 +162,7 @@ func TestAccDNSRecords_ptrRecordWildcardTargetFailsPlan(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: ptrHost("wildcard"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"pointer": "*",
 			},
@@ -190,7 +190,7 @@ func TestAccDNSRecords_ptrRecordInvalidPointerFailsPlan(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: ptrHost("badname"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"pointer": ".invalid",
 			},
@@ -218,7 +218,7 @@ func TestAccDNSRecords_ptrRecordMissingPointerFailsPlan(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: ptrHost("noptr"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			// no pointer
 		},
 	}
@@ -275,7 +275,7 @@ func TestAccDNSRecords_ptrRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "PTR",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"pointer": pointer,
 			},

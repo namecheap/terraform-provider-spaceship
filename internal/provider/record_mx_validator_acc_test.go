@@ -44,7 +44,7 @@ func TestAccDNSRecords_mxValidation(t *testing.T) {
 			{
 				Type:        "MX",
 				Name:        mxHost(tc.suffix),
-				TTL:         intPointer(3600),
+				TTL:         intPtr(3600),
 				StringAttrs: map[string]string{"exchange": tc.exchange},
 				IntAttrs:    map[string]int{"preference": 10},
 			},
@@ -75,7 +75,7 @@ func TestAccDNSRecords_mxCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:        "MX",
 			Name:        host,
-			TTL:         intPointer(ttl),
+			TTL:         intPtr(ttl),
 			StringAttrs: map[string]string{"exchange": exchange},
 			IntAttrs:    map[string]int{"preference": pref},
 		}}
@@ -136,28 +136,28 @@ func TestAccDNSRecords_mxEdgeValues(t *testing.T) {
 		{
 			Type:        "MX",
 			Name:        zeroHost,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"exchange": fmt.Sprintf("mail.%s", domain)},
 			IntAttrs:    map[string]int{"preference": 0},
 		},
 		{
 			Type:        "MX",
 			Name:        caseHost,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"exchange": fmt.Sprintf("Mail.%s", domain)},
 			IntAttrs:    map[string]int{"preference": 10},
 		},
 		{
 			Type:        "MX",
 			Name:        multiHost,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"exchange": fmt.Sprintf("mail1.%s", domain)},
 			IntAttrs:    map[string]int{"preference": 10},
 		},
 		{
 			Type:        "MX",
 			Name:        multiHost,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"exchange": fmt.Sprintf("mail2.%s", domain)},
 			IntAttrs:    map[string]int{"preference": 20},
 		},
@@ -231,7 +231,7 @@ func TestAccDNSRecords_mxRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "MX",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"exchange": exchange,
 			},

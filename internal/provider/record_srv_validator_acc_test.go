@@ -25,7 +25,7 @@ func TestAccDNSRecords_srvRecord(t *testing.T) {
 		{
 			Type: "SRV",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"service":  "_sip",
 				"protocol": "_tcp",
@@ -83,7 +83,7 @@ func TestAccDNSRecords_srvMissingRequiredFieldsFailsPlan(t *testing.T) {
 		{
 			Type: "SRV",
 			Name: "test-srv-invalid",
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 		},
 	}
 
@@ -115,7 +115,7 @@ func TestAccDNSRecords_srvRecordApexTargetFailsPlan(t *testing.T) {
 		{
 			Type: "SRV",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"service":  "_sip",
 				"protocol": "_tcp",
@@ -157,7 +157,7 @@ func TestAccDNSRecords_srvRecordWildcardTargetFailsPlan(t *testing.T) {
 		{
 			Type: "SRV",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"service":  "_sip",
 				"protocol": "_tcp",

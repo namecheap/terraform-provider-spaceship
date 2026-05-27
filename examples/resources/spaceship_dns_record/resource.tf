@@ -2,11 +2,6 @@
 # one-by-one. To own the entire custom record set for a domain in a single
 # resource, use spaceship_dns_records instead.
 #
-# Caution: do not mix this resource with spaceship_dns_records for the same
-# domain. The plural resource will delete any record not in its list,
-# including records created by this singular resource. Pick one or the
-# other per domain.
-#
 # The Spaceship API has no "update record data" operation: it matches records
 # by (type, name, data). Changing any field other than `ttl` therefore forces
 # the record to be destroyed and recreated. `lifecycle { create_before_destroy }`

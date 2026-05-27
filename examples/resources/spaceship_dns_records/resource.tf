@@ -1,11 +1,6 @@
 # Manage the entire custom DNS record set for a domain in one resource.
 # On every apply this diffs the list against what's in the live zone and
 # deletes any custom record not present here.
-#
-# Caution: because this resource owns the full custom group, do not mix it
-# with spaceship_dns_record (singular) for the same domain. Records created
-# by the singular resource will be deleted by this one. Pick one or the
-# other per domain.
 
 resource "spaceship_dns_records" "example" {
   domain = "example.com"

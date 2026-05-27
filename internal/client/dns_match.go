@@ -69,6 +69,10 @@ func intToString(value *int) string {
 	return fmt.Sprintf("%d", *value)
 }
 
+// portValueSignature renders a PortValue as a normalized comparison key for
+// record matching: the string form is lowercased so port labels match
+// case-insensitively. This is intentionally distinct from PortValue.MarshalJSON,
+// which preserves the exact wire format the API requires — do not merge them.
 func portValueSignature(port *PortValue) string {
 	if port == nil {
 		return ""

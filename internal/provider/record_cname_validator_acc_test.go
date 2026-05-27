@@ -44,7 +44,7 @@ func TestAccDNSRecords_cnameValidation(t *testing.T) {
 			{
 				Type:        "CNAME",
 				Name:        cnameHost(tc.suffix),
-				TTL:         intPointer(3600),
+				TTL:         intPtr(3600),
 				StringAttrs: map[string]string{"cname": tc.cname},
 			},
 		}
@@ -76,7 +76,7 @@ func TestAccDNSRecords_cnameCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:        "CNAME",
 			Name:        host,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"cname": target},
 		}}
 	}
@@ -155,7 +155,7 @@ func TestAccDNSRecords_cnameRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "CNAME",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"cname": target,
 			},

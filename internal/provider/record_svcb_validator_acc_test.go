@@ -81,7 +81,7 @@ func TestAccDNSRecords_svcbValidation(t *testing.T) {
 			{
 				Type:        "SVCB",
 				Name:        svcbHost(tc.suffix),
-				TTL:         intPointer(3600),
+				TTL:         intPtr(3600),
 				IntAttrs:    tc.intAttrs,
 				StringAttrs: tc.stringAttrs,
 			},
@@ -113,7 +113,7 @@ func TestAccDNSRecords_svcbCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:     "SVCB",
 			Name:     host,
-			TTL:      intPointer(ttl),
+			TTL:      intPtr(ttl),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("%s.%s", targetHost, domain),
@@ -184,7 +184,7 @@ func TestAccDNSRecords_svcbAliasModeLifecycle(t *testing.T) {
 	aliasMode := []testAccDNSRecord{{
 		Type:        "SVCB",
 		Name:        host,
-		TTL:         intPointer(3600),
+		TTL:         intPtr(3600),
 		IntAttrs:    map[string]int{"svc_priority": 0},
 		StringAttrs: map[string]string{"target_name": "."},
 	}}
@@ -192,7 +192,7 @@ func TestAccDNSRecords_svcbAliasModeLifecycle(t *testing.T) {
 	serviceMode := []testAccDNSRecord{{
 		Type:     "SVCB",
 		Name:     host,
-		TTL:      intPointer(3600),
+		TTL:      intPtr(3600),
 		IntAttrs: map[string]int{"svc_priority": 1},
 		StringAttrs: map[string]string{
 			"target_name": fmt.Sprintf("svc.%s", domain),
@@ -253,7 +253,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     "@",
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -263,7 +263,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     maxPrioHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 65535},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -273,7 +273,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     wildPortHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -285,7 +285,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     udpSchemeHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -297,7 +297,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     multiHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc1.%s", domain),
@@ -307,7 +307,7 @@ func TestAccDNSRecords_svcbEdgeValues(t *testing.T) {
 		{
 			Type:     "SVCB",
 			Name:     multiHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 2},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc2.%s", domain),

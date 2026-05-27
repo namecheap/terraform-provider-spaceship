@@ -32,7 +32,7 @@ func TestAccDNSRecords_aaaaRecord(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": address,
 			},
@@ -77,7 +77,7 @@ func TestAccDNSRecords_aaaaRecordLoopback(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": address,
 			},
@@ -110,7 +110,7 @@ func TestAccDNSRecords_aaaaRecordMaxLength(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": address,
 			},
@@ -147,7 +147,7 @@ func TestAccDNSRecords_aaaaRecordUnspecified(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": address,
 			},
@@ -177,7 +177,7 @@ func TestAccDNSRecords_aaaaRecordIPv4AsAddressFailsPlan(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: aaaaHost("ipv4leak"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "192.0.2.1", // RFC 5737 documentation IPv4
 			},
@@ -205,7 +205,7 @@ func TestAccDNSRecords_aaaaRecordIPv4MappedFailsPlan(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: aaaaHost("v4mapped"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "::ffff:192.0.2.1",
 			},
@@ -233,7 +233,7 @@ func TestAccDNSRecords_aaaaRecordInvalidAddressFailsPlan(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: aaaaHost("badaddr"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "notanip",
 			},
@@ -262,7 +262,7 @@ func TestAccDNSRecords_aaaaRecordTooLongAddressFailsPlan(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: aaaaHost("toolong"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": address,
 			},
@@ -290,7 +290,7 @@ func TestAccDNSRecords_aaaaRecordMissingAddressFailsPlan(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: aaaaHost("noaddr"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			// no address
 		},
 	}

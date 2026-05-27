@@ -10,17 +10,14 @@ description: |-
 
 Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
 
+> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
+
 ## Example Usage
 
 ```terraform
 # Manage a single DNS record. Use this when you want to manage records
 # one-by-one. To own the entire custom record set for a domain in a single
 # resource, use spaceship_dns_records instead.
-#
-# Caution: do not mix this resource with spaceship_dns_records for the same
-# domain. The plural resource will delete any record not in its list,
-# including records created by this singular resource. Pick one or the
-# other per domain.
 #
 # The Spaceship API has no "update record data" operation: it matches records
 # by (type, name, data). Changing any field other than `ttl` therefore forces
@@ -97,13 +94,22 @@ Import is supported using the following syntax:
 The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
 
 ```shell
-# The composite ID has the form: domain/TYPE/name/<data-signature>
-# The data signature is a normalized, pipe-separated representation of the
-# record's type-specific fields. For an A record it is the lowercased IPv4
-# address; for other types see the resource's `id` documentation.
+# The composite ID has the form domain/TYPE/name/<data-signature>, with the
+# four segments joined by "/". The <data-signature> is the record's
+# type-specific data fields, lowercased and joined by "|" — for an A record
+# that is a single field (just the IPv4 address, so no "|" appears), but other
+# types have several, e.g. CAA is "flag|tag|value" and SRV is
+# "service|protocol|priority|weight". See the resource's `id` documentation
+# for the per-type field list.
 #
 # After a successful Create, `terraform state show <addr>` prints the exact
 # ID — the easiest way to recover it for an import.
+#
+# You often don't need import at all: if a record with identical (type, name,
+# data) already exists, just declare the resource and `terraform apply`. Create
+# is idempotent and adopts the existing record, aligning its TTL to your
+# config. Use import only to bring an existing record under management without
+# issuing any write.
 
 terraform import spaceship_dns_record.web "example.com/A/@/203.0.113.10"
 ```

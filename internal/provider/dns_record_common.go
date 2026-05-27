@@ -5,10 +5,111 @@ import (
 	"strings"
 	"terraform-provider-spaceship/internal/client"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
+
+// dnsRecordModel is the Terraform model for a single DNS record, shared by the
+// list resource (as an element of its records list) and the singular dns_record
+// resource (embedded in its model). Field descriptions mirror recordAttributes()
+// in record_attributes.go, which is the canonical schema-level source.
+type dnsRecordModel struct {
+	// Record type (A, AAAA, ALIAS, CAA, CNAME, HTTPS, MX, NS, PTR, SRV, SVCB, TLSA, TXT).
+	Type types.String `tfsdk:"type"`
+	// Record host. "@" denotes the zone apex.
+	Name types.String `tfsdk:"name"`
+	// Record TTL in seconds. Defaults to 3600 when omitted.
+	TTL types.Int64 `tfsdk:"ttl"`
+	// IPv4 or IPv6 address for A and AAAA records.
+	Address types.String `tfsdk:"address"`
+	// Canonical domain name for ALIAS records (apex-safe CNAME-like behavior).
+	AliasName types.String `tfsdk:"alias_name"`
+	// Canonical name for CNAME records.
+	CName types.String `tfsdk:"cname"`
+	// Flag for CAA records (0 or 128).
+	Flag types.Int64 `tfsdk:"flag"`
+	// Tag for CAA records (e.g. "issue").
+	Tag types.String `tfsdk:"tag"`
+	// Generic value field used by CAA and TXT records.
+	Value types.String `tfsdk:"value"`
+	// String-form port for HTTPS/SVCB/TLSA records (accepts "*" or "_NNNN").
+	Port types.String `tfsdk:"port"`
+	// Scheme for HTTPS/SVCB/TLSA records (e.g. "_https", "_tcp").
+	Scheme types.String `tfsdk:"scheme"`
+	// Service priority for HTTPS/SVCB records (0-65535).
+	SvcPriority types.Int64 `tfsdk:"svc_priority"`
+	// Target name for HTTPS/SVCB records.
+	TargetName types.String `tfsdk:"target_name"`
+	// SvcParams string for HTTPS/SVCB records.
+	SvcParams types.String `tfsdk:"svc_params"`
+	// Mail exchange host for MX records.
+	Exchange types.String `tfsdk:"exchange"`
+	// Preference value for MX records (0-65535).
+	Preference types.Int64 `tfsdk:"preference"`
+	// Nameserver host for NS records.
+	Nameserver types.String `tfsdk:"nameserver"`
+	// Pointer target for PTR records.
+	Pointer types.String `tfsdk:"pointer"`
+	// Service label for SRV records (e.g. "_sip").
+	Service types.String `tfsdk:"service"`
+	// Protocol label for SRV/TLSA records (e.g. "_tcp").
+	Protocol types.String `tfsdk:"protocol"`
+	// Priority for SRV records (0-65535).
+	Priority types.Int64 `tfsdk:"priority"`
+	// Weight for SRV records (0-65535).
+	Weight types.Int64 `tfsdk:"weight"`
+	// Integer-form port for SRV records (1-65535).
+	PortNumber types.Int64 `tfsdk:"port_number"`
+	// Target host for SRV records.
+	Target types.String `tfsdk:"target"`
+	// Usage value for TLSA records (0-255).
+	Usage types.Int64 `tfsdk:"usage"`
+	// Selector value for TLSA records (0-255).
+	Selector types.Int64 `tfsdk:"selector"`
+	// Matching type for TLSA records (0-255).
+	Matching types.Int64 `tfsdk:"matching"`
+	// Association data (hex) for TLSA records.
+	AssociationData types.String `tfsdk:"association_data"`
+}
+
+// dnsRecordObjectType is the runtime attr.Type twin of dnsRecordModel. The
+// Plugin Framework needs an explicit attribute-type map to build the
+// types.List / types.Object values the list resource works with; keep it in
+// sync with dnsRecordModel's tfsdk tags.
+var dnsRecordObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"type":             types.StringType,
+		"name":             types.StringType,
+		"ttl":              types.Int64Type,
+		"address":          types.StringType,
+		"alias_name":       types.StringType,
+		"cname":            types.StringType,
+		"flag":             types.Int64Type,
+		"tag":              types.StringType,
+		"value":            types.StringType,
+		"port":             types.StringType,
+		"scheme":           types.StringType,
+		"svc_priority":     types.Int64Type,
+		"target_name":      types.StringType,
+		"svc_params":       types.StringType,
+		"exchange":         types.StringType,
+		"preference":       types.Int64Type,
+		"nameserver":       types.StringType,
+		"pointer":          types.StringType,
+		"service":          types.StringType,
+		"protocol":         types.StringType,
+		"priority":         types.Int64Type,
+		"weight":           types.Int64Type,
+		"port_number":      types.Int64Type,
+		"target":           types.StringType,
+		"usage":            types.Int64Type,
+		"selector":         types.Int64Type,
+		"matching":         types.Int64Type,
+		"association_data": types.StringType,
+	},
+}
 
 // hydrateRecordModel copies every field of an API record into the Terraform
 // model using the empty-string-as-null convention. Single source of truth for
@@ -45,6 +146,8 @@ func hydrateRecordModel(model *dnsRecordModel, record client.DNSRecord) {
 	model.Tag = stringOrNull(record.Tag)
 	model.Value = stringOrNull(record.Value)
 
+	// TODO
+	// why it is stringnull?
 	model.Port = types.StringNull()
 	model.PortNumber = types.Int64Null()
 	if record.Port != nil {
@@ -95,7 +198,10 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 		diags.AddAttributeError(attrPath.AtName("name"), "Missing record name", "Each DNS record must specify a name (use '@' for the apex).")
 		return client.DNSRecord{}, diags
 	}
-
+	// TODO
+	// WHY it statially defined here and not in model for all records?
+	// TTL FIeld is not required
+	// what is default on the site
 	ttl := int64(3600)
 	if !model.TTL.IsNull() && !model.TTL.IsUnknown() {
 		ttl = model.TTL.ValueInt64()
@@ -104,7 +210,9 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 	record := client.DNSRecord{
 		Type: recordType,
 		Name: name,
-		TTL:  int(ttl),
+		// TODO
+		// why to convert here again?
+		TTL: int(ttl),
 	}
 
 	getString := func(value types.String) (string, bool) {

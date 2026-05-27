@@ -99,7 +99,7 @@ func TestAccDNSRecords_tlsaValidation(t *testing.T) {
 			{
 				Type:        "TLSA",
 				Name:        tlsaHost(tc.suffix),
-				TTL:         intPointer(3600),
+				TTL:         intPtr(3600),
 				IntAttrs:    tc.intAttrs,
 				StringAttrs: tc.stringAttrs,
 			},
@@ -130,7 +130,7 @@ func TestAccDNSRecords_tlsaCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type: "TLSA",
 			Name: host,
-			TTL:  intPointer(ttl),
+			TTL:  intPtr(ttl),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -238,7 +238,7 @@ func TestAccDNSRecords_tlsaImportPreExisting(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -293,7 +293,7 @@ func TestAccDNSRecords_tlsaMultipleSameHost(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -304,7 +304,7 @@ func TestAccDNSRecords_tlsaMultipleSameHost(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_25",
 				"protocol":         "_tcp",
@@ -315,7 +315,7 @@ func TestAccDNSRecords_tlsaMultipleSameHost(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -363,7 +363,7 @@ func TestAccDNSRecords_tlsaBoundaryValues(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: "@",
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -374,7 +374,7 @@ func TestAccDNSRecords_tlsaBoundaryValues(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: maxValuesHost,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_443",
 				"protocol":         "_tcp",
@@ -385,7 +385,7 @@ func TestAccDNSRecords_tlsaBoundaryValues(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: wildPortHost,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "*",
 				"protocol":         "_tcp",
@@ -396,7 +396,7 @@ func TestAccDNSRecords_tlsaBoundaryValues(t *testing.T) {
 		{
 			Type: "TLSA",
 			Name: udpProtoHost,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"port":             "_853",
 				"protocol":         "_udp",

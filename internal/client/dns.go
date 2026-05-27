@@ -2,18 +2,11 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-)
-
-var (
-	_ json.Marshaler   = (*PortValue)(nil)
-	_ json.Unmarshaler = (*PortValue)(nil)
 )
 
 // DNSRecord represents a DNS record managed through the Spaceship API.
@@ -24,82 +17,43 @@ type DNSRecord struct {
 	TTL  int    `json:"ttl,omitempty"`
 
 	//other fields for dns records
-	Address         string       `json:"address,omitempty"`
-	AliasName       string       `json:"aliasName,omitempty"`
-	CName           string       `json:"cname,omitempty"`
-	Flag            *int         `json:"flag,omitempty"`
-	Tag             string       `json:"tag,omitempty"`
-	Value           string       `json:"value,omitempty"`
-	Port            *PortValue   `json:"port,omitempty"`
-	Scheme          string       `json:"scheme,omitempty"`
-	SvcPriority     *int         `json:"svcPriority,omitempty"`
-	TargetName      string       `json:"targetName,omitempty"`
-	SvcParams       string       `json:"svcParams,omitempty"`
-	Exchange        string       `json:"exchange,omitempty"`
-	Preference      *int         `json:"preference,omitempty"`
-	Nameserver      string       `json:"nameserver,omitempty"`
-	Pointer         string       `json:"pointer,omitempty"`
-	Service         string       `json:"service,omitempty"`
-	Protocol        string       `json:"protocol,omitempty"`
-	Priority        *int         `json:"priority,omitempty"`
-	Weight          *int         `json:"weight,omitempty"`
-	Target          string       `json:"target,omitempty"`
-	Usage           *int         `json:"usage,omitempty"`
-	Selector        *int         `json:"selector,omitempty"`
-	Matching        *int         `json:"matching,omitempty"`
-	AssociationData string       `json:"associationData,omitempty"`
-	Group           *RecordGroup `json:"group,omitempty"`
+	Address         string     `json:"address,omitempty"`
+	AliasName       string     `json:"aliasName,omitempty"`
+	CName           string     `json:"cname,omitempty"`
+	Flag            *int       `json:"flag,omitempty"`
+	Tag             string     `json:"tag,omitempty"`
+	Value           string     `json:"value,omitempty"`
+	Port            *PortValue `json:"port,omitempty"`
+	Scheme          string     `json:"scheme,omitempty"`
+	SvcPriority     *int       `json:"svcPriority,omitempty"`
+	TargetName      string     `json:"targetName,omitempty"`
+	SvcParams       string     `json:"svcParams,omitempty"`
+	Exchange        string     `json:"exchange,omitempty"`
+	Preference      *int       `json:"preference,omitempty"`
+	Nameserver      string     `json:"nameserver,omitempty"`
+	Pointer         string     `json:"pointer,omitempty"`
+	Service         string     `json:"service,omitempty"`
+	Protocol        string     `json:"protocol,omitempty"`
+	Priority        *int       `json:"priority,omitempty"`
+	Weight          *int       `json:"weight,omitempty"`
+	Target          string     `json:"target,omitempty"`
+	Usage           *int       `json:"usage,omitempty"`
+	Selector        *int       `json:"selector,omitempty"`
+	Matching        *int       `json:"matching,omitempty"`
+	AssociationData string     `json:"associationData,omitempty"`
+
+	// Group is populated only on reads. The API returns one of three group
+	// types (custom, product, personalNS); writes (PUT/DELETE) ignore it and
+	// the server always assigns new records to "custom". Left nil on writes,
+	// so omitempty keeps it out of request bodies. Used by
+	// filterCustomDNSRecords to drop Spaceship-managed records.
+	Group *RecordGroup `json:"group,omitempty"`
 }
 
+// RecordGroup is the read-only group classification the API attaches to each
+// record. Type is one of: custom, product, personalNS.
 type RecordGroup struct {
 	Type string `json:"type"`
-}
-
-type PortValue struct {
-	String *string
-	Int    *int
-}
-
-func NewStringPortValue(value string) *PortValue {
-	return &PortValue{String: &value}
-}
-
-func NewIntPortValue(value int) *PortValue {
-	return &PortValue{Int: &value}
-}
-
-func (p *PortValue) MarshalJSON() ([]byte, error) {
-	if p == nil {
-		return []byte("null"), nil
-	}
-	if p.Int != nil {
-		return json.Marshal(*p.Int)
-	}
-	if p.String != nil {
-		return json.Marshal(*p.String)
-	}
-	return []byte("null"), nil
-}
-
-func (p *PortValue) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" {
-		return nil
-	}
-	var intValue int
-	if err := json.Unmarshal(data, &intValue); err == nil {
-		p.Int = &intValue
-		p.String = nil
-		return nil
-	}
-
-	var stringValue string
-	if err := json.Unmarshal(data, &stringValue); err == nil {
-		p.String = &stringValue
-		p.Int = nil
-		return nil
-	}
-
-	return fmt.Errorf("invalid port value: %s", string(data))
 }
 
 const (
@@ -163,13 +117,16 @@ func (c *Client) FindDNSRecord(ctx context.Context, domain, recordType, name, si
 	if err != nil {
 		return DNSRecord{}, err
 	}
-	target := strings.ToUpper(recordType) + "|" + strings.ToLower(name) + "|" + signature
+
+	target := strings.ToUpper(recordType)
 	for _, record := range records {
 		if RecordKey(record) == target {
 			return record, nil
 		}
 	}
+
 	return DNSRecord{}, ErrRecordNotFound
+
 }
 
 // filterCustomDNSRecords returns only records whose group type is "custom"
@@ -213,9 +170,7 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 // This calls the upsert endpoint (PUT /dns/records/{domain}) and is therefore
 // **idempotent for records with matching (type, name, data)**: a call against
 // an already-existing identical record is a no-op (or TTL update), not an
-// error. This property is what lets the singular dns_record resource's Create
-// transparently adopt pre-existing matching records without explicit
-// adopt-on-create logic. Verified by TestAccDNSRecord_createWhenIdenticalExists.
+// error.
 //
 // Conflict cases (e.g. CNAME with a different target at the same hostname)
 // still return 422 because they violate API-level uniqueness constraints.
@@ -235,23 +190,6 @@ func (c *Client) CreateDNSRecord(ctx context.Context, domain string, record DNSR
 	}
 	return nil
 }
-
-// func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
-// 	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
-
-// 	records := []DNSRecord{record}
-
-// 	payload := struct {
-// 		Items []DNSRecord `json:"items"`
-// 	}{
-// 		Items: records,
-// 	}
-
-// 	if _, err := c.doJSON(ctx, http.MethodDelete, endpoint, payload, nil); err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
 	records := []DNSRecord{record}

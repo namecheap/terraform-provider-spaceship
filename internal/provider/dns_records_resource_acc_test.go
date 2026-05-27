@@ -30,7 +30,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 		{
 			Type: "A",
 			Name: fmt.Sprintf("%s-a", prefix),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.10",
 			},
@@ -38,7 +38,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: fmt.Sprintf("%s-aaaa", prefix),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "2001:db8::1",
 			},
@@ -46,7 +46,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 		{
 			Type: "CNAME",
 			Name: fmt.Sprintf("%s-cname", prefix),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"cname": fmt.Sprintf("origin.%s", domain),
 			},
@@ -54,7 +54,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 		{
 			Type: "MX",
 			Name: fmt.Sprintf("%s-mx", prefix),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"exchange": fmt.Sprintf("mail.%s", domain),
 			},
@@ -65,7 +65,7 @@ func TestAccDNSRecords_basicTypes(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: fmt.Sprintf("%s-txt", prefix),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "v=spf1 a mx -all",
 			},
@@ -130,7 +130,7 @@ func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 		{
 			Type: "A",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.20",
 			},
@@ -138,7 +138,7 @@ func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "order-check",
 			},
@@ -146,7 +146,7 @@ func TestAccDNSRecords_preservesRecordOrder(t *testing.T) {
 		{
 			Type: "AAAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "2001:db8::2",
 			},
@@ -205,7 +205,7 @@ func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
 		{
 			Type: "A",
 			Name: host,
-			TTL:  intPointer(300),
+			TTL:  intPtr(300),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.30",
 			},
@@ -213,7 +213,7 @@ func TestAccDNSRecords_removedFromConfiguration(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(300),
+			TTL:  intPtr(300),
 			StringAttrs: map[string]string{
 				"value": "removal-check",
 			},
@@ -251,7 +251,7 @@ func TestAccDNSRecords_invalidRecordNameFailsPlan(t *testing.T) {
 		{
 			Type: "A",
 			Name: ".example.",
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.20",
 			},
@@ -294,8 +294,8 @@ func TestAccDNSRecords_numericPortInExistingZone(t *testing.T) {
 		Port:     client.NewIntPortValue(443),
 		Service:  "_autodiscover",
 		Protocol: "_tcp",
-		Priority: intPointerClient(0),
-		Weight:   intPointerClient(0),
+		Priority: intPtr(0),
+		Weight:   intPtr(0),
 		Target:   fmt.Sprintf("autoconfig.%s", domain),
 	}
 
@@ -325,7 +325,7 @@ func TestAccDNSRecords_numericPortInExistingZone(t *testing.T) {
 		{
 			Type: "CNAME",
 			Name: cnameName,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"cname": fmt.Sprintf("origin.%s", domain),
 			},
@@ -401,7 +401,7 @@ func TestAccDNSRecords_existingRecordsDeletedOnCreate(t *testing.T) {
 		{
 			Type: "A",
 			Name: managedName,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.50",
 			},
@@ -463,7 +463,7 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 		{
 			Type: "A",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "198.51.100.77",
 			},
@@ -471,7 +471,7 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "stable-check",
 			},
@@ -506,22 +506,6 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 	})
 }
 
-// TODO leave only 1
-// pug in some common place
-
-// TODO
-// try to find similar other dublicates in code
-func intPointerClient(v int) *int {
-	return &v
-}
-func intPointer(v int) *int {
-	return &v
-}
-func intPtr(v int) *int {
-	return &v
-}
-
-// TODO why it exists?
 type testAccDNSRecord struct {
 	Type        string
 	Name        string

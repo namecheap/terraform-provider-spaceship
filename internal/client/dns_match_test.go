@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TODO reuse existing
 func intPtr(v int) *int {
 	return &v
 }

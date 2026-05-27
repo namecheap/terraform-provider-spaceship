@@ -10,6 +10,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+func intPtr(v int) *int {
+	return &v
+}
+
 func TestBoolOrDefault_Null(t *testing.T) {
 	if boolOrDefault(types.BoolNull(), true) != true {
 		t.Error("expected true for null with fallback true")

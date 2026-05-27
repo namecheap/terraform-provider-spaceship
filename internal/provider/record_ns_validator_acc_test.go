@@ -36,7 +36,7 @@ func TestAccDNSRecords_nsRecord(t *testing.T) {
 		{
 			Type: "NS",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"nameserver": nameserver,
 			},
@@ -85,7 +85,7 @@ func TestAccDNSRecords_nsRecordCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:        "NS",
 			Name:        host,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"nameserver": target},
 		}}
 	}
@@ -137,13 +137,13 @@ func TestAccDNSRecords_nsRecordMultipleAtSameHost(t *testing.T) {
 		{
 			Type:        "NS",
 			Name:        host,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"nameserver": "ns1.example.com"},
 		},
 		{
 			Type:        "NS",
 			Name:        host,
-			TTL:         intPointer(3600),
+			TTL:         intPtr(3600),
 			StringAttrs: map[string]string{"nameserver": "ns2.example.com"},
 		},
 	}
@@ -179,7 +179,7 @@ func TestAccDNSRecords_nsRecordApexTargetFailsPlan(t *testing.T) {
 		{
 			Type: "NS",
 			Name: nsHost("apex"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"nameserver": "@",
 			},
@@ -207,7 +207,7 @@ func TestAccDNSRecords_nsRecordWildcardTargetFailsPlan(t *testing.T) {
 		{
 			Type: "NS",
 			Name: nsHost("wildcard"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"nameserver": "*",
 			},
@@ -235,7 +235,7 @@ func TestAccDNSRecords_nsRecordInvalidNameserverFailsPlan(t *testing.T) {
 		{
 			Type: "NS",
 			Name: nsHost("badname"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"nameserver": ".invalid",
 			},
@@ -263,7 +263,7 @@ func TestAccDNSRecords_nsRecordMissingNameserverFailsPlan(t *testing.T) {
 		{
 			Type: "NS",
 			Name: nsHost("nons"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			// no nameserver
 		},
 	}
@@ -320,7 +320,7 @@ func TestAccDNSRecords_nsRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "NS",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"nameserver": nameserver,
 			},

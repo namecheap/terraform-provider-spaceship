@@ -35,7 +35,7 @@ func TestAccDNSRecords_caaRecord(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -84,7 +84,7 @@ func TestAccDNSRecords_caaRecordInvalidTagFailsPlan(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: caaHost("badtag"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -116,7 +116,7 @@ func TestAccDNSRecords_caaRecordInvalidValueFailsPlan(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: caaHost("badvalue"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -148,7 +148,7 @@ func TestAccDNSRecords_caaRecordMissingTagFailsPlan(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: caaHost("notag"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -179,7 +179,7 @@ func TestAccDNSRecords_caaRecordMissingValueFailsPlan(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: caaHost("noval"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -210,7 +210,7 @@ func TestAccDNSRecords_caaRecordMissingFlagFailsPlan(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: caaHost("noflag"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"tag":   "issue",
 				"value": "letsencrypt.org",
@@ -276,7 +276,7 @@ func TestAccDNSRecords_caaRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -340,7 +340,7 @@ func TestAccDNSRecords_caaRecordCriticalFlag(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 128,
 			},
@@ -393,7 +393,7 @@ func TestAccDNSRecords_caaRecordUpdateValue(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -408,7 +408,7 @@ func TestAccDNSRecords_caaRecordUpdateValue(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -457,7 +457,7 @@ func TestAccDNSRecords_caaRecordValueCaseInsensitive(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -505,7 +505,7 @@ func TestAccDNSRecords_caaRecordMultipleTagsSameHost(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -517,7 +517,7 @@ func TestAccDNSRecords_caaRecordMultipleTagsSameHost(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -529,7 +529,7 @@ func TestAccDNSRecords_caaRecordMultipleTagsSameHost(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -577,7 +577,7 @@ func TestAccDNSRecords_caaRecordIodefMailto(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},
@@ -617,7 +617,7 @@ func TestAccDNSRecords_caaRecordDisallowAll(t *testing.T) {
 		{
 			Type: "CAA",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"flag": 0,
 			},

@@ -31,9 +31,6 @@ type dnsRecordResourceModel struct {
 	ID     types.String `tfsdk:"id"`
 	Domain types.String `tfsdk:"domain"`
 
-	//todo
-	// learn how does it work in go
-	// try more example
 	dnsRecordModel
 }
 
@@ -117,18 +114,9 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 	}
 
 	var plan dnsRecordResourceModel
-	// this line is super important
-	// values would not be read from terraform without it
-	// how it even works?
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 
 	domain := plan.Domain.ValueString()
-
-	//todo why it is needed
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 
 	// No "fetch existing record before creating" / adopt-on-create logic here
 	// by design: the API's upsert endpoint (used by CreateDNSRecord below) is

@@ -8,7 +8,6 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -86,76 +85,6 @@ type dnsRecordsResourceModel struct {
 	Domain  types.String `tfsdk:"domain"`
 	Force   types.Bool   `tfsdk:"force"`
 	Records types.List   `tfsdk:"records"`
-}
-
-type dnsRecordModel struct {
-	//Type of the record
-	Type types.String `tfsdk:"type"`
-	// Name of the record
-	Name types.String `tfsdk:"name"`
-	TTL  types.Int64  `tfsdk:"ttl"`
-	// Address
-	Address types.String `tfsdk:"address"`
-	// Alias name for alias record
-	AliasName types.String `tfsdk:"alias_name"`
-	//TODO
-	//add descriptions for other records
-	CName           types.String `tfsdk:"cname"`
-	Flag            types.Int64  `tfsdk:"flag"`
-	Tag             types.String `tfsdk:"tag"`
-	Value           types.String `tfsdk:"value"`
-	Port            types.String `tfsdk:"port"`
-	Scheme          types.String `tfsdk:"scheme"`
-	SvcPriority     types.Int64  `tfsdk:"svc_priority"`
-	TargetName      types.String `tfsdk:"target_name"`
-	SvcParams       types.String `tfsdk:"svc_params"`
-	Exchange        types.String `tfsdk:"exchange"`
-	Preference      types.Int64  `tfsdk:"preference"`
-	Nameserver      types.String `tfsdk:"nameserver"`
-	Pointer         types.String `tfsdk:"pointer"`
-	Service         types.String `tfsdk:"service"`
-	Protocol        types.String `tfsdk:"protocol"`
-	Priority        types.Int64  `tfsdk:"priority"`
-	Weight          types.Int64  `tfsdk:"weight"`
-	PortNumber      types.Int64  `tfsdk:"port_number"`
-	Target          types.String `tfsdk:"target"`
-	Usage           types.Int64  `tfsdk:"usage"`
-	Selector        types.Int64  `tfsdk:"selector"`
-	Matching        types.Int64  `tfsdk:"matching"`
-	AssociationData types.String `tfsdk:"association_data"`
-}
-
-var dnsRecordObjectType = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"type":             types.StringType,
-		"name":             types.StringType,
-		"ttl":              types.Int64Type,
-		"address":          types.StringType,
-		"alias_name":       types.StringType,
-		"cname":            types.StringType,
-		"flag":             types.Int64Type,
-		"tag":              types.StringType,
-		"value":            types.StringType,
-		"port":             types.StringType,
-		"scheme":           types.StringType,
-		"svc_priority":     types.Int64Type,
-		"target_name":      types.StringType,
-		"svc_params":       types.StringType,
-		"exchange":         types.StringType,
-		"preference":       types.Int64Type,
-		"nameserver":       types.StringType,
-		"pointer":          types.StringType,
-		"service":          types.StringType,
-		"protocol":         types.StringType,
-		"priority":         types.Int64Type,
-		"weight":           types.Int64Type,
-		"port_number":      types.Int64Type,
-		"target":           types.StringType,
-		"usage":            types.Int64Type,
-		"selector":         types.Int64Type,
-		"matching":         types.Int64Type,
-		"association_data": types.StringType,
-	},
 }
 
 func (r *dnsRecordsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {

@@ -36,7 +36,7 @@ func TestAccDNSRecords_aliasRecord(t *testing.T) {
 		{
 			Type: "ALIAS",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"alias_name": aliasName,
 			},
@@ -80,7 +80,7 @@ func TestAccDNSRecords_aliasRecordApexTargetFailsPlan(t *testing.T) {
 		{
 			Type: "ALIAS",
 			Name: aliasHost("apex"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"alias_name": "@",
 			},
@@ -108,7 +108,7 @@ func TestAccDNSRecords_aliasRecordInvalidAliasNameFailsPlan(t *testing.T) {
 		{
 			Type: "ALIAS",
 			Name: aliasHost("badname"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"alias_name": ".invalid",
 			},
@@ -136,7 +136,7 @@ func TestAccDNSRecords_aliasRecordMissingAliasNameFailsPlan(t *testing.T) {
 		{
 			Type: "ALIAS",
 			Name: aliasHost("noalias"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			// no alias_name
 		},
 	}
@@ -193,7 +193,7 @@ func TestAccDNSRecords_aliasRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "ALIAS",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"alias_name": aliasName,
 			},
