@@ -47,7 +47,7 @@ func RecordValueSignature(record DNSRecord) string {
 	case "PTR":
 		write(strings.ToLower(record.Pointer))
 	case "SRV":
-		write(strings.ToLower(record.Service), strings.ToLower(record.Protocol), intToString(record.Priority), intToString(record.Weight))
+		write(strings.ToLower(record.Service), strings.ToLower(record.Protocol), intToString(record.Priority), intToString(record.Weight), portValueSignature(record.Port), strings.ToLower(record.Target))
 	case "SVCB":
 		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
 	case "TLSA":

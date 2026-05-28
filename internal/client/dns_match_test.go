@@ -21,7 +21,7 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 		{"MX", DNSRecord{Type: "MX", Name: "@", Exchange: "mail.example.com", Preference: intPtr(10)}},
 		{"NS", DNSRecord{Type: "NS", Name: "@", Nameserver: "ns1.example.com"}},
 		{"PTR", DNSRecord{Type: "PTR", Name: "1", Pointer: "host.example.com"}},
-		{"SRV", DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10)}},
+		{"SRV", DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10), Port: NewIntPortValue(5060), Target: "sip.example.com"}},
 		{"SVCB", DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"}},
 		{"TXT", DNSRecord{Type: "TXT", Name: "@", Value: "v=spf1"}},
 		{"unknown", DNSRecord{Type: "UNKNOWN", Name: "@", Address: "fallback"}},
@@ -107,6 +107,42 @@ func TestIntToString(t *testing.T) {
 	v := 42
 	if intToString(&v) != "42" {
 		t.Errorf("expected 42, got %q", intToString(&v))
+	}
+}
+
+// SRV signature must include port and target so two records differing only
+// in those fields don't collide on RecordKey (causing in-memory diff drops
+// and identical composite IDs on the singular dns_record resource).
+func TestRecordValueSignature_SRVDifferentPort(t *testing.T) {
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Target: "sip.example.com"}
+	r1 := base
+	r1.Port = NewIntPortValue(5060)
+	r2 := base
+	r2.Port = NewIntPortValue(5061)
+	if RecordValueSignature(r1) == RecordValueSignature(r2) {
+		t.Error("expected SRV records with different ports to have different signatures")
+	}
+}
+
+func TestRecordValueSignature_SRVDifferentTarget(t *testing.T) {
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Port: NewIntPortValue(5060)}
+	r1 := base
+	r1.Target = "sip-a.example.com"
+	r2 := base
+	r2.Target = "sip-b.example.com"
+	if RecordValueSignature(r1) == RecordValueSignature(r2) {
+		t.Error("expected SRV records with different targets to have different signatures")
+	}
+}
+
+func TestRecordValueSignature_SRVTargetCaseInsensitive(t *testing.T) {
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Port: NewIntPortValue(5060)}
+	r1 := base
+	r1.Target = "SIP.Example.Com"
+	r2 := base
+	r2.Target = "sip.example.com"
+	if RecordValueSignature(r1) != RecordValueSignature(r2) {
+		t.Error("expected case-insensitive SRV target match")
 	}
 }
 
