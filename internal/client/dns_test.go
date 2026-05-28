@@ -126,6 +126,30 @@ func TestGetDNSRecords_Error(t *testing.T) {
 	}
 }
 
+func TestFindDNSRecord_MatchesByTypeNameAndSignature(t *testing.T) {
+	c, _ := testServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{
+				{"type": "A", "name": "www", "ttl": 3600, "address": "1.2.3.4"},
+				{"type": "A", "name": "www", "ttl": 3600, "address": "5.6.7.8"},
+			},
+			"total": 2,
+		})
+	})
+
+	got, err := c.FindDNSRecord(t.Context(), "example.com", "A", "www", "5.6.7.8")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Address != "5.6.7.8" {
+		t.Errorf("expected 5.6.7.8, got %q", got.Address)
+	}
+
+	if _, err := c.FindDNSRecord(t.Context(), "example.com", "A", "www", "9.9.9.9"); err != ErrRecordNotFound {
+		t.Errorf("expected ErrRecordNotFound, got %v", err)
+	}
+}
+
 func TestUpsertDNSRecords_Empty(t *testing.T) {
 	err := (&Client{}).UpsertDNSRecords(t.Context(), "example.com", true, nil)
 	if err != nil {

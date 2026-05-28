@@ -118,7 +118,7 @@ func (c *Client) FindDNSRecord(ctx context.Context, domain, recordType, name, si
 		return DNSRecord{}, err
 	}
 
-	target := strings.ToUpper(recordType)
+	target := strings.ToUpper(recordType) + "|" + strings.ToLower(name) + "|" + signature
 	for _, record := range records {
 		if RecordKey(record) == target {
 			return record, nil
