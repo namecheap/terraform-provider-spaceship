@@ -300,7 +300,7 @@ func (r *dnsRecordResource) ImportState(ctx context.Context, req resource.Import
 // split uses a limit of 4 to keep the data segment intact.
 func parseRecordID(id string) (domain, recordType, name, signature string, ok bool) {
 	parts := strings.SplitN(id, "/", 4)
-	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+	if len(parts) != 4 || parts[0] == "" || parts[1] == "" || parts[2] == "" || parts[3] == "" {
 		return "", "", "", "", false
 	}
 	return parts[0], parts[1], parts[2], parts[3], true
