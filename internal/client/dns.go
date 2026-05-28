@@ -90,6 +90,9 @@ func (c *Client) GetDNSRecords(ctx context.Context, domain string) ([]DNSRecord,
 			return nil, err
 		}
 
+		for i := range payload.Items {
+			normalizeRecordPort(&payload.Items[i])
+		}
 		result = append(result, payload.Items...)
 
 		if total == -1 {

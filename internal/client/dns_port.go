@@ -3,6 +3,8 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -38,6 +40,40 @@ func (p *PortValue) MarshalJSON() ([]byte, error) {
 		return json.Marshal(*p.String)
 	}
 	return []byte("null"), nil
+}
+
+// normalizeRecordPort coerces a record's polymorphic Port into the canonical
+// form for its type so signature comparison and provider-state hydration are
+// stable regardless of whether the API returned the JSON port as a string or
+// a number. Without this, a TLSA record sent as "_443" but echoed back as 443
+// produces a different RecordKey on Read, FindDNSRecord misses, state is
+// dropped, and the next plan re-creates a record the upsert API treats as
+// identical — i.e. the "ID changes, server record doesn't" symptom.
+//
+// Canonical forms (matching what callers send and how each type's schema
+// surfaces the port in the provider model):
+//   - HTTPS, SVCB, TLSA: "_NNN" string (or "*" wildcard, untouched)
+//   - SRV:               integer
+//
+// Other record types have no port and are left untouched.
+func normalizeRecordPort(record *DNSRecord) {
+	if record == nil || record.Port == nil {
+		return
+	}
+	switch strings.ToUpper(record.Type) {
+	case "HTTPS", "SVCB", "TLSA":
+		if record.Port.Int != nil && record.Port.String == nil {
+			canonical := "_" + strconv.Itoa(*record.Port.Int)
+			record.Port = &PortValue{String: &canonical}
+		}
+	case "SRV":
+		if record.Port.String != nil && record.Port.Int == nil {
+			raw := strings.TrimPrefix(*record.Port.String, "_")
+			if n, err := strconv.Atoi(raw); err == nil {
+				record.Port = &PortValue{Int: &n}
+			}
+		}
+	}
 }
 
 func (p *PortValue) UnmarshalJSON(data []byte) error {
