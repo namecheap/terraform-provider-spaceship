@@ -223,7 +223,10 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 	}
 
 	requireString := func(value types.String, attrName, description string) (string, bool) {
-		if value.IsNull() || value.IsUnknown() || strings.TrimSpace(value.ValueString()) == "" {
+		if value.IsUnknown() {
+			return "", false
+		}
+		if value.IsNull() || strings.TrimSpace(value.ValueString()) == "" {
 			diags.AddAttributeError(attrPath.AtName(attrName), fmt.Sprintf("Missing %s", attrName), description)
 			return "", false
 		}
@@ -231,7 +234,10 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 	}
 
 	requireInt := func(value types.Int64, attrName, description string) (int, bool) {
-		if value.IsNull() || value.IsUnknown() {
+		if value.IsUnknown() {
+			return 0, false
+		}
+		if value.IsNull() {
 			diags.AddAttributeError(attrPath.AtName(attrName), fmt.Sprintf("Missing %s", attrName), description)
 			return 0, false
 		}

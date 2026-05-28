@@ -279,3 +279,33 @@ func TestExpandDNSRecords_MissingRequiredFields(t *testing.T) {
 		})
 	}
 }
+
+// Unknown required string (e.g. address pointing at another resource's
+// computed output) must pass through without a "Missing" diagnostic.
+func TestExpandDNSRecords_UnknownRequiredString(t *testing.T) {
+	ctx := context.Background()
+	list := buildRecordList(t, dnsRecordModel{
+		Type:    types.StringValue("A"),
+		Name:    types.StringValue("test"),
+		Address: types.StringUnknown(),
+	})
+	_, diags := expandDNSRecords(ctx, list, path.Root("records"))
+	if diags.HasError() {
+		t.Errorf("unexpected diagnostics for unknown address: %s", diags)
+	}
+}
+
+// Unknown required int must pass through without a "Missing" diagnostic.
+func TestExpandDNSRecords_UnknownRequiredInt(t *testing.T) {
+	ctx := context.Background()
+	list := buildRecordList(t, dnsRecordModel{
+		Type:       types.StringValue("MX"),
+		Name:       types.StringValue("test"),
+		Exchange:   types.StringValue("mx.example.com"),
+		Preference: types.Int64Unknown(),
+	})
+	_, diags := expandDNSRecords(ctx, list, path.Root("records"))
+	if diags.HasError() {
+		t.Errorf("unexpected diagnostics for unknown preference: %s", diags)
+	}
+}
