@@ -148,6 +148,7 @@ func recordAttributes() map[string]schema.Attribute {
 // adapter that synthesizes an Object from the flat resource attributes).
 func recordTypeObjectValidators() []validator.Object {
 	return []validator.Object{
+		records.IrrelevantFieldsValidator(),
 		records.AValidator(),
 		records.AAAAValidator(),
 		records.ALIASValidator(),
