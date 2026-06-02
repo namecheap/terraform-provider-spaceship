@@ -11,6 +11,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+// defaultRecordTTL is the TTL applied when a record omits one. It is the single
+// source of truth: the schema Default (recordAttributes) and the conversion
+// fallback in modelToDNSRecord both reference it.
+const defaultRecordTTL int64 = 3600
+
 // dnsRecordModel is the Terraform model for a single DNS record, shared by the
 // list resource (as an element of its records list) and the singular dns_record
 // resource (embedded in its model). Field descriptions mirror recordAttributes()
@@ -145,9 +150,6 @@ func hydrateRecordModel(model *dnsRecordModel, record client.DNSRecord) {
 	model.Flag = intPointerOrNull(record.Flag)
 	model.Tag = stringOrNull(record.Tag)
 	model.Value = stringOrNull(record.Value)
-
-	// TODO
-	// why it is stringnull?
 	model.Port = types.StringNull()
 	model.PortNumber = types.Int64Null()
 	if record.Port != nil {
@@ -198,11 +200,10 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 		diags.AddAttributeError(attrPath.AtName("name"), "Missing record name", "Each DNS record must specify a name (use '@' for the apex).")
 		return client.DNSRecord{}, diags
 	}
-	// TODO
-	// WHY it statially defined here and not in model for all records?
-	// TTL FIeld is not required
-	// what is default on the site
-	ttl := int64(3600)
+	// TTL is Optional+Computed with a schema Default (see recordAttributes), so a
+	// planned model always carries a value. This fallback only guards callers that
+	// build the model without going through plan (e.g. unit tests).
+	ttl := defaultRecordTTL
 	if !model.TTL.IsNull() && !model.TTL.IsUnknown() {
 		ttl = model.TTL.ValueInt64()
 	}
@@ -210,8 +211,7 @@ func modelToDNSRecord(model dnsRecordModel, attrPath path.Path) (client.DNSRecor
 	record := client.DNSRecord{
 		Type: recordType,
 		Name: name,
-		// TODO
-		// why to convert here again?
+		// int64 (Terraform types.Int64) -> int (client.DNSRecord.TTL).
 		TTL: int(ttl),
 	}
 

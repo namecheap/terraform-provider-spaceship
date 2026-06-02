@@ -6,7 +6,6 @@ import (
 
 	"terraform-provider-spaceship/internal/client"
 
-	"github.com/dlclark/regexp2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -26,51 +25,7 @@ var (
 	_ resource.Resource                = &dnsRecordsResource{}
 	_ resource.ResourceWithConfigure   = &dnsRecordsResource{}
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
-
-	recordNamePattern = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
-
-// TODO move this validator in separate file?
-// validators
-func recordNameValidator() validator.String {
-	return &recordNameValidatorImpl{}
-}
-
-type recordNameValidatorImpl struct{}
-
-func (v recordNameValidatorImpl) Description(ctx context.Context) string {
-	return "must be a valid record name"
-}
-func (v recordNameValidatorImpl) MarkdownDescription(ctx context.Context) string {
-	return "must be a valid record name"
-}
-func (v recordNameValidatorImpl) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	value := req.ConfigValue.ValueString()
-
-	match, err := recordNamePattern.MatchString(value)
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid Record Name",
-			fmt.Sprintf("Error validating record name: %s", err),
-		)
-		return
-	}
-
-	if !match {
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid Record Name",
-			"must be a valid record name format",
-		)
-	}
-
-}
-
-//validators ends
 
 func NewDNSRecordsResource() resource.Resource {
 	return &dnsRecordsResource{}
@@ -314,8 +269,6 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *dnsRecordsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// should be extracted somewhere
-	// I am tired of typing it
 	if r.client == nil {
 		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please ensure the provider block is present.")
 		return
@@ -464,36 +417,4 @@ func boolOrDefault(value types.Bool, fallback bool) bool {
 		return fallback
 	}
 	return value.ValueBool()
-}
-
-// TODO
-// move to some other file
-
-// deprecatedBoolWarning is a validator that emits a warning when a deprecated
-// bool attribute is explicitly configured.
-type deprecatedBoolWarning struct {
-	message string
-}
-
-func deprecatedBoolValidator(message string) validator.Bool {
-	return deprecatedBoolWarning{message: message}
-}
-
-func (v deprecatedBoolWarning) Description(_ context.Context) string {
-	return v.message
-}
-
-func (v deprecatedBoolWarning) MarkdownDescription(ctx context.Context) string {
-	return v.Description(ctx)
-}
-
-func (v deprecatedBoolWarning) ValidateBool(_ context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	resp.Diagnostics.Append(diag.NewAttributeWarningDiagnostic(
-		req.Path,
-		"Deprecated Attribute",
-		v.message,
-	))
 }

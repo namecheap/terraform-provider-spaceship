@@ -129,7 +129,6 @@ func (c *Client) FindDNSRecord(ctx context.Context, domain, recordType, name, si
 	}
 
 	return DNSRecord{}, ErrRecordNotFound
-
 }
 
 // filterCustomDNSRecords returns only records whose group type is "custom"
@@ -180,29 +179,18 @@ func (c *Client) UpsertDNSRecords(ctx context.Context, domain string, force bool
 func (c *Client) CreateDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
 	endpoint := c.endpointURL([]string{"dns", "records", domain}, nil)
 
-	records := []DNSRecord{record}
-
 	payload := struct {
 		Items []DNSRecord `json:"items"`
 	}{
-		Items: records,
+		Items: []DNSRecord{record},
 	}
 
-	if _, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil); err != nil {
-		return err
-	}
-	return nil
+	_, err := c.doJSON(ctx, http.MethodPut, endpoint, payload, nil)
+	return err
 }
 
 func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
-	records := []DNSRecord{record}
-
-	err := c.DeleteDNSRecords(ctx, domain, records)
-	if err != nil {
-		return err
-	}
-	return nil
-
+	return c.DeleteDNSRecords(ctx, domain, []DNSRecord{record})
 }
 
 // DeleteDNSRecords removes the specified DNS records.

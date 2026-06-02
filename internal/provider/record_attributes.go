@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-// record attributes retrusn the schema attributes that describe a single DNS record.
+// record attributes retunn the schema attributes that describe a single DNS record.
 // shared by the list resource and the single-record resource.
 // merged with id + domain at the resource root
 func recordAttributes() map[string]schema.Attribute {
@@ -27,14 +27,14 @@ func recordAttributes() map[string]schema.Attribute {
 			MarkdownDescription: "Record host. Use `@` for the zone apex.",
 			Validators: []validator.String{
 				stringvalidator.LengthBetween(1, 253),
-				recordNameValidator(),
+				records.NameValidator(),
 			},
 		},
 		"ttl": schema.Int64Attribute{
 			Optional:            true,
 			Computed:            true,
 			MarkdownDescription: "Record TTL in seconds. Defaults to 3600 if omitted.",
-			Default:             int64default.StaticInt64(3600),
+			Default:             int64default.StaticInt64(defaultRecordTTL),
 			Validators: []validator.Int64{
 				int64validator.Between(60, 3600),
 			},
