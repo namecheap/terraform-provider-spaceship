@@ -318,11 +318,9 @@ func TestAccDNSRecord_PTR_lifecycle(t *testing.T) {
 	})
 }
 
-// SRV: change `priority` to trigger Replace via a field that's actually in
-// recordValueSignature (`service|protocol|priority|weight`). Changing only
-// `target` would not change the signature, so the ID would not change either
-// — Replace would still happen because the schema marks every non-ttl field
-// RequiresReplace, but the ID assertion in step 4 would fail.
+// SRV: change `priority` to trigger Replace via a field that's in
+// recordValueSignature (`service|protocol|priority|weight|port|target`), so the
+// composite ID changes and the step 4 ID assertion exercises the new signature.
 func TestAccDNSRecord_SRV_lifecycle(t *testing.T) {
 	prefix := testAccRecordPrefix()
 	resourceName := "spaceship_dns_record.test"
@@ -341,8 +339,8 @@ func TestAccDNSRecord_SRV_lifecycle(t *testing.T) {
   weight      = 10
   port_number = 5060
   target      = "srv.example.com"`,
-		initialDataSig: "_sip|_tcp|5|10",
-		changedDataSig: "_sip|_tcp|10|10",
+		initialDataSig: "_sip|_tcp|5|10|5060|srv.example.com",
+		changedDataSig: "_sip|_tcp|10|10|5060|srv.example.com",
 		initialChecks: []resource.TestCheckFunc{
 			resource.TestCheckResourceAttr(resourceName, "service", "_sip"),
 			resource.TestCheckResourceAttr(resourceName, "protocol", "_tcp"),
@@ -353,6 +351,68 @@ func TestAccDNSRecord_SRV_lifecycle(t *testing.T) {
 		},
 		changedChecks: []resource.TestCheckFunc{
 			resource.TestCheckResourceAttr(resourceName, "priority", "10"),
+		},
+	})
+}
+
+// SRV target is part of the signature: changing only target must Replace and
+// change the composite ID.
+func TestAccDNSRecord_SRV_targetReplace(t *testing.T) {
+	prefix := testAccRecordPrefix()
+	resourceName := "spaceship_dns_record.test"
+	testAccDNSRecordLifecycle(t, testAccRecordLifecycleCase{
+		recordType: "SRV",
+		recordName: prefix + "-srv-target",
+		initialDataHCL: `service     = "_sip"
+  protocol    = "_tcp"
+  priority    = 5
+  weight      = 10
+  port_number = 5060
+  target      = "srv1.example.com"`,
+		changedDataHCL: `service     = "_sip"
+  protocol    = "_tcp"
+  priority    = 5
+  weight      = 10
+  port_number = 5060
+  target      = "srv2.example.com"`,
+		initialDataSig: "_sip|_tcp|5|10|5060|srv1.example.com",
+		changedDataSig: "_sip|_tcp|5|10|5060|srv2.example.com",
+		initialChecks: []resource.TestCheckFunc{
+			resource.TestCheckResourceAttr(resourceName, "target", "srv1.example.com"),
+		},
+		changedChecks: []resource.TestCheckFunc{
+			resource.TestCheckResourceAttr(resourceName, "target", "srv2.example.com"),
+		},
+	})
+}
+
+// SRV port is part of the signature: changing only port_number must Replace and
+// change the composite ID.
+func TestAccDNSRecord_SRV_portReplace(t *testing.T) {
+	prefix := testAccRecordPrefix()
+	resourceName := "spaceship_dns_record.test"
+	testAccDNSRecordLifecycle(t, testAccRecordLifecycleCase{
+		recordType: "SRV",
+		recordName: prefix + "-srv-port",
+		initialDataHCL: `service     = "_sip"
+  protocol    = "_tcp"
+  priority    = 5
+  weight      = 10
+  port_number = 5060
+  target      = "srv.example.com"`,
+		changedDataHCL: `service     = "_sip"
+  protocol    = "_tcp"
+  priority    = 5
+  weight      = 10
+  port_number = 5061
+  target      = "srv.example.com"`,
+		initialDataSig: "_sip|_tcp|5|10|5060|srv.example.com",
+		changedDataSig: "_sip|_tcp|5|10|5061|srv.example.com",
+		initialChecks: []resource.TestCheckFunc{
+			resource.TestCheckResourceAttr(resourceName, "port_number", "5060"),
+		},
+		changedChecks: []resource.TestCheckFunc{
+			resource.TestCheckResourceAttr(resourceName, "port_number", "5061"),
 		},
 	})
 }
