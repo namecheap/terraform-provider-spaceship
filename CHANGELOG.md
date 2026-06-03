@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.2.0...v0.3.0) (2026-06-03)
+
+
+### Features
+
+* add single domain resource record ([#75](https://github.com/namecheap/terraform-provider-spaceship/issues/75)) ([22bf7a4](https://github.com/namecheap/terraform-provider-spaceship/commit/22bf7a40d16ed3491dc78480d9600ff98c3d8101))
+
 ## [0.2.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.1.0...v0.2.0) (2026-04-28)
 
 
