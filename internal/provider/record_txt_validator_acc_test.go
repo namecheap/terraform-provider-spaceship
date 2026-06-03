@@ -37,7 +37,7 @@ func TestAccDNSRecords_txtRecord(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": value,
 			},
@@ -83,7 +83,7 @@ func TestAccDNSRecords_txtRecordWhitespaceOnlyValueFailsPlan(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: txtHost("ws"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": " \t\n",
 			},
@@ -115,7 +115,7 @@ func TestAccDNSRecords_txtRecordLeadingTrailingWhitespace(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": value,
 			},
@@ -156,7 +156,7 @@ func TestAccDNSRecords_txtRecordEmptyValueFailsPlan(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: txtHost("empty"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "",
 			},
@@ -184,7 +184,7 @@ func TestAccDNSRecords_txtRecordMissingValueFailsPlan(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: txtHost("noval"),
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 		},
 	}
 
@@ -212,7 +212,7 @@ func TestAccDNSRecords_txtRecordUpdateValue(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "v=spf1 a mx -all",
 			},
@@ -223,7 +223,7 @@ func TestAccDNSRecords_txtRecordUpdateValue(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "v=spf1 include:_spf.example.com -all",
 			},
@@ -266,7 +266,7 @@ func TestAccDNSRecords_txtRecordValueCaseSensitive(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "MixedCaseToken",
 			},
@@ -274,7 +274,7 @@ func TestAccDNSRecords_txtRecordValueCaseSensitive(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "mixedcasetoken",
 			},
@@ -319,7 +319,7 @@ func TestAccDNSRecords_txtRecordMultipleValuesSameHost(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "v=spf1 a mx -all",
 			},
@@ -327,7 +327,7 @@ func TestAccDNSRecords_txtRecordMultipleValuesSameHost(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "google-site-verification=abc123def456",
 			},
@@ -335,7 +335,7 @@ func TestAccDNSRecords_txtRecordMultipleValuesSameHost(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": "facebook-domain-verification=xyz789",
 			},
@@ -382,7 +382,7 @@ func TestAccDNSRecords_txtRecordLongValue(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": value,
 			},
@@ -426,7 +426,7 @@ func TestAccDNSRecords_txtRecordSpecialChars(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": value,
 			},
@@ -498,7 +498,7 @@ func TestAccDNSRecords_txtRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "TXT",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"value": value,
 			},

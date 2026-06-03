@@ -37,7 +37,7 @@ jobs:
                   version: v2.11
 
             - name: Set up Terraform
-              uses: hashicorp/setup-terraform@v3
+              uses: hashicorp/setup-terraform@v4
               with:
                   terraform_wrapper: false
 
@@ -117,7 +117,7 @@ jobs:
 
             - name: Set up Terraform
               if: ${{ steps.acc_secrets.outputs.has_secrets == 'true' }}
-              uses: hashicorp/setup-terraform@v3
+              uses: hashicorp/setup-terraform@v4
               with:
                   terraform_wrapper: false
 

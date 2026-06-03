@@ -120,8 +120,6 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		)
 		return
 	}
-	//map of any type could be improved at least in this case?
-	// or it will not work for empty interface?
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{
 		"base_url": defaultBaseURL,
 	})
@@ -134,6 +132,7 @@ func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resou
 	return []func() resource.Resource{
 		NewDNSRecordsResource,
 		NewDomainResource,
+		NewDNSRecordResource,
 	}
 }
 

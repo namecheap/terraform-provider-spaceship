@@ -25,7 +25,7 @@ func TestAccDNSRecords_aRecord(t *testing.T) {
 		{
 			Type: "A",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "192.0.2.1",
 			},
@@ -70,7 +70,7 @@ func TestAccDNSRecords_aRecordInvalidAddressFailsPlan(t *testing.T) {
 		{
 			Type: "A",
 			Name: "test-a-invalid",
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			StringAttrs: map[string]string{
 				"address": "not-an-ip",
 			},
@@ -98,7 +98,7 @@ func TestAccDNSRecords_aRecordMissingAddressFailsPlan(t *testing.T) {
 		{
 			Type: "A",
 			Name: "test-a-noaddr",
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 		},
 	}
 

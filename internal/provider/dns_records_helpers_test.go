@@ -10,6 +10,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
+func intPtr(v int) *int {
+	return &v
+}
+
 func TestBoolOrDefault_Null(t *testing.T) {
 	if boolOrDefault(types.BoolNull(), true) != true {
 		t.Error("expected true for null with fallback true")
@@ -31,127 +35,6 @@ func TestBoolOrDefault_Set(t *testing.T) {
 	}
 	if boolOrDefault(types.BoolValue(true), false) != true {
 		t.Error("expected true when explicitly set to true")
-	}
-}
-
-func TestRecordValueSignature_AllTypes(t *testing.T) {
-	tests := []struct {
-		name   string
-		record client.DNSRecord
-	}{
-		{"A", client.DNSRecord{Type: "A", Name: "@", Address: "1.2.3.4"}},
-		{"AAAA", client.DNSRecord{Type: "AAAA", Name: "@", Address: "2001:db8::1"}},
-		{"ALIAS", client.DNSRecord{Type: "ALIAS", Name: "@", AliasName: "other.com"}},
-		{"CAA", client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}},
-		{"CNAME", client.DNSRecord{Type: "CNAME", Name: "www", CName: "example.com"}},
-		{"HTTPS", client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}},
-		{"MX", client.DNSRecord{Type: "MX", Name: "@", Exchange: "mail.example.com", Preference: intPtr(10)}},
-		{"NS", client.DNSRecord{Type: "NS", Name: "@", Nameserver: "ns1.example.com"}},
-		{"PTR", client.DNSRecord{Type: "PTR", Name: "1", Pointer: "host.example.com"}},
-		{"SRV", client.DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10)}},
-		{"SVCB", client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}},
-		{"TXT", client.DNSRecord{Type: "TXT", Name: "@", Value: "v=spf1"}},
-		{"unknown", client.DNSRecord{Type: "UNKNOWN", Name: "@", Address: "fallback"}},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			sig := recordValueSignature(tc.record)
-			if sig == "" && tc.name != "unknown" {
-				t.Error("expected non-empty signature")
-			}
-			// signature should be deterministic
-			if sig != recordValueSignature(tc.record) {
-				t.Error("signature should be deterministic")
-			}
-		})
-	}
-}
-
-func TestRecordValueSignature_CAAValueCaseInsensitive(t *testing.T) {
-	r1 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "LetsEncrypt.org"}
-	r2 := client.DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}
-	if recordValueSignature(r1) != recordValueSignature(r2) {
-		t.Error("expected case-insensitive match for CAA value")
-	}
-}
-
-func TestRecordValueSignature_SvcParamsCaseInsensitive(t *testing.T) {
-	r1 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
-	r2 := client.DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_443"), Scheme: "_https"}
-	if recordValueSignature(r1) != recordValueSignature(r2) {
-		t.Error("expected case-insensitive match for HTTPS SvcParams")
-	}
-
-	r3 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "ALPN=H2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
-	r4 := client.DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: client.NewStringPortValue("_853"), Scheme: "_dot"}
-	if recordValueSignature(r3) != recordValueSignature(r4) {
-		t.Error("expected case-insensitive match for SVCB SvcParams")
-	}
-}
-
-func TestRecordValueSignature_TXTValueCaseSensitive(t *testing.T) {
-	r1 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=DKIM1; p=ABC"}
-	r2 := client.DNSRecord{Type: "TXT", Name: "@", Value: "v=dkim1; p=abc"}
-	if recordValueSignature(r1) == recordValueSignature(r2) {
-		t.Error("expected case-sensitive match for TXT value")
-	}
-}
-
-func TestRecordValueSignature_CaseInsensitive(t *testing.T) {
-	r1 := client.DNSRecord{Type: "A", Name: "@", Address: "1.2.3.4"}
-	r2 := client.DNSRecord{Type: "a", Name: "@", Address: "1.2.3.4"}
-	if recordValueSignature(r1) != recordValueSignature(r2) {
-		t.Error("expected case-insensitive match for A records")
-	}
-}
-
-func TestPortValueSignature(t *testing.T) {
-	tests := []struct {
-		name     string
-		port     *client.PortValue
-		expected string
-	}{
-		{"nil", nil, ""},
-		{"int", client.NewIntPortValue(443), "443"},
-		{"string", client.NewStringPortValue("_443"), "_443"},
-		{"empty", &client.PortValue{}, ""},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := portValueSignature(tc.port)
-			if got != tc.expected {
-				t.Errorf("expected %q, got %q", tc.expected, got)
-			}
-		})
-	}
-}
-
-func TestIntToString(t *testing.T) {
-	if intToString(nil) != "" {
-		t.Error("expected empty for nil")
-	}
-	v := 42
-	if intToString(&v) != "42" {
-		t.Errorf("expected 42, got %q", intToString(&v))
-	}
-}
-
-func TestRecordKey(t *testing.T) {
-	r := client.DNSRecord{Type: "A", Name: "test", Address: "1.2.3.4"}
-	key := recordKey(r)
-	if key == "" {
-		t.Error("expected non-empty key")
-	}
-	// same record should produce same key
-	if key != recordKey(r) {
-		t.Error("expected deterministic key")
-	}
-	// type should be uppercased, name lowercased
-	r2 := client.DNSRecord{Type: "a", Name: "TEST", Address: "1.2.3.4"}
-	if key != recordKey(r2) {
-		t.Error("expected case-insensitive key match")
 	}
 }
 
@@ -394,5 +277,35 @@ func TestExpandDNSRecords_MissingRequiredFields(t *testing.T) {
 				t.Errorf("expected error for %s", tc.name)
 			}
 		})
+	}
+}
+
+// Unknown required string (e.g. address pointing at another resource's
+// computed output) must pass through without a "Missing" diagnostic.
+func TestExpandDNSRecords_UnknownRequiredString(t *testing.T) {
+	ctx := context.Background()
+	list := buildRecordList(t, dnsRecordModel{
+		Type:    types.StringValue("A"),
+		Name:    types.StringValue("test"),
+		Address: types.StringUnknown(),
+	})
+	_, diags := expandDNSRecords(ctx, list, path.Root("records"))
+	if diags.HasError() {
+		t.Errorf("unexpected diagnostics for unknown address: %s", diags)
+	}
+}
+
+// Unknown required int must pass through without a "Missing" diagnostic.
+func TestExpandDNSRecords_UnknownRequiredInt(t *testing.T) {
+	ctx := context.Background()
+	list := buildRecordList(t, dnsRecordModel{
+		Type:       types.StringValue("MX"),
+		Name:       types.StringValue("test"),
+		Exchange:   types.StringValue("mx.example.com"),
+		Preference: types.Int64Unknown(),
+	})
+	_, diags := expandDNSRecords(ctx, list, path.Root("records"))
+	if diags.HasError() {
+		t.Errorf("unexpected diagnostics for unknown preference: %s", diags)
 	}
 }

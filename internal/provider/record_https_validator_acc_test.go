@@ -71,7 +71,7 @@ func TestAccDNSRecords_httpsValidation(t *testing.T) {
 			{
 				Type:        "HTTPS",
 				Name:        httpsHost(tc.suffix),
-				TTL:         intPointer(3600),
+				TTL:         intPtr(3600),
 				IntAttrs:    map[string]int{"svc_priority": 1},
 				StringAttrs: tc.stringAttrs,
 			},
@@ -102,7 +102,7 @@ func TestAccDNSRecords_httpsCreateAndUpdate(t *testing.T) {
 		return []testAccDNSRecord{{
 			Type:     "HTTPS",
 			Name:     host,
-			TTL:      intPointer(ttl),
+			TTL:      intPtr(ttl),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("%s.%s", targetHost, domain),
@@ -173,7 +173,7 @@ func TestAccDNSRecords_httpsAliasModeLifecycle(t *testing.T) {
 	aliasMode := []testAccDNSRecord{{
 		Type:        "HTTPS",
 		Name:        host,
-		TTL:         intPointer(3600),
+		TTL:         intPtr(3600),
 		IntAttrs:    map[string]int{"svc_priority": 0},
 		StringAttrs: map[string]string{"target_name": "."},
 	}}
@@ -181,7 +181,7 @@ func TestAccDNSRecords_httpsAliasModeLifecycle(t *testing.T) {
 	serviceMode := []testAccDNSRecord{{
 		Type:     "HTTPS",
 		Name:     host,
-		TTL:      intPointer(3600),
+		TTL:      intPtr(3600),
 		IntAttrs: map[string]int{"svc_priority": 1},
 		StringAttrs: map[string]string{
 			"target_name": fmt.Sprintf("svc.%s", domain),
@@ -242,7 +242,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     "@",
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -252,7 +252,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     maxPrioHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 65535},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -262,7 +262,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     wildPortHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -274,7 +274,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     highPortHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc.%s", domain),
@@ -286,7 +286,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     multiHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 1},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc1.%s", domain),
@@ -296,7 +296,7 @@ func TestAccDNSRecords_httpsEdgeValues(t *testing.T) {
 		{
 			Type:     "HTTPS",
 			Name:     multiHost,
-			TTL:      intPointer(3600),
+			TTL:      intPtr(3600),
 			IntAttrs: map[string]int{"svc_priority": 2},
 			StringAttrs: map[string]string{
 				"target_name": fmt.Sprintf("svc2.%s", domain),
@@ -349,7 +349,7 @@ func TestAccDNSRecords_httpsRecordComposition(t *testing.T) {
 	httpsRecord := testAccDNSRecord{
 		Type:     "HTTPS",
 		Name:     host,
-		TTL:      intPointer(3600),
+		TTL:      intPtr(3600),
 		IntAttrs: map[string]int{"svc_priority": 1},
 		StringAttrs: map[string]string{
 			"target_name": fmt.Sprintf("svc.%s", domain),
@@ -359,7 +359,7 @@ func TestAccDNSRecords_httpsRecordComposition(t *testing.T) {
 	aRecord := testAccDNSRecord{
 		Type:        "A",
 		Name:        host,
-		TTL:         intPointer(3600),
+		TTL:         intPtr(3600),
 		StringAttrs: map[string]string{"address": "1.2.3.4"},
 	}
 
@@ -438,7 +438,7 @@ func TestAccDNSRecords_httpsRecordImportPreExisting(t *testing.T) {
 		{
 			Type: "HTTPS",
 			Name: host,
-			TTL:  intPointer(3600),
+			TTL:  intPtr(3600),
 			IntAttrs: map[string]int{
 				"svc_priority": 1,
 			},

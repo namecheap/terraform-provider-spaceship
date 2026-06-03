@@ -3,22 +3,16 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"terraform-provider-spaceship/internal/client"
-	"terraform-provider-spaceship/internal/provider/records"
 
-	"github.com/dlclark/regexp2"
-	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -31,50 +25,7 @@ var (
 	_ resource.Resource                = &dnsRecordsResource{}
 	_ resource.ResourceWithConfigure   = &dnsRecordsResource{}
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
-
-	recordNamePattern = regexp2.MustCompile(`^(?!\.)(@|\*|([_*]\.)?(?:(?!-)(?=[^\.]*[^\W_])[\w-]{1,63}(?<!-)($|\.)){1,127}(?<!\.))$`, 0)
 )
-
-// validators
-func recordNameValidator() validator.String {
-	return &recordNameValidatorImpl{}
-}
-
-type recordNameValidatorImpl struct{}
-
-func (v recordNameValidatorImpl) Description(ctx context.Context) string {
-	return "must be a valid record name"
-}
-func (v recordNameValidatorImpl) MarkdownDescription(ctx context.Context) string {
-	return "must be a valid record name"
-}
-func (v recordNameValidatorImpl) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	value := req.ConfigValue.ValueString()
-
-	match, err := recordNamePattern.MatchString(value)
-	if err != nil {
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid Record Name",
-			fmt.Sprintf("Error validating record name: %s", err),
-		)
-		return
-	}
-
-	if !match {
-		resp.Diagnostics.AddAttributeError(
-			req.Path,
-			"Invalid Record Name",
-			"must be a valid record name format",
-		)
-	}
-
-}
-
-//validators ends
 
 func NewDNSRecordsResource() resource.Resource {
 	return &dnsRecordsResource{}
@@ -89,70 +40,6 @@ type dnsRecordsResourceModel struct {
 	Domain  types.String `tfsdk:"domain"`
 	Force   types.Bool   `tfsdk:"force"`
 	Records types.List   `tfsdk:"records"`
-}
-
-type dnsRecordModel struct {
-	Type            types.String `tfsdk:"type"`
-	Name            types.String `tfsdk:"name"`
-	TTL             types.Int64  `tfsdk:"ttl"`
-	Address         types.String `tfsdk:"address"`
-	AliasName       types.String `tfsdk:"alias_name"`
-	CName           types.String `tfsdk:"cname"`
-	Flag            types.Int64  `tfsdk:"flag"`
-	Tag             types.String `tfsdk:"tag"`
-	Value           types.String `tfsdk:"value"`
-	Port            types.String `tfsdk:"port"`
-	Scheme          types.String `tfsdk:"scheme"`
-	SvcPriority     types.Int64  `tfsdk:"svc_priority"`
-	TargetName      types.String `tfsdk:"target_name"`
-	SvcParams       types.String `tfsdk:"svc_params"`
-	Exchange        types.String `tfsdk:"exchange"`
-	Preference      types.Int64  `tfsdk:"preference"`
-	Nameserver      types.String `tfsdk:"nameserver"`
-	Pointer         types.String `tfsdk:"pointer"`
-	Service         types.String `tfsdk:"service"`
-	Protocol        types.String `tfsdk:"protocol"`
-	Priority        types.Int64  `tfsdk:"priority"`
-	Weight          types.Int64  `tfsdk:"weight"`
-	PortNumber      types.Int64  `tfsdk:"port_number"`
-	Target          types.String `tfsdk:"target"`
-	Usage           types.Int64  `tfsdk:"usage"`
-	Selector        types.Int64  `tfsdk:"selector"`
-	Matching        types.Int64  `tfsdk:"matching"`
-	AssociationData types.String `tfsdk:"association_data"`
-}
-
-var dnsRecordObjectType = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"type":             types.StringType,
-		"name":             types.StringType,
-		"ttl":              types.Int64Type,
-		"address":          types.StringType,
-		"alias_name":       types.StringType,
-		"cname":            types.StringType,
-		"flag":             types.Int64Type,
-		"tag":              types.StringType,
-		"value":            types.StringType,
-		"port":             types.StringType,
-		"scheme":           types.StringType,
-		"svc_priority":     types.Int64Type,
-		"target_name":      types.StringType,
-		"svc_params":       types.StringType,
-		"exchange":         types.StringType,
-		"preference":       types.Int64Type,
-		"nameserver":       types.StringType,
-		"pointer":          types.StringType,
-		"service":          types.StringType,
-		"protocol":         types.StringType,
-		"priority":         types.Int64Type,
-		"weight":           types.Int64Type,
-		"port_number":      types.Int64Type,
-		"target":           types.StringType,
-		"usage":            types.Int64Type,
-		"selector":         types.Int64Type,
-		"matching":         types.Int64Type,
-		"association_data": types.StringType,
-	},
 }
 
 func (r *dnsRecordsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -200,147 +87,8 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					listplanmodifier.UseStateForUnknown(),
 				},
 				NestedObject: schema.NestedAttributeObject{
-					Validators: []validator.Object{
-						records.AValidator(),
-						records.AAAAValidator(),
-						records.ALIASValidator(),
-						records.CAAValidator(),
-						records.HTTPSValidator(),
-						records.CNAMEValidator(),
-						records.MXValidator(),
-						records.NSValidator(),
-						records.PTRValidator(),
-						records.SRVValidator(),
-						records.SVCBValidator(),
-						records.TLSAValidator(),
-						records.TXTValidator(),
-					},
-					Attributes: map[string]schema.Attribute{
-						"type": schema.StringAttribute{
-							Required:            true,
-							MarkdownDescription: "DNS record type(A, AAAA, ALIAS, CAA, CNAME, HTTPS, MX, NS, PTR, SRV, SVCB, TLSA, TXT).",
-							Validators: []validator.String{
-								stringvalidator.OneOf("A", "AAAA", "ALIAS", "CAA", "CNAME", "HTTPS", "MX", "NS", "PTR", "SRV", "SVCB", "TLSA", "TXT"),
-							},
-						},
-						"name": schema.StringAttribute{
-							Required:            true,
-							MarkdownDescription: "Record host. Use `@` for the zone apex.",
-							Validators: []validator.String{
-								stringvalidator.LengthBetween(1, 253),
-								recordNameValidator(),
-							},
-						},
-						"ttl": schema.Int64Attribute{
-							Optional:            true,
-							Computed:            true,
-							MarkdownDescription: "Record TTL in seconds. Defaults to 3600 if omitted.",
-							Default:             int64default.StaticInt64(3600),
-							Validators: []validator.Int64{
-								int64validator.Between(60, 3600),
-							},
-						},
-						"address": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "IPv4 or IPv6 address for A and AAAA records",
-						},
-						"alias_name": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.",
-						},
-						"cname": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Canonical name for CNAME records.",
-						},
-						"flag": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Flag for CAA records (0 or 128).",
-						},
-						"tag": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Tag for CAA records (e.g. `issue`)",
-						},
-						"value": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Generic value field used by several record types (CAA, TXT).",
-						},
-						"port": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).",
-						},
-						"scheme": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)",
-						},
-						"svc_priority": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Service priority for HTTPS/SVCB records (0-65535).",
-						},
-						"target_name": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Target name for HTTPS/SVCB records.",
-						},
-						"svc_params": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "SvcParams string for HTTPS/SVCB records.",
-						},
-						"exchange": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Mail exchange host for MX records.",
-						},
-						"preference": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Preference value for MX records (0-65535).",
-						},
-						"nameserver": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Nameserver host for NS records.",
-						},
-						"pointer": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Pointer target for PTR records.",
-						},
-						"service": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Service label for SRV records (for example `_sip`).",
-						},
-						"protocol": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Protocol label for SRV/TLSA records (e.g. `_tcp`).",
-						},
-						"priority": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Priority for SRV records (0-65535).",
-						},
-						"weight": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Weight for SRV records (0-65535).",
-						},
-						"port_number": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Port for SRV records (1-65535).",
-						},
-						"target": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Target host for SRV records.",
-						},
-						"usage": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Usage value for TLSA records (0-255).",
-						},
-						"selector": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Selector value for TLSA records (0-255).",
-						},
-						"matching": schema.Int64Attribute{
-							Optional:            true,
-							MarkdownDescription: "Matching type for TLSA records (0-255).",
-						},
-						"association_data": schema.StringAttribute{
-							Optional:            true,
-							MarkdownDescription: "Association data (hex) for TLSA records.",
-						},
-					},
+					Validators: recordTypeObjectValidators(),
+					Attributes: recordAttributes(),
 				},
 			},
 		},
@@ -421,7 +169,6 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 
 func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.client == nil {
-		// TODO looks like repeated part
 		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please ensure the provider block is present")
 		return
 	}
@@ -522,8 +269,6 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *dnsRecordsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// should be extracted somewhere
-	// I am tired of typing it
 	if r.client == nil {
 		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please ensure the provider block is present.")
 		return
@@ -559,262 +304,21 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 	}
 
 	var models []dnsRecordModel
-	diags = list.ElementsAs(ctx, &models, false)
+	listDiags := list.ElementsAs(ctx, &models, false)
+	diags.Append(listDiags...)
 	if diags.HasError() {
 		return nil, diags
 	}
 
 	records := make([]client.DNSRecord, 0, len(models))
-
 	for idx, item := range models {
 		recordPath := listPath.AtListIndex(idx)
-
-		recordType := strings.ToUpper(strings.TrimSpace(item.Type.ValueString()))
-		if recordType == "" {
-			diags.AddAttributeError(recordPath.AtName("type"), "Missing record type", "Each DNS record must specify a type (e.g. A, MX, TXT).")
+		record, recordDiags := modelToDNSRecord(item, recordPath)
+		diags.Append(recordDiags...)
+		if recordDiags.HasError() {
 			continue
 		}
-
-		name := strings.TrimSpace(item.Name.ValueString())
-		if name == "" {
-			diags.AddAttributeError(recordPath.AtName("name"), "Missing record name", "Each DNS record must specify a name (use '@' for the apex).")
-			continue
-		}
-
-		// why it is not coming from default value from terraform schema in one place?
-		ttl := int64(3600)
-		if !item.TTL.IsNull() && !item.TTL.IsUnknown() {
-			ttl = item.TTL.ValueInt64()
-		}
-
-		record := client.DNSRecord{
-			Type: recordType,
-			Name: name,
-			TTL:  int(ttl),
-		}
-
-		valid := true
-
-		getString := func(value types.String, attrName string) (string, bool) {
-			if value.IsNull() || value.IsUnknown() {
-				return "", false
-			}
-			return value.ValueString(), true
-		}
-
-		requireString := func(value types.String, attrName, description string) (string, bool) {
-			if value.IsNull() || value.IsUnknown() || strings.TrimSpace(value.ValueString()) == "" {
-				diags.AddAttributeError(recordPath.AtName(attrName), fmt.Sprintf("Missing %s", attrName), description)
-				return "", false
-			}
-			return value.ValueString(), true
-		}
-
-		requireInt := func(value types.Int64, attrName, description string) (int, bool) {
-			if value.IsNull() || value.IsUnknown() {
-				diags.AddAttributeError(recordPath.AtName(attrName), fmt.Sprintf("Missing %s", attrName), description)
-				return 0, false
-			}
-			return int(value.ValueInt64()), true
-		}
-
-		switch recordType {
-		case "A", "AAAA":
-			if addr, ok := requireString(item.Address, "address", "Rerocrds of this type require the `address` attributes."); ok {
-				record.Address = addr
-			} else {
-				valid = false
-			}
-
-		case "ALIAS":
-			if alias, ok := requireString(item.AliasName, "alias_name", "ALIAS records require the `alias_name` attribute."); ok {
-				record.AliasName = alias
-			} else {
-				valid = false
-			}
-
-		case "CAA":
-			if flag, ok := requireInt(item.Flag, "flag", "CAA records require the `flag` attribute (0 or 128)"); ok {
-				record.Flag = &flag
-			} else {
-				valid = false
-			}
-
-			if tag, ok := requireString(item.Tag, "tag", "CAA records require the `tag` attribute (e.g. `issue`)"); ok {
-				record.Tag = tag
-			} else {
-				valid = false
-			}
-
-			if value, ok := requireString(item.Value, "value", "CAA records require the `value` attribute"); ok {
-				record.Value = value
-			} else {
-				valid = false
-			}
-		case "CNAME":
-			if cname, ok := requireString(item.CName, "cname", "CNAME records require the `cname` attribute"); ok {
-				record.CName = cname
-			} else {
-				valid = false
-			}
-
-		case "HTTPS":
-			if pri, ok := requireInt(item.SvcPriority, "svc_priority", "HTTPS records require the `scv_priority` attribute"); ok {
-				record.SvcPriority = &pri
-			} else {
-				valid = false
-			}
-			if target, ok := requireString(item.TargetName, "target_name", "HTTPS records require the `target_name` attribute"); ok {
-				record.TargetName = target
-			} else {
-				valid = false
-			}
-			if params, ok := getString(item.SvcParams, "svc_params"); ok {
-				record.SvcParams = params
-			} else {
-				record.SvcParams = ""
-			}
-			if port, ok := getString(item.Port, "port"); ok {
-				record.Port = client.NewStringPortValue(port)
-				if _, hasScheme := getString(item.Scheme, "scheme"); !hasScheme {
-					diags.AddAttributeError(recordPath.AtName("scheme"), "Missing scheme", "HTTPS records that specify `port` must also set `scheme` (usually `_https`)")
-					valid = false
-				}
-			}
-			if scheme, ok := getString(item.Scheme, "scheme"); ok {
-				record.Scheme = scheme
-			}
-		case "MX":
-			if exchange, ok := requireString(item.Exchange, "exchange", "MX records require the `exchange` attribute(mail server hostname)"); ok {
-				record.Exchange = exchange
-			} else {
-				valid = false
-			}
-			if pref, ok := requireInt(item.Preference, "preference", "MX records require the `preference` attribute (0-65536)."); ok {
-				record.Preference = &pref
-			} else {
-				valid = false
-			}
-
-		case "NS":
-			if ns, ok := requireString(item.Nameserver, "nameserver", "NS records require the `nameserver` attribute."); ok {
-				record.Nameserver = ns
-			} else {
-				valid = false
-			}
-
-		case "PTR":
-			if pointer, ok := requireString(item.Pointer, "pointer", "PTR records require the `pointer` attribute."); ok {
-				record.Pointer = pointer
-			} else {
-				valid = false
-			}
-
-		case "SRV":
-			if service, ok := requireString(item.Service, "service", "SRV records require the `service`, attribute (for example `_sip`)."); ok {
-				record.Service = service
-			} else {
-				valid = false
-			}
-			if protocol, ok := requireString(item.Protocol, "protocol", "SRV records require the `protocol` attribute (e.g. `_tcp`)"); ok {
-				record.Protocol = protocol
-			} else {
-				valid = false
-			}
-			if priority, ok := requireInt(item.Priority, "priority", "SRV records require the `priority` attribute (0-65535)."); ok {
-				record.Priority = &priority
-			} else {
-				valid = false
-			}
-			if weight, ok := requireInt(item.Weight, "weight", "SRV records require the `weight` attribute(0-65535)."); ok {
-				record.Weight = &weight
-			} else {
-				valid = false
-			}
-			if port, ok := requireInt(item.PortNumber, "port_number", "SRV records require the `port_number` attribute(1-65535)."); ok {
-				record.Port = client.NewIntPortValue(port)
-			} else {
-				valid = false
-			}
-			if target, ok := requireString(item.Target, "target", "SRV recrods reqiure the `target` attriabute."); ok {
-				record.Target = target
-			} else {
-				valid = false
-			}
-
-		case "SVCB":
-			if pri, ok := requireInt(item.SvcPriority, "svc_priority", "SVCB records require the `svc_priority` attributre(0-65535)."); ok {
-				record.SvcPriority = &pri
-			} else {
-				valid = false
-			}
-			if target, ok := requireString(item.TargetName, "target_name", "SVCB records require the `target` attribute."); ok {
-				record.TargetName = target
-			} else {
-				valid = false
-			}
-			if params, ok := getString(item.SvcParams, "svc_params"); ok {
-				record.SvcParams = params
-			} else {
-				record.SvcParams = ""
-			}
-			if port, ok := getString(item.Port, "port"); ok {
-				record.Port = client.NewStringPortValue(port)
-			}
-			if scheme, ok := getString(item.Scheme, "scheme"); ok {
-				record.Scheme = scheme
-			}
-
-		case "TLSA":
-			if port, ok := requireString(item.Port, "port", "TLSA records require the `port` attribute (for example `_443`)."); ok {
-				record.Port = client.NewStringPortValue(port)
-			} else {
-				valid = false
-			}
-			if protocol, ok := requireString(item.Protocol, "protocol", "TLSA records require the `protocol` attribute (e.g. `_tcp`)"); ok {
-				record.Protocol = protocol
-			} else {
-				valid = false
-			}
-			if usage, ok := requireInt(item.Usage, "usage", "TLSA records require the `usage` attribute (0-255)"); ok {
-				record.Usage = &usage
-			} else {
-				valid = false
-			}
-			if selector, ok := requireInt(item.Selector, "selector", "TLSA records require the `selector` attribute(0-255)"); ok {
-				record.Selector = &selector
-			} else {
-				valid = false
-			}
-			if matching, ok := requireInt(item.Matching, "matching", "TLSA records require the `matching` attribute(0-255)."); ok {
-				record.Matching = &matching
-			} else {
-				valid = false
-			}
-			if assoc, ok := requireString(item.AssociationData, "association_data", "TLSA records require the `association_data` attribute containign the certificate associations"); ok {
-				record.AssociationData = assoc
-			} else {
-				valid = false
-			}
-			if scheme, ok := getString(item.Scheme, "scheme"); ok {
-				record.Scheme = scheme
-			}
-
-		case "TXT":
-			if value, ok := requireString(item.Value, "value", "TXT records require the `value` attribute."); ok {
-				record.Value = value
-			} else {
-				valid = false
-			}
-		default:
-			diags.AddAttributeError(recordPath.AtName("type"), "Unsupported record type", fmt.Sprintf("Type %q is not supported by the provider.", recordType))
-			continue
-		}
-
-		if valid {
-			records = append(records, record)
-		}
-
+		records = append(records, record)
 	}
 	return records, diags
 }
@@ -822,66 +326,8 @@ func expandDNSRecords(ctx context.Context, list types.List, listPath path.Path) 
 func flattenDNSRecords(ctx context.Context, records []client.DNSRecord) (types.List, diag.Diagnostics) {
 	elements := make([]dnsRecordModel, 0, len(records))
 	for _, record := range records {
-		model := dnsRecordModel{
-			Type: types.StringValue(record.Type),
-			Name: types.StringValue(record.Name),
-		}
-
-		if record.TTL > 0 {
-			model.TTL = types.Int64Value(int64(record.TTL))
-		} else {
-			model.TTL = types.Int64Null()
-		}
-
-		stringOrNull := func(value string) types.String {
-			if value == "" {
-				return types.StringNull()
-			}
-			return types.StringValue(value)
-		}
-
-		intPointerOrNull := func(value *int) types.Int64 {
-			if value == nil {
-				return types.Int64Null()
-			}
-			return types.Int64Value(int64(*value))
-		}
-
-		model.Address = stringOrNull(record.Address)
-		model.AliasName = stringOrNull(record.AliasName)
-		model.CName = stringOrNull(record.CName)
-		model.Flag = intPointerOrNull(record.Flag)
-		model.Tag = stringOrNull(record.Tag)
-		model.Value = stringOrNull(record.Value)
-
-		if record.Port != nil {
-			if record.Port.String != nil {
-				model.Port = stringOrNull(*record.Port.String)
-			}
-
-			if record.Port.Int != nil {
-				model.PortNumber = types.Int64Value(int64(*record.Port.Int))
-			}
-		}
-
-		model.Scheme = stringOrNull(record.Scheme)
-		model.SvcPriority = intPointerOrNull(record.SvcPriority)
-		model.TargetName = stringOrNull(record.TargetName)
-		model.SvcParams = stringOrNull(record.SvcParams)
-		model.Exchange = stringOrNull(record.Exchange)
-		model.Preference = intPointerOrNull(record.Preference)
-		model.Nameserver = stringOrNull(record.Nameserver)
-		model.Pointer = stringOrNull(record.Pointer)
-		model.Service = stringOrNull(record.Service)
-		model.Protocol = stringOrNull(record.Protocol)
-		model.Priority = intPointerOrNull(record.Priority)
-		model.Weight = intPointerOrNull(record.Weight)
-		model.Target = stringOrNull(record.Target)
-		model.Usage = intPointerOrNull(record.Usage)
-		model.Selector = intPointerOrNull(record.Selector)
-		model.Matching = intPointerOrNull(record.Matching)
-		model.AssociationData = stringOrNull(record.AssociationData)
-
+		var model dnsRecordModel
+		hydrateRecordModel(&model, record)
 		elements = append(elements, model)
 	}
 
@@ -891,13 +337,13 @@ func flattenDNSRecords(ctx context.Context, records []client.DNSRecord) (types.L
 func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []client.DNSRecord) {
 	desiredMap := make(map[string]client.DNSRecord, len(desired))
 	for _, record := range desired {
-		desiredMap[recordKey(record)] = record
+		desiredMap[client.RecordKey(record)] = record
 	}
 
 	existingMap := make(map[string]client.DNSRecord, len(existing))
 	for _, record := range existing {
-		existingMap[recordKey(record)] = record
-		if _, ok := desiredMap[recordKey(record)]; !ok {
+		existingMap[client.RecordKey(record)] = record
+		if _, ok := desiredMap[client.RecordKey(record)]; !ok {
 			toDelete = append(toDelete, record)
 		}
 	}
@@ -905,9 +351,9 @@ func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []
 	seen := make(map[string]struct{})
 
 	for _, record := range desired {
-		key := recordKey(record)
+		key := client.RecordKey(record)
 		existingRecord, ok := existingMap[key]
-		if ok && existingRecord.TTL == record.TTL && recordValueSignature(existingRecord) == recordValueSignature(record) {
+		if ok && existingRecord.TTL == record.TTL && client.RecordValueSignature(existingRecord) == client.RecordValueSignature(record) {
 			continue
 		}
 
@@ -920,10 +366,6 @@ func diffDNSRecords(existing, desired []client.DNSRecord) (toDelete, toUpsert []
 	}
 
 	return toDelete, toUpsert
-}
-
-func recordKey(record client.DNSRecord) string {
-	return strings.ToUpper(record.Type) + "|" + strings.ToLower(record.Name) + "|" + recordValueSignature(record)
 }
 
 func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSRecord {
@@ -940,7 +382,7 @@ func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSReco
 	keyed := make([]keyedRecord, len(records))
 	for i, record := range records {
 		keyed[i] = keyedRecord{
-			key:    recordKey(record),
+			key:    client.RecordKey(record),
 			record: record,
 		}
 	}
@@ -948,7 +390,7 @@ func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSReco
 	ordered := make([]client.DNSRecord, 0, len(records))
 
 	for _, ref := range reference {
-		key := recordKey(ref)
+		key := client.RecordKey(ref)
 		for i := range keyed {
 			if keyed[i].used {
 				continue
@@ -970,101 +412,9 @@ func orderDNSRecordsLike(reference, records []client.DNSRecord) []client.DNSReco
 	return ordered
 }
 
-func recordValueSignature(record client.DNSRecord) string {
-	var builder strings.Builder
-	write := func(parts ...string) {
-		for _, part := range parts {
-			if builder.Len() > 0 {
-				builder.WriteString("|")
-			}
-			builder.WriteString(part)
-		}
-	}
-
-	switch strings.ToUpper(record.Type) {
-	case "A", "AAAA":
-		write(strings.ToLower(record.Address))
-	case "ALIAS":
-		write(strings.ToLower(record.AliasName))
-	case "CAA":
-		write(intToString(record.Flag), strings.ToLower(record.Tag), strings.ToLower(record.Value))
-	case "CNAME":
-		write(strings.ToLower(record.CName))
-	case "HTTPS":
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
-	case "MX":
-		write(strings.ToLower(record.Exchange), intToString(record.Preference))
-	case "NS":
-		write(strings.ToLower(record.Nameserver))
-	case "PTR":
-		write(strings.ToLower(record.Pointer))
-	case "SRV":
-		write(strings.ToLower(record.Service), strings.ToLower(record.Protocol), intToString(record.Priority), intToString(record.Weight))
-	case "SVCB":
-		write(intToString(record.SvcPriority), strings.ToLower(record.TargetName), strings.ToLower(record.SvcParams), portValueSignature(record.Port), strings.ToLower(record.Scheme))
-	case "TLSA":
-		normalized := strings.ReplaceAll(strings.ToLower(record.AssociationData), " ", "")
-		write(portValueSignature(record.Port), strings.ToLower(record.Protocol), intToString(record.Usage), intToString(record.Selector), intToString(record.Matching), normalized)
-	case "TXT":
-		write(record.Value)
-	default:
-		write(record.Address)
-	}
-	return builder.String()
-}
-
-func intToString(value *int) string {
-	if value == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", *value)
-}
-
-func portValueSignature(port *client.PortValue) string {
-	if port == nil {
-		return ""
-	}
-	if port.Int != nil {
-		return fmt.Sprintf("%d", *port.Int)
-	}
-	if port.String != nil {
-		return strings.ToLower(*port.String)
-	}
-	return ""
-}
-
 func boolOrDefault(value types.Bool, fallback bool) bool {
 	if value.IsNull() || value.IsUnknown() {
 		return fallback
 	}
 	return value.ValueBool()
-}
-
-// deprecatedBoolWarning is a validator that emits a warning when a deprecated
-// bool attribute is explicitly configured.
-type deprecatedBoolWarning struct {
-	message string
-}
-
-func deprecatedBoolValidator(message string) validator.Bool {
-	return deprecatedBoolWarning{message: message}
-}
-
-func (v deprecatedBoolWarning) Description(_ context.Context) string {
-	return v.message
-}
-
-func (v deprecatedBoolWarning) MarkdownDescription(ctx context.Context) string {
-	return v.Description(ctx)
-}
-
-func (v deprecatedBoolWarning) ValidateBool(_ context.Context, req validator.BoolRequest, resp *validator.BoolResponse) {
-	if req.ConfigValue.IsNull() || req.ConfigValue.IsUnknown() {
-		return
-	}
-	resp.Diagnostics.Append(diag.NewAttributeWarningDiagnostic(
-		req.Path,
-		"Deprecated Attribute",
-		v.message,
-	))
 }
