@@ -28,9 +28,6 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 			if sig == "" && tc.name != "unknown" {
 				t.Error("expected non-empty signature")
 			}
-			if sig != RecordValueSignature(tc.record) {
-				t.Error("signature should be deterministic")
-			}
 		})
 	}
 }

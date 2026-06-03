@@ -10,9 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 )
 
-// record attributes return the schema attributes that describe a single DNS record.
-// shared by the list resource and the single-record resource.
-// merged with id + domain at the resource root
+// recordAttributes returns the schema attributes that describe a single DNS record.
+// Shared by the list resource and the single-record resource.
+// Merged with id + domain at the resource root.
 func recordAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"type": schema.StringAttribute{

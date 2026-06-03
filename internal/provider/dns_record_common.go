@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"strings"
+
 	"terraform-provider-spaceship/internal/client"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
