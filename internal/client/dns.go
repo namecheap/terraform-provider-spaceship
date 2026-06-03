@@ -189,6 +189,8 @@ func (c *Client) CreateDNSRecord(ctx context.Context, domain string, record DNSR
 	return err
 }
 
+// DeleteDNSRecord removes a single DNS record from the domain. It is a
+// convenience wrapper around DeleteDNSRecords.
 func (c *Client) DeleteDNSRecord(ctx context.Context, domain string, record DNSRecord) error {
 	return c.DeleteDNSRecords(ctx, domain, []DNSRecord{record})
 }

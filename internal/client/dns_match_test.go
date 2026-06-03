@@ -2,11 +2,6 @@ package client
 
 import "testing"
 
-// TODO reuse existing
-func intPtr(v int) *int {
-	return &v
-}
-
 func TestRecordValueSignature_AllTypes(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -15,14 +10,14 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 		{"A", DNSRecord{Type: "A", Name: "@", Address: "1.2.3.4"}},
 		{"AAAA", DNSRecord{Type: "AAAA", Name: "@", Address: "2001:db8::1"}},
 		{"ALIAS", DNSRecord{Type: "ALIAS", Name: "@", AliasName: "other.com"}},
-		{"CAA", DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}},
+		{"CAA", DNSRecord{Type: "CAA", Name: "@", Flag: intP(0), Tag: "issue", Value: "letsencrypt.org"}},
 		{"CNAME", DNSRecord{Type: "CNAME", Name: "www", CName: "example.com"}},
-		{"HTTPS", DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_443"), Scheme: "_https"}},
-		{"MX", DNSRecord{Type: "MX", Name: "@", Exchange: "mail.example.com", Preference: intPtr(10)}},
+		{"HTTPS", DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intP(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_443"), Scheme: "_https"}},
+		{"MX", DNSRecord{Type: "MX", Name: "@", Exchange: "mail.example.com", Preference: intP(10)}},
 		{"NS", DNSRecord{Type: "NS", Name: "@", Nameserver: "ns1.example.com"}},
 		{"PTR", DNSRecord{Type: "PTR", Name: "1", Pointer: "host.example.com"}},
-		{"SRV", DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(5), Weight: intPtr(10), Port: NewIntPortValue(5060), Target: "sip.example.com"}},
-		{"SVCB", DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"}},
+		{"SRV", DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intP(5), Weight: intP(10), Port: NewIntPortValue(5060), Target: "sip.example.com"}},
+		{"SVCB", DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intP(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"}},
 		{"TXT", DNSRecord{Type: "TXT", Name: "@", Value: "v=spf1"}},
 		{"unknown", DNSRecord{Type: "UNKNOWN", Name: "@", Address: "fallback"}},
 	}
@@ -41,22 +36,22 @@ func TestRecordValueSignature_AllTypes(t *testing.T) {
 }
 
 func TestRecordValueSignature_CAAValueCaseInsensitive(t *testing.T) {
-	r1 := DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "LetsEncrypt.org"}
-	r2 := DNSRecord{Type: "CAA", Name: "@", Flag: intPtr(0), Tag: "issue", Value: "letsencrypt.org"}
+	r1 := DNSRecord{Type: "CAA", Name: "@", Flag: intP(0), Tag: "issue", Value: "LetsEncrypt.org"}
+	r2 := DNSRecord{Type: "CAA", Name: "@", Flag: intP(0), Tag: "issue", Value: "letsencrypt.org"}
 	if RecordValueSignature(r1) != RecordValueSignature(r2) {
 		t.Error("expected case-insensitive match for CAA value")
 	}
 }
 
 func TestRecordValueSignature_SvcParamsCaseInsensitive(t *testing.T) {
-	r1 := DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "ALPN=H2", Port: NewStringPortValue("_443"), Scheme: "_https"}
-	r2 := DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intPtr(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_443"), Scheme: "_https"}
+	r1 := DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intP(1), TargetName: "target.com", SvcParams: "ALPN=H2", Port: NewStringPortValue("_443"), Scheme: "_https"}
+	r2 := DNSRecord{Type: "HTTPS", Name: "@", SvcPriority: intP(1), TargetName: "target.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_443"), Scheme: "_https"}
 	if RecordValueSignature(r1) != RecordValueSignature(r2) {
 		t.Error("expected case-insensitive match for HTTPS SvcParams")
 	}
 
-	r3 := DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "ALPN=H2", Port: NewStringPortValue("_853"), Scheme: "_dot"}
-	r4 := DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intPtr(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"}
+	r3 := DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intP(1), TargetName: "svc.com", SvcParams: "ALPN=H2", Port: NewStringPortValue("_853"), Scheme: "_dot"}
+	r4 := DNSRecord{Type: "SVCB", Name: "@", SvcPriority: intP(1), TargetName: "svc.com", SvcParams: "alpn=h2", Port: NewStringPortValue("_853"), Scheme: "_dot"}
 	if RecordValueSignature(r3) != RecordValueSignature(r4) {
 		t.Error("expected case-insensitive match for SVCB SvcParams")
 	}
@@ -114,7 +109,7 @@ func TestIntToString(t *testing.T) {
 // in those fields don't collide on RecordKey (causing in-memory diff drops
 // and identical composite IDs on the singular dns_record resource).
 func TestRecordValueSignature_SRVDifferentPort(t *testing.T) {
-	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Target: "sip.example.com"}
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intP(0), Weight: intP(0), Target: "sip.example.com"}
 	r1 := base
 	r1.Port = NewIntPortValue(5060)
 	r2 := base
@@ -125,7 +120,7 @@ func TestRecordValueSignature_SRVDifferentPort(t *testing.T) {
 }
 
 func TestRecordValueSignature_SRVDifferentTarget(t *testing.T) {
-	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Port: NewIntPortValue(5060)}
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intP(0), Weight: intP(0), Port: NewIntPortValue(5060)}
 	r1 := base
 	r1.Target = "sip-a.example.com"
 	r2 := base
@@ -136,7 +131,7 @@ func TestRecordValueSignature_SRVDifferentTarget(t *testing.T) {
 }
 
 func TestRecordValueSignature_SRVTargetCaseInsensitive(t *testing.T) {
-	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intPtr(0), Weight: intPtr(0), Port: NewIntPortValue(5060)}
+	base := DNSRecord{Type: "SRV", Name: "_sip._tcp", Service: "_sip", Protocol: "_tcp", Priority: intP(0), Weight: intP(0), Port: NewIntPortValue(5060)}
 	r1 := base
 	r1.Target = "SIP.Example.Com"
 	r2 := base

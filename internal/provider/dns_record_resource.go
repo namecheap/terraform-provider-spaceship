@@ -115,6 +115,9 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 
 	var plan dnsRecordResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
 	domain := plan.Domain.ValueString()
 
