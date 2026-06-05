@@ -123,19 +123,34 @@ output "first_domain" {
 
 ## Testing
 
-```bash
-go test ./...
-```
-
-Unit tests cover the reconciliation helpers. Acceptance tests require real credentials and a disposable test domain:
+Unit tests need no credentials and never touch the network:
 
 ```bash
-export SPACESHIP_API_KEY=...
-export SPACESHIP_API_SECRET=...
-export SPACESHIP_TEST_DOMAIN=example.com
-# Optional: export SPACESHIP_TEST_RECORD_PREFIX=tfacc
-# Optional: export SPACESHIP_TEST_RECORD_NAME=tf-acc
-go test -run TestAcc ./internal/provider -v
+make test
 ```
 
-> ⚠️ Ensure the domain you supply is safe to modify. The acceptance test creates, updates, imports, and then destroys a dedicated `A` record.
+Acceptance tests exercise the full Terraform lifecycle against the **real** Spaceship API, so they need live credentials and a disposable test domain. Following the Terraform convention, they read configuration from environment variables and the framework only runs them when `TF_ACC` is set.
+
+`make testacc` loads those variables from a gitignored `.env` file so you don't have to export them by hand. Copy the template and fill it in:
+
+```bash
+cp .env.example .env
+# then edit .env with your SPACESHIP_API_KEY / SPACESHIP_API_SECRET / SPACESHIP_TEST_DOMAIN
+make testacc
+```
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SPACESHIP_API_KEY` | yes | Spaceship API key |
+| `SPACESHIP_API_SECRET` | yes | Spaceship API secret |
+| `SPACESHIP_TEST_DOMAIN` | yes | Disposable domain the tests mutate |
+| `SPACESHIP_TEST_RECORD_PREFIX` | no | Override the record-name prefix the tests use |
+| `SPACESHIP_TEST_RECORD_NAME` | no | Override the record name the tests use |
+
+`make testacc` sources `.env` and sets `TF_ACC=1` for you. You can also skip `.env` and export the variables manually — `make testacc` falls back to whatever is already in the environment. To run a single test directly, set `TF_ACC=1` yourself:
+
+```bash
+TF_ACC=1 go test -run TestAccFunctionName ./internal/provider -v
+```
+
+> ⚠️ Ensure the domain you supply is safe to modify. The acceptance tests create, update, import, and then destroy real DNS records on it.
