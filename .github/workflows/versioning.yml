@@ -23,13 +23,13 @@ jobs:
         id: generate-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.SPS_RELEASE_APP_ID }}
+          client-id: ${{ vars.SPS_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.SPS_RELEASE_PRIVATE_KEY }}
 
       # Use the generated token in release-please
       - name: Release Please
         id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
