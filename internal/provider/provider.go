@@ -133,6 +133,7 @@ func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resou
 		NewDNSRecordsResource,
 		NewDomainResource,
 		NewDNSRecordResource,
+		NewPersonalNameserverResource,
 	}
 }
 
