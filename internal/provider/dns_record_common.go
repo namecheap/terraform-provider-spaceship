@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // defaultRecordTTL is the TTL applied when a record omits one. It is the single

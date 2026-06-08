@@ -5,8 +5,6 @@ import (
 	"os"
 	"strings"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,6 +14,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 const defaultBaseURL = "https://spaceship.dev/api/v1"
@@ -133,6 +133,7 @@ func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resou
 		NewDNSRecordsResource,
 		NewDomainResource,
 		NewDNSRecordResource,
+		NewPersonalNameserverResource,
 	}
 }
 

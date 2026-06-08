@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // TestDomainResource_ImportState verifies that a domain resource can be

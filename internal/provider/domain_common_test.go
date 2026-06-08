@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 func TestStringValueOrNull_NonEmpty(t *testing.T) {

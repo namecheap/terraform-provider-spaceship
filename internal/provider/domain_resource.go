@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -23,6 +21,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 func NewDomainResource() resource.Resource {
