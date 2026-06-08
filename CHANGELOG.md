@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.3.0...v0.4.0) (2026-06-08)
+
+
+### Features
+
+* introduce personal nameserver resource ([#78](https://github.com/namecheap/terraform-provider-spaceship/issues/78)) ([ff27c4f](https://github.com/namecheap/terraform-provider-spaceship/commit/ff27c4f539502106a6ceaba84d45c899c06966b7))
+
 ## [0.3.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.2.0...v0.3.0) (2026-06-03)
 
 
