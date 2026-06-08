@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 func intPtr(v int) *int {

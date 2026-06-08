@@ -7,10 +7,10 @@ import (
 	"regexp"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // Two distinct 64-char lowercase hex digests (SHA-256 sized) used as

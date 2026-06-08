@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 func NewDomainListDataSource() datasource.DataSource {

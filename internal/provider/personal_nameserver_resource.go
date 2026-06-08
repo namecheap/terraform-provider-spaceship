@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"terraform-provider-spaceship/internal/client"
-	"terraform-provider-spaceship/internal/provider/records"
-
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -19,6 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"terraform-provider-spaceship/internal/client"
+	"terraform-provider-spaceship/internal/provider/records"
 )
 
 var (

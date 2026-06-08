@@ -10,7 +10,3 @@ formatters:
   enable:
     - gofmt
     - goimports
-  settings:
-    goimports:
-      local-prefixes:
-        - terraform-provider-spaceship

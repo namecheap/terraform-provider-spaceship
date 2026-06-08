@@ -4,10 +4,10 @@ import (
 	"context"
 	"strings"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 type nameserversValidator struct{}

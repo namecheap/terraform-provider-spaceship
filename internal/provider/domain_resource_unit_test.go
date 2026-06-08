@@ -8,11 +8,11 @@ import (
 	"sync"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // mockSpaceshipAPIWithStaleReads creates a mock Spaceship API that simulates

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // testAccRecordLifecycleCase describes a single record-type's inputs to the

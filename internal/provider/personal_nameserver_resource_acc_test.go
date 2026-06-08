@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+
+	"terraform-provider-spaceship/internal/client"
 )
 
 // Full lifecycle: create, empty-plan re-apply, IP update in place, host rename

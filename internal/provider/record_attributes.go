@@ -1,13 +1,13 @@
 package provider
 
 import (
-	"terraform-provider-spaceship/internal/provider/records"
-
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
+	"terraform-provider-spaceship/internal/provider/records"
 )
 
 // recordAttributes returns the schema attributes that describe a single DNS record.
