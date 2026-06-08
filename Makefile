@@ -39,16 +39,13 @@ test-cover: ## Run unit tests with a coverage report
 	go tool cover -func=coverage.out
 
 .PHONY: testacc
-testacc: ## Run acceptance tests against the real Spaceship API
-	@if [[ -z "$$SPACESHIP_API_KEY" ]]; then \
-		echo "SPACESHIP_API_KEY must be set"; exit 1; \
-	fi
-	@if [[ -z "$$SPACESHIP_API_SECRET" ]]; then \
-		echo "SPACESHIP_API_SECRET must be set"; exit 1; \
-	fi
-	@if [[ -z "$$SPACESHIP_TEST_DOMAIN" ]]; then \
-		echo "SPACESHIP_TEST_DOMAIN must be set"; exit 1; \
-	fi
+testacc: ## Run acceptance tests against the real Spaceship API (loads .env if present)
+	@set -a; [[ -f .env ]] && source .env; set +a; \
+	for v in SPACESHIP_API_KEY SPACESHIP_API_SECRET SPACESHIP_TEST_DOMAIN; do \
+		if [[ -z "$${!v}" ]]; then \
+			echo "$$v must be set — export it or add it to .env (see .env.example)"; exit 1; \
+		fi; \
+	done; \
 	TF_ACC=1 go test -run TestAcc ./internal/provider -v -count=1 -timeout=30m -failfast
 
 .PHONY: lint
