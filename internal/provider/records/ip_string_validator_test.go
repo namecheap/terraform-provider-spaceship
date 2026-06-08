@@ -1,7 +1,6 @@
 package records
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -13,7 +12,7 @@ import (
 // before apply.
 func TestIPAddressValidator_RejectsMalformed(t *testing.T) {
 	resp := &validator.StringResponse{}
-	IPAddressValidator().ValidateString(context.Background(),
+	IPAddressValidator().ValidateString(t.Context(),
 		validator.StringRequest{ConfigValue: types.StringValue("not-an-ip")}, resp)
 
 	if !resp.Diagnostics.HasError() {
@@ -28,7 +27,7 @@ func TestIPAddressValidator_RejectsMalformed(t *testing.T) {
 func TestIPAddressValidator_AllowsIPv4AndIPv6(t *testing.T) {
 	for _, ip := range []string{"192.0.2.1", "2001:db8::1"} {
 		resp := &validator.StringResponse{}
-		IPAddressValidator().ValidateString(context.Background(),
+		IPAddressValidator().ValidateString(t.Context(),
 			validator.StringRequest{ConfigValue: types.StringValue(ip)}, resp)
 
 		if resp.Diagnostics.HasError() {
@@ -42,7 +41,7 @@ func TestIPAddressValidator_AllowsIPv4AndIPv6(t *testing.T) {
 func TestIPAddressValidator_IgnoresNullAndUnknown(t *testing.T) {
 	for _, v := range []types.String{types.StringNull(), types.StringUnknown()} {
 		resp := &validator.StringResponse{}
-		IPAddressValidator().ValidateString(context.Background(),
+		IPAddressValidator().ValidateString(t.Context(),
 			validator.StringRequest{ConfigValue: v}, resp)
 
 		if resp.Diagnostics.HasError() {

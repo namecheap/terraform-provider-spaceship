@@ -261,6 +261,9 @@ func (r *personalNameserverResource) expand(ctx context.Context, model personalN
 		diags.AddAttributeError(path.Root("ips"), "Invalid IP addresses", err.Error())
 	}
 
+	if diags.HasError() {
+		return client.PersonalNameserver{}, diags
+	}
 	return ns, diags
 }
 

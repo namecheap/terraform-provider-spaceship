@@ -161,6 +161,7 @@ func TestPersonalNameserver_Validate(t *testing.T) {
 		{"no ips", PersonalNameserver{Host: "ns1", IPs: nil}, true},
 		{"too many ips", PersonalNameserver{Host: "ns1", IPs: validIPs(17)}, true},
 		{"invalid ip", PersonalNameserver{Host: "ns1", IPs: []string{"not-an-ip"}}, true},
+		{"host too long", PersonalNameserver{Host: strings.Repeat("a", 256), IPs: []string{"1.2.3.4"}}, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
