@@ -43,8 +43,6 @@ func (v *nsRecordValidator) ValidateObject(ctx context.Context, req validator.Ob
 		return
 	}
 
-	rec := &clientrecords.NSRecord{}
-
 	nameserverAttr, ok := attrs["nameserver"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(
@@ -52,20 +50,22 @@ func (v *nsRecordValidator) ValidateObject(ctx context.Context, req validator.Ob
 			"Invalid Field Type",
 			"The 'nameserver' field must be a string for NS records.",
 		)
-	} else if nameserverAttr.IsNull() || nameserverAttr.IsUnknown() {
+		return
+	}
+	if nameserverAttr.IsNull() || nameserverAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("nameserver"),
 			"Missing Required Field",
 			"The 'nameserver' field is required for NS records.",
 		)
-	} else {
-		rec.Nameserver = nameserverAttr.ValueString()
-		if err := rec.ValidateNameserver(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("nameserver"),
-				"Invalid Nameserver Value",
-				err.Error(),
-			)
-		}
+		return
+	}
+
+	if err := (&clientrecords.NSRecord{Nameserver: nameserverAttr.ValueString()}).ValidateNameserver(); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("nameserver"),
+			"Invalid Nameserver Value",
+			err.Error(),
+		)
 	}
 }

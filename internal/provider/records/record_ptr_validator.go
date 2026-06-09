@@ -43,8 +43,6 @@ func (v *ptrRecordValidator) ValidateObject(ctx context.Context, req validator.O
 		return
 	}
 
-	rec := &clientrecords.PTRRecord{}
-
 	pointerAttr, ok := attrs["pointer"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(
@@ -52,20 +50,22 @@ func (v *ptrRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'pointer' field must be a string for PTR records.",
 		)
-	} else if pointerAttr.IsNull() || pointerAttr.IsUnknown() {
+		return
+	}
+	if pointerAttr.IsNull() || pointerAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("pointer"),
 			"Missing Required Field",
 			"The 'pointer' field is required for PTR records.",
 		)
-	} else {
-		rec.Pointer = pointerAttr.ValueString()
-		if err := rec.ValidatePointer(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("pointer"),
-				"Invalid Pointer Value",
-				err.Error(),
-			)
-		}
+		return
+	}
+
+	if err := (&clientrecords.PTRRecord{Pointer: pointerAttr.ValueString()}).ValidatePointer(); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("pointer"),
+			"Invalid Pointer Value",
+			err.Error(),
+		)
 	}
 }

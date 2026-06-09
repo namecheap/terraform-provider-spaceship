@@ -43,8 +43,6 @@ func (v *aliasRecordValidator) ValidateObject(ctx context.Context, req validator
 		return
 	}
 
-	rec := &clientrecords.ALIASRecord{}
-
 	aliasNameAttr, ok := attrs["alias_name"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(
@@ -52,20 +50,22 @@ func (v *aliasRecordValidator) ValidateObject(ctx context.Context, req validator
 			"Invalid Field Type",
 			"The 'alias_name' field must be a string for ALIAS records.",
 		)
-	} else if aliasNameAttr.IsNull() || aliasNameAttr.IsUnknown() {
+		return
+	}
+	if aliasNameAttr.IsNull() || aliasNameAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("alias_name"),
 			"Missing Required Field",
 			"The 'alias_name' field is required for ALIAS records.",
 		)
-	} else {
-		rec.AliasName = aliasNameAttr.ValueString()
-		if err := rec.ValidateAliasName(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("alias_name"),
-				"Invalid Alias Name Value",
-				err.Error(),
-			)
-		}
+		return
+	}
+
+	if err := (&clientrecords.ALIASRecord{AliasName: aliasNameAttr.ValueString()}).ValidateAliasName(); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("alias_name"),
+			"Invalid Alias Name Value",
+			err.Error(),
+		)
 	}
 }
