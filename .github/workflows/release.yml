@@ -1,35 +1,49 @@
 name: Release
 
+# Cuts a release whenever a `v*` tag is pushed. The release-please bot opens a
+# release PR on every merge to master; merging that PR creates the tag and
+# triggers this workflow. See RELEASE.md for the full flow.
 on:
   push:
     tags:
       - v*
 
+# GoReleaser needs to create the GitHub Release and upload binaries.
+# Declaring this explicitly avoids depending on the repo-level "Default
+# workflow permissions" setting (which is invisible from the YAML).
+permissions:
+  contents: write
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 pulls the full history and all tags. GoReleaser needs
+      # both to compute the changelog (commits since the previous tag) and to
+      # identify the previous tag itself. The older `git fetch --unshallow`
+      # workaround is no longer needed since actions/checkout supports this
+      # natively.
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
         with:
           go-version-file: go.mod
+          cache: true
 
       - name: Import GPG key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
         with:
-          version: latest
           args: release --clean
         env:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
