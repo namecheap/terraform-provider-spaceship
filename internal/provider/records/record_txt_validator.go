@@ -43,8 +43,6 @@ func (v *txtRecordValidator) ValidateObject(ctx context.Context, req validator.O
 		return
 	}
 
-	rec := &clientrecords.TXTRecord{}
-
 	valueAttr, ok := attrs["value"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(
@@ -52,20 +50,22 @@ func (v *txtRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'value' field must be a string for TXT records.",
 		)
-	} else if valueAttr.IsNull() || valueAttr.IsUnknown() {
+		return
+	}
+	if valueAttr.IsNull() || valueAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("value"),
 			"Missing Required Field",
 			"The 'value' field is required for TXT records.",
 		)
-	} else {
-		rec.Value = valueAttr.ValueString()
-		if err := rec.ValidateValue(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("value"),
-				"Invalid Value",
-				err.Error(),
-			)
-		}
+		return
+	}
+
+	if err := (&clientrecords.TXTRecord{Value: valueAttr.ValueString()}).ValidateValue(); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("value"),
+			"Invalid Value",
+			err.Error(),
+		)
 	}
 }

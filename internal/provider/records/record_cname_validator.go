@@ -43,8 +43,6 @@ func (v *cnameRecordValidator) ValidateObject(ctx context.Context, req validator
 		return
 	}
 
-	rec := &clientrecords.CNAMERecord{}
-
 	cnameAttr, ok := attrs["cname"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(
@@ -52,20 +50,22 @@ func (v *cnameRecordValidator) ValidateObject(ctx context.Context, req validator
 			"Invalid Field Type",
 			"The 'cname' field must be a string for CNAME records.",
 		)
-	} else if cnameAttr.IsNull() || cnameAttr.IsUnknown() {
+		return
+	}
+	if cnameAttr.IsNull() || cnameAttr.IsUnknown() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("cname"),
 			"Missing Required Field",
 			"The 'cname' field is required for CNAME records.",
 		)
-	} else {
-		rec.CName = cnameAttr.ValueString()
-		if err := rec.ValidateCName(); err != nil {
-			resp.Diagnostics.AddAttributeError(
-				req.Path.AtName("cname"),
-				"Invalid CName Value",
-				err.Error(),
-			)
-		}
+		return
+	}
+
+	if err := (&clientrecords.CNAMERecord{CName: cnameAttr.ValueString()}).ValidateCName(); err != nil {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("cname"),
+			"Invalid CName Value",
+			err.Error(),
+		)
 	}
 }
