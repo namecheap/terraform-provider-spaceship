@@ -6,9 +6,13 @@ description: |-
 
 # Spaceship Provider
 
-> 🚧 **Active Development:** This provider is still evolving and is not intended for production deployments. Expect breaking changes between releases and test in non-critical environments first.
-
 Use the Spaceship provider to manage domain settings (including auto-renew and nameservers) and DNS records for domains registered with Spaceship.
+
+## Getting Credentials
+
+Create an API key and secret in the [Spaceship API Manager](https://www.spaceship.com/application/api-manager/). When creating the key, grant it the permission scopes for the resources you plan to manage — see the [Spaceship API documentation](https://docs.spaceship.dev/) for authentication details and the list of available scopes.
+
+Provide the credentials via the `api_key` and `api_secret` provider attributes, or the `SPACESHIP_API_KEY` and `SPACESHIP_API_SECRET` environment variables.
 
 ## Example Usage
 
@@ -17,7 +21,7 @@ terraform {
   required_providers {
     spaceship = {
       source  = "namecheap/spaceship"
-      version = ">= 0.0.1"
+      version = ">= 0.4.0"
     }
   }
 }
@@ -53,5 +57,5 @@ resource "spaceship_dns_records" "root" {
 
 ### Optional
 
-- `api_key` (String, Sensitive) Spaceship API key. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_KEY` environment variable.
-- `api_secret` (String, Sensitive) Spaceship API secret. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_SECRET` environment variable.
+- `api_key` (String, Sensitive) Spaceship API key, created in the [API Manager](https://www.spaceship.com/application/api-manager/). If omitted, the provider will attempt to read the value from the `SPACESHIP_API_KEY` environment variable.
+- `api_secret` (String, Sensitive) Spaceship API secret, created in the [API Manager](https://www.spaceship.com/application/api-manager/) alongside the API key. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_SECRET` environment variable.

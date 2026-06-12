@@ -1,5 +1,3 @@
-> 🚧 **Active Development:** This provider is experimental, under active development, and not yet recommended for production workloads. Expect breaking changes and use only with disposable test domains.
-
 # Spaceship Terraform Provider
 
 [![CI](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/ci.yml/badge.svg)](https://github.com/namecheap/terraform-provider-spaceship/actions/workflows/ci.yml)
@@ -38,6 +36,8 @@ The resulting `terraform-provider-spaceship` binary can be copied to Terraform's
 
 ## Credentials
 
+Create an API key and secret in the [Spaceship API Manager](https://www.spaceship.com/application/api-manager/). When creating the key, grant it the permission scopes for the resources you plan to manage — see the [Spaceship API documentation](https://docs.spaceship.dev/) for authentication details and the list of available scopes.
+
 The provider authenticates against the Spaceship API using the same `X-API-Key` and `X-API-Secret` headers. Supply credentials either inline:
 
 ```hcl
@@ -56,7 +56,7 @@ terraform {
   required_providers {
     spaceship = {
       source  = "registry.terraform.io/namecheap/spaceship"
-      version = ">= 0.0.1"
+      version = ">= 0.4.0"
     }
   }
 }
