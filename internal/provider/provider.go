@@ -124,8 +124,25 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		"base_url": defaultBaseURL,
 	})
 
-	resp.DataSourceData = client
-	resp.ResourceData = client
+	// All resources and data sources receive the same providerData: the raw
+	// client plus a shared DNS-record cache. The cache lives here (and not on
+	// the client) so the client stays a pure API client; it is per-process and
+	// thus naturally scoped to a single Terraform command.
+	pd := &providerData{
+		Client:     client,
+		DNSRecords: newDNSRecordCache(client),
+	}
+	resp.DataSourceData = pd
+	resp.ResourceData = pd
+}
+
+// providerData is the shared dependency bundle handed to every resource and
+// data source through ProviderData. Resources that only talk to the API read
+// Client; the singular dns_record resource additionally uses DNSRecords to
+// collapse its many per-record reads into one fetch per domain.
+type providerData struct {
+	Client     *client.Client
+	DNSRecords *dnsRecordCache
 }
 
 func (p *spaceshipProvider) Resources(_ context.Context) []func() resource.Resource {

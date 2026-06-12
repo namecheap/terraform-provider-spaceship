@@ -95,12 +95,12 @@ func (r *domainListDataSource) Configure(_ context.Context, req datasource.Confi
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.Client)
+	pd, ok := req.ProviderData.(*providerData)
 
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *providerData, got %T", req.ProviderData))
 		return
 	}
 
-	r.client = client
+	r.client = pd.Client
 }

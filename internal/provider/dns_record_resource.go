@@ -26,6 +26,10 @@ func NewDNSRecordResource() resource.Resource {
 
 type dnsRecordResource struct {
 	client *client.Client
+	// records is the shared per-domain read cache. Read/Update fetch through it
+	// so N records in one domain cost one zone fetch instead of N; every write
+	// path invalidates the domain so later reads never serve stale data.
+	records *dnsRecordCache
 }
 
 type dnsRecordResourceModel struct {
@@ -100,12 +104,13 @@ func (r *dnsRecordResource) Configure(_ context.Context, req resource.ConfigureR
 		return
 	}
 
-	client, ok := req.ProviderData.(*client.Client)
+	pd, ok := req.ProviderData.(*providerData)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *providerData, got %T", req.ProviderData))
 		return
 	}
-	r.client = client
+	r.client = pd.Client
+	r.records = pd.DNSRecords
 }
 
 func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -143,6 +148,7 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to create DNS record: %s", err))
 		return
 	}
+	r.records.Invalidate(domain)
 
 	// Only `id` is computed — every other attribute came from the user's plan
 	// and is already populated on `plan`. Setting other fields here would
@@ -197,6 +203,7 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS record: %s", err))
 		return
 	}
+	r.records.Invalidate(domain)
 
 	resp.State.RemoveResource(ctx)
 
@@ -223,7 +230,7 @@ func (r *dnsRecordResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	record, err := r.client.FindDNSRecord(ctx, domain, recordType, name, signature)
+	record, err := r.records.Find(ctx, domain, recordType, name, signature)
 	if errors.Is(err, client.ErrRecordNotFound) {
 		// Record no longer exists in the custom group — drop it from state so
 		// Terraform will plan a recreate on the next apply.
@@ -265,7 +272,7 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	record, err := r.client.FindDNSRecord(ctx, domain, recordType, name, signature)
+	record, err := r.records.Find(ctx, domain, recordType, name, signature)
 	if errors.Is(err, client.ErrRecordNotFound) {
 		resp.Diagnostics.AddError(
 			"DNS record not found",
@@ -284,6 +291,7 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update DNS record TTL: %s", err))
 		return
 	}
+	r.records.Invalidate(domain)
 
 	// Data signature unchanged, so the composite ID remains stable.
 	plan.ID = state.ID

@@ -95,12 +95,12 @@ func (r *personalNameserverResource) Configure(_ context.Context, req resource.C
 		return
 	}
 
-	c, ok := req.ProviderData.(*client.Client)
+	pd, ok := req.ProviderData.(*providerData)
 	if !ok {
-		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *client.Client, got %T", req.ProviderData))
+		resp.Diagnostics.AddError("Unexpected provider data type", fmt.Sprintf("Expected *providerData, got %T", req.ProviderData))
 		return
 	}
-	r.client = c
+	r.client = pd.Client
 }
 
 func (r *personalNameserverResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
