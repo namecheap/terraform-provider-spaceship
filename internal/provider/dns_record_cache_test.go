@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -141,6 +142,61 @@ func TestDNSRecordCache_InvalidateIsPerDomain(t *testing.T) {
 	// 2 warm-up fetches + 1 re-fetch for a.com; b.com stays cached.
 	if got := atomic.LoadInt64(gets); got != 3 {
 		t.Fatalf("expected 3 fetches, got %d", got)
+	}
+}
+
+// A cancelled caller fails alone; waiters sharing the same in-flight fetch
+// still get the result.
+func TestDNSRecordCache_CancelledCallerDoesNotFailWaiters(t *testing.T) {
+	var once sync.Once
+	started := make(chan struct{})
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { close(started) })
+		<-release
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{{"type": "A", "name": "@", "ttl": 3600, "address": "1.2.3.4"}},
+			"total": 1,
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	c, err := client.NewClient(server.URL, "k", "s")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	cache := newDNSRecordCache(c)
+
+	// Leader starts the flight, then gets cancelled while the fetch is blocked.
+	leaderCtx, cancel := context.WithCancel(t.Context())
+	leaderErr := make(chan error, 1)
+	go func() {
+		_, err := cache.Find(leaderCtx, "example.com", "A", "@", "1.2.3.4")
+		leaderErr <- err
+	}()
+	<-started
+	cancel()
+	if err := <-leaderErr; !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled for cancelled caller, got %v", err)
+	}
+
+	// Waiters with live contexts join the same flight and must still succeed.
+	var wg sync.WaitGroup
+	errs := make([]error, 3)
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = cache.Find(t.Context(), "example.com", "A", "@", "1.2.3.4")
+		}()
+	}
+	close(release)
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("waiter %d: %v", i, err)
+		}
 	}
 }
 

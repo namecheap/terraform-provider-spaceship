@@ -16,11 +16,15 @@ import (
 // zone, so N records in one domain cost N full zone reads. The cache collapses
 // that into one read per domain.
 //
-// Correctness rests on write-invalidation: any mutation of a domain's records
-// must call Invalidate(domain) so a later Find re-fetches instead of serving
-// stale data. The cache deliberately lives in the provider layer (not the
-// client) so the client stays a cache-free, reusable API surface — which means
-// the client cannot invalidate on its own, and callers own that responsibility.
+// Correctness rests on write-invalidation: every resource that reads through
+// the cache must call Invalidate(domain) after mutating that domain's records,
+// so a later Find re-fetches instead of serving stale data. The plural
+// spaceship_dns_records resource deliberately does not participate (neither
+// reading nor invalidating): mixing it with the singular resource on one
+// domain is documented as unsupported, so the cache does not defend against
+// that configuration. The cache lives in the provider layer (not the client)
+// so the client stays a cache-free, reusable API surface — which means the
+// client cannot invalidate on its own, and callers own that responsibility.
 type dnsRecordCache struct {
 	client *client.Client
 
@@ -79,8 +83,13 @@ func (c *dnsRecordCache) records(ctx context.Context, domain string) ([]client.D
 	// is held only around the map, never across the network call. A caller that
 	// arrives just after a flight completes (and the key is forgotten) simply
 	// runs one extra fetch — never stale, just an occasional redundant read.
-	result, err, _ := c.sf.Do(domain, func() (any, error) {
-		records, err := c.client.GetDNSRecords(ctx, domain)
+	//
+	// DoChan + select lets each caller observe its own context cancellation,
+	// and context.WithoutCancel detaches the shared fetch from any single
+	// caller's ctx so one caller's cancellation can't fail waiters that still
+	// need the result.
+	ch := c.sf.DoChan(domain, func() (any, error) {
+		records, err := c.client.GetDNSRecords(context.WithoutCancel(ctx), domain)
 		if err != nil {
 			return nil, err
 		}
@@ -89,8 +98,14 @@ func (c *dnsRecordCache) records(ctx context.Context, domain string) ([]client.D
 		c.mu.Unlock()
 		return records, nil
 	})
-	if err != nil {
-		return nil, err
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case res := <-ch:
+		if res.Err != nil {
+			return nil, res.Err
+		}
+		return res.Val.([]client.DNSRecord), nil
 	}
-	return result.([]client.DNSRecord), nil
 }
