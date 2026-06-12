@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.4.0...v0.4.1) (2026-06-12)
+
+
+### Bug Fixes
+
+* improvider provider published docs, remove warnings, add useful links ([#86](https://github.com/namecheap/terraform-provider-spaceship/issues/86)) ([a5b4801](https://github.com/namecheap/terraform-provider-spaceship/commit/a5b48015f86d492218b97df2ff4736b080815c44))
+
 ## [0.4.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.3.0...v0.4.0) (2026-06-08)
 
 
