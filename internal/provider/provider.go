@@ -59,7 +59,7 @@ func (p *spaceshipProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 		MarkdownDescription: "The Spaceship provider is used to manage DNS records and domain settings, including auto-renew and nameservers, for domains managed by the Spaceship registrar",
 		Attributes: map[string]schema.Attribute{
 			"api_key": schema.StringAttribute{
-				MarkdownDescription: "Spaceship API key. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_KEY` environment variable.",
+				MarkdownDescription: "Spaceship API key, created in the [API Manager](https://www.spaceship.com/application/api-manager/). If omitted, the provider will attempt to read the value from the `SPACESHIP_API_KEY` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 				Validators: []validator.String{
@@ -67,7 +67,7 @@ func (p *spaceshipProvider) Schema(_ context.Context, _ provider.SchemaRequest, 
 				},
 			},
 			"api_secret": schema.StringAttribute{
-				MarkdownDescription: "Spaceship API secret. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_SECRET` environment variable.",
+				MarkdownDescription: "Spaceship API secret, created in the [API Manager](https://www.spaceship.com/application/api-manager/) alongside the API key. If omitted, the provider will attempt to read the value from the `SPACESHIP_API_SECRET` environment variable.",
 				Optional:            true,
 				Sensitive:           true,
 				Validators: []validator.String{
