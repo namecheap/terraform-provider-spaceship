@@ -121,14 +121,25 @@ func (c *Client) FindDNSRecord(ctx context.Context, domain, recordType, name, si
 		return DNSRecord{}, err
 	}
 
+	if record, ok := MatchDNSRecord(records, recordType, name, signature); ok {
+		return record, nil
+	}
+	return DNSRecord{}, ErrRecordNotFound
+}
+
+// MatchDNSRecord scans an already-fetched record slice for the one matching the
+// API identity (type, name, data signature) and reports whether it was found.
+// Matching uses RecordKey, so it follows the API's case rules. Splitting this
+// out from FindDNSRecord lets callers that already hold the records (e.g. a
+// cache) reuse the exact same match logic without re-fetching.
+func MatchDNSRecord(records []DNSRecord, recordType, name, signature string) (DNSRecord, bool) {
 	target := strings.ToUpper(recordType) + "|" + strings.ToLower(name) + "|" + signature
 	for _, record := range records {
 		if RecordKey(record) == target {
-			return record, nil
+			return record, true
 		}
 	}
-
-	return DNSRecord{}, ErrRecordNotFound
+	return DNSRecord{}, false
 }
 
 // filterCustomDNSRecords returns only records whose group type is "custom"
