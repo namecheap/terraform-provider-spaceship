@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.4.1...v0.5.0) (2026-06-15)
+
+
+### Features
+
+* dns record read cache ([#88](https://github.com/namecheap/terraform-provider-spaceship/issues/88)) ([a61bc9a](https://github.com/namecheap/terraform-provider-spaceship/commit/a61bc9a05239ccd916316728b5c9d8ba94d694f0))
+
 ## [0.4.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.4.0...v0.4.1) (2026-06-12)
 
 
