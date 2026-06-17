@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.0...v0.5.1) (2026-06-17)
+
+
+### Bug Fixes
+
+* **deps:** bump dependencies to patch security vulnerabilities ([#90](https://github.com/namecheap/terraform-provider-spaceship/issues/90)) ([11cc5b4](https://github.com/namecheap/terraform-provider-spaceship/commit/11cc5b4c07538908ec089a557ca38bb5d18dc56c))
+
 ## [0.5.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.4.1...v0.5.0) (2026-06-15)
 
 
