@@ -21,9 +21,25 @@ GOMOD="${4:-go.mod}"
 CODEQL="${5:-}"
 
 MARKER='<!-- security-scan-summary -->'
-SHA_SHORT="${COMMIT_SHA:0:8}"
+# Guard before substring: under `set -u` ${COMMIT_SHA:0:8} on an unset var is a
+# fatal unbound-variable error, and an empty COMMIT_SHA would render empty
+# backticks. Fall back to "unknown" for both, mirroring BRANCH below.
+_sha="${COMMIT_SHA:-unknown}"
+SHA_SHORT="${_sha:0:8}"
 BRANCH="${BRANCH:-unknown}"
+# Sanitize the shell-interpolated branch before it lands inside a backtick span
+# on the commit line: collapse newlines/CR/pipes to spaces and drop backticks so
+# the value can't escape the inline-code span (mirrors the jq `cell` helper).
+BRANCH="$(printf '%s' "$BRANCH" | tr '\n\r|' '   ' | tr -d '`')"
 NOW="$(date -u '+%Y-%m-%d %H:%M UTC')"
+
+# Reusable jq helper: sanitize an untrusted string for a Markdown table cell.
+# Coerces to string, escapes the column separator (| -> \|), collapses any
+# newline/CR to a space (a raw newline would split the row), and strips
+# backticks so a value can't break out of (or forge) an inline-code span.
+# Prepend $CELL to any filter that interpolates scan/dep data, then pipe each
+# untrusted field through `| cell`.
+CELL='def cell: (. // "") | tostring | gsub("\r";" ") | gsub("\n";" ") | gsub("[|]";"\\|") | gsub("`";"");'
 
 # jq wrapper: print the filter result, or a fallback when the file is
 # missing/empty/invalid, so one dead scan job can't break the whole report.
@@ -110,48 +126,48 @@ printf '### 📦 Dependencies\n\n'
 printf -- '- **SBOM components (CycloneDX):** %s\n' "$sbom_comp"
 printf -- '- **Go modules in `go.mod`:** %s direct · %s indirect\n\n' "$mod_direct" "$mod_indirect"
 
-lic_breakdown=$(jqf "$SBOM" '
+lic_breakdown=$(jqf "$SBOM" "$CELL"'
   [.components[]?.licenses[]? | (.license.id // .license.name // .expression // "UNKNOWN")]
   | group_by(.) | map({k: .[0], n: length}) | sort_by(-.n) | .[:10][]
-  | "| \(.k) | \(.n) |"' "")
+  | "| \(.k | cell) | \(.n) |"' "")
 if [ -n "$lic_breakdown" ]; then
   printf '<details><summary>License breakdown (top 10)</summary>\n\n'
   printf '| License | Components |\n|---|---:|\n%s\n\n</details>\n\n' "$lic_breakdown"
 fi
 
 # --- detail sections (only when there is something to show) ----------------
-vuln_rows=$(jqf "$TRIVY" '
+vuln_rows=$(jqf "$TRIVY" "$CELL"'
   [.Results[]?.Vulnerabilities[]?]
   | unique_by([.VulnerabilityID, .PkgName])
   | sort_by({"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"UNKNOWN":4}[.Severity] // 5)
   | .[:50][]
-  | "| \(.Severity) | \(.VulnerabilityID) | \(.PkgName) | \(.InstalledVersion) | \((.FixedVersion // "") | if . == "" then "—" else . end) |"' "")
+  | "| \(.Severity | cell) | \(.VulnerabilityID | cell) | \(.PkgName | cell) | \(.InstalledVersion | cell) | \((.FixedVersion // "") | if . == "" then "—" else . end | cell) |"' "")
 if [ -n "$vuln_rows" ]; then
   printf '<details><summary>Vulnerabilities (Trivy, top 50)</summary>\n\n'
   printf '| Severity | ID | Package | Installed | Fixed |\n|---|---|---|---|---|\n%s\n\n</details>\n\n' "$vuln_rows"
 fi
 
-gv_rows=$(jqf "$GOVULN" '
+gv_rows=$(jqf "$GOVULN" "$CELL"'
   [.[] | select(.finding!=null) | .finding | select(.trace[0].function!=null)
    | {osv, module: .trace[0].module, fn: .trace[0].function}]
   | unique_by(.osv) | .[]
-  | "| \(.osv) | \(.module // "—") | `\(.fn // "—")` |"' "" -s)
+  | "| \(.osv | cell) | \(.module // "—" | cell) | `\(.fn // "—" | cell)` |"' "" -s)
 if [ -n "$gv_rows" ]; then
   printf '<details><summary>Reachable Go vulnerabilities (govulncheck)</summary>\n\n'
   printf '| Advisory | Module | Called symbol |\n|---|---|---|\n%s\n\n</details>\n\n' "$gv_rows"
 fi
 
-lic_rows=$(jqf "$TRIVY" '
+lic_rows=$(jqf "$TRIVY" "$CELL"'
   [.Results[]?.Licenses[]?] | .[]
-  | "| \(.Severity) | \(.PkgName // .FilePath // "—") | \(.Name) | \(.Category // "—") |"' "")
+  | "| \(.Severity | cell) | \(.PkgName // .FilePath // "—" | cell) | \(.Name | cell) | \(.Category // "—" | cell) |"' "")
 if [ -n "$lic_rows" ]; then
   printf '<details><summary>License findings (Trivy)</summary>\n\n'
   printf '| Severity | Package/File | License | Category |\n|---|---|---|---|\n%s\n\n</details>\n\n' "$lic_rows"
 fi
 
-misconf_rows=$(jqf "$TRIVY" '
+misconf_rows=$(jqf "$TRIVY" "$CELL"'
   [.Results[]? | .Target as $t | (.Misconfigurations[]? | select(.Status=="FAIL") | {t: $t, id: .ID, sev: .Severity, title: .Title})]
-  | .[] | "| \(.sev) | \(.id) | \(.title) | \(.t) |"' "")
+  | .[] | "| \(.sev | cell) | \(.id | cell) | \(.title | cell) | \(.t | cell) |"' "")
 if [ -n "$misconf_rows" ]; then
   printf '<details><summary>IaC misconfigurations (Trivy)</summary>\n\n'
   printf '| Severity | ID | Title | Target |\n|---|---|---|---|\n%s\n\n</details>\n\n' "$misconf_rows"
@@ -159,9 +175,9 @@ fi
 
 # Secrets: report rule + location only, NEVER the matched value, to avoid
 # re-leaking a credential into the PR comment / artifact.
-secret_rows=$(jqf "$TRIVY" '
+secret_rows=$(jqf "$TRIVY" "$CELL"'
   [.Results[]? | .Target as $t | (.Secrets[]? | {t: $t, rule: .RuleID, sev: .Severity, title: .Title, line: .StartLine})]
-  | .[] | "| \(.sev) | \(.rule) | \(.title) | \(.t):\(.line) |"' "")
+  | .[] | "| \(.sev | cell) | \(.rule | cell) | \(.title | cell) | \(.t | cell):\(.line) |"' "")
 if [ -n "$secret_rows" ]; then
   printf '<details><summary>Secret findings (Trivy — values redacted)</summary>\n\n'
   printf '| Severity | Rule | Title | Location |\n|---|---|---|---|\n%s\n\n</details>\n\n' "$secret_rows"
