@@ -61,7 +61,7 @@ func (d *domainResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages domain setting for Spaceship domain",
+		Description: "Manages domain settings for Spaceship domain",
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
 				Required:    true,
