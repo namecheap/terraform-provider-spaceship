@@ -315,7 +315,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 }
 
 func (d *domainResource) Delete(_ context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	// removing resouce from state only
+	// removing resource from state only
 	// no external call
 	// leaving infra in the same state
 }
