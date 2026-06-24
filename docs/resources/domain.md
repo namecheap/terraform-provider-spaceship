@@ -3,12 +3,12 @@
 page_title: "spaceship_domain Resource - spaceship"
 subcategory: ""
 description: |-
-  Manages domain setting for Spaceship domain
+  Manages domain settings for Spaceship domain
 ---
 
 # spaceship_domain (Resource)
 
-Manages domain setting for Spaceship domain
+Manages domain settings for Spaceship domain
 
 ## Example Usage
 
