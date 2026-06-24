@@ -174,7 +174,7 @@ func TestUpdateDomainNameServers(t *testing.T) {
 	})
 
 	err := c.UpdateDomainNameServers(t.Context(), "example.com", UpdateNameserverRequest{
-		Provider: CustomNamerverProvider,
+		Provider: CustomNameserverProvider,
 		Hosts:    []string{"ns1.example.com", "ns2.example.com"},
 	})
 	if err != nil {
@@ -186,7 +186,7 @@ func TestNameserverProvider_Valid(t *testing.T) {
 	if !BasicNameserverProvider.Valid() {
 		t.Error("basic should be valid")
 	}
-	if !CustomNamerverProvider.Valid() {
+	if !CustomNameserverProvider.Valid() {
 		t.Error("custom should be valid")
 	}
 	if NameserverProvider("invalid").Valid() {

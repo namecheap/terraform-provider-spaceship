@@ -160,11 +160,11 @@ type NameserverProvider string
 
 const (
 	BasicNameserverProvider NameserverProvider = "basic"
-	CustomNamerverProvider  NameserverProvider = "custom"
+	CustomNameserverProvider  NameserverProvider = "custom"
 )
 
 func (p NameserverProvider) Valid() bool {
-	return p == BasicNameserverProvider || p == CustomNamerverProvider
+	return p == BasicNameserverProvider || p == CustomNameserverProvider
 }
 
 type UpdateNameserverRequest struct {
@@ -179,7 +179,7 @@ func DefaultBasicNameserverHosts() []string {
 /*
 UpdateDomainNameServers updates the nameserver configuration for a domain.
 The request Provider must be one of BasicNameserverProvider or
-CustomNamerverProvider. When Provider is basic, Hosts must be empty and the
+CustomNameserverProvider. When Provider is basic, Hosts must be empty and the
 default Spaceship nameservers are used. When Provider is custom, Hosts must
 contain the desired nameserver hostnames.
 
