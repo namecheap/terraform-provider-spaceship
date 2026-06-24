@@ -8,12 +8,15 @@ import (
 	"strings"
 )
 
-// Represents an error response from the Spaceship API.
+// SpaceshipApiError represents a non-2xx error response from the Spaceship API.
+// Status is the HTTP status code; Message is the trimmed response body and may
+// be empty.
 type SpaceshipApiError struct {
 	Status  int
 	Message string
 }
 
+// Error implements the error interface.
 func (e *SpaceshipApiError) Error() string {
 	if e == nil {
 		return "<nil>"
@@ -26,6 +29,9 @@ func (e *SpaceshipApiError) Error() string {
 	return fmt.Sprintf("spaceship api error (status %d)", e.Status)
 }
 
+// errorFromResponse builds a *SpaceshipApiError from a non-2xx response. The
+// body is read up to 64 KiB (LimitReader guards against an unexpectedly large
+// body) and used, trimmed, as the error Message.
 func (c *Client) errorFromResponse(resp *http.Response) error {
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
@@ -40,7 +46,8 @@ func (c *Client) errorFromResponse(resp *http.Response) error {
 	}
 }
 
-// returns true if the err represents 404 response
+// IsNotFoundError reports whether err is a *SpaceshipApiError with HTTP 404.
+// Callers use it to treat "already gone" as success on delete paths.
 func IsNotFoundError(err error) bool {
 	var apiErr *SpaceshipApiError
 	if !errors.As(err, &apiErr) {
