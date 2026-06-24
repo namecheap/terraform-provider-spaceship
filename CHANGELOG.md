@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.1...v0.5.2) (2026-06-24)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/crypto to v0.52.0 ([#94](https://github.com/namecheap/terraform-provider-spaceship/issues/94)) ([98b19fc](https://github.com/namecheap/terraform-provider-spaceship/commit/98b19fc905f095f32e5c936a780f1185328ba62c))
+
 ## [0.5.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.0...v0.5.1) (2026-06-17)
 
 
