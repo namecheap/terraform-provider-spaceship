@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 type DomainList struct {
@@ -48,23 +49,52 @@ type Contacts struct {
 	Attributes []string `json:"attributes"`
 }
 
-// TODO
-// create pagination later when there are more than 100 domains in account
+const maxDomainListPageSize = 100
+
+// GetDomainList fetches all domains in the account, following pagination until
+// every page has been retrieved.
 func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
-	var domainList DomainList
+	return c.listDomains(ctx, maxDomainListPageSize)
+}
 
-	query := url.Values{}
-	query.Set("take", "100")
-	query.Set("skip", "0")
-	query.Set("orderBy", "name")
+// listDomains fetches all domains using the given page size, following
+// pagination. The page size is a parameter so tests can force multi-page
+// behavior against accounts with only a handful of domains; production callers
+// use GetDomainList, which passes the API maximum (100).
+func (c *Client) listDomains(ctx context.Context, pageSize int) (DomainList, error) {
+	var (
+		result DomainList
+		skip   = 0
+		total  = int64(-1)
+	)
 
-	endpoint := c.endpointURL([]string{"domains"}, query)
+	for {
+		query := url.Values{}
+		query.Set("take", strconv.Itoa(pageSize))
+		query.Set("skip", strconv.Itoa(skip))
+		query.Set("orderBy", "name")
 
-	if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
-		return domainList, err
+		endpoint := c.endpointURL([]string{"domains"}, query)
+
+		var page DomainList
+		if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &page); err != nil {
+			return DomainList{}, err
+		}
+
+		result.Items = append(result.Items, page.Items...)
+
+		if total == -1 {
+			total = page.Total
+		}
+		if int64(len(result.Items)) >= total || len(page.Items) == 0 {
+			break
+		}
+
+		skip += pageSize
 	}
 
-	return domainList, nil
+	result.Total = total
+	return result, nil
 }
 
 func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {

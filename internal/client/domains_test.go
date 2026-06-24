@@ -32,6 +32,37 @@ func TestGetDomainList(t *testing.T) {
 	}
 }
 
+// Verifies GetDomainList follows pagination across multiple pages.
+func TestGetDomainList_Paginates(t *testing.T) {
+	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch skip := r.URL.Query().Get("skip"); skip {
+		case "0":
+			_ = json.NewEncoder(w).Encode(DomainList{
+				Items: []DomainInfo{{Name: "a.com"}},
+				Total: 2,
+			})
+		case "100":
+			_ = json.NewEncoder(w).Encode(DomainList{
+				Items: []DomainInfo{{Name: "b.com"}},
+				Total: 2,
+			})
+		default:
+			t.Errorf("unexpected skip=%q", skip)
+		}
+	})
+
+	list, err := c.GetDomainList(t.Context())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(list.Items) != 2 {
+		t.Fatalf("expected 2 domains across pages, got %d", len(list.Items))
+	}
+	if list.Items[0].Name != "a.com" || list.Items[1].Name != "b.com" {
+		t.Errorf("unexpected page contents: %+v", list.Items)
+	}
+}
+
 func TestGetDomainInfo_Success(t *testing.T) {
 	c, _ := testServer(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(DomainInfo{
