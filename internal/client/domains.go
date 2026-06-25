@@ -7,7 +7,8 @@ import (
 	"strconv"
 )
 
-// DomainList is a page of domains returned by the domain list endpoint.
+// DomainList holds domains returned by the domain list endpoint. GetDomainList
+// returns one with every domain in the account, accumulated across all pages.
 type DomainList struct {
 	Items []DomainInfo `json:"items"`
 	Total int64        `json:"total"`
