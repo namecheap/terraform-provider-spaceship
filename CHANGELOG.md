@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.2...v0.5.3) (2026-06-25)
+
+
+### Bug Fixes
+
+* **client:** paginate domain list ([#96](https://github.com/namecheap/terraform-provider-spaceship/issues/96)) ([1677ea6](https://github.com/namecheap/terraform-provider-spaceship/commit/1677ea621326bddabeb58c891d74c918ca572404))
+
 ## [0.5.2](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.1...v0.5.2) (2026-06-24)
 
 
