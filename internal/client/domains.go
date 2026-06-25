@@ -4,12 +4,18 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
+// DomainList holds domains returned by the domain list endpoint. GetDomainList
+// returns one with every domain in the account, accumulated across all pages.
 type DomainList struct {
 	Items []DomainInfo `json:"items"`
 	Total int64        `json:"total"`
 }
+
+// DomainInfo describes a single domain: registration state, lifecycle and
+// verification status, privacy settings, nameservers, and contacts.
 type DomainInfo struct {
 	Name               string            `json:"name"`
 	UnicodeName        string            `json:"unicodeName"`
@@ -26,20 +32,24 @@ type DomainInfo struct {
 	Contacts           Contacts          `json:"contacts"`
 }
 
+// ReasonCode is a single suspension reason attached to a domain.
 type ReasonCode struct {
 	ReasonCode string `json:"reasonCode"`
 }
 
+// PrivacyProtection describes a domain's WHOIS privacy configuration.
 type PrivacyProtection struct {
 	ContactForm bool   `json:"contactForm"`
 	Level       string `json:"level"`
 }
 
+// Nameservers describes a domain's nameserver provider and host list.
 type Nameservers struct {
 	Provider string   `json:"provider"`
 	Hosts    []string `json:"hosts"`
 }
 
+// Contacts holds the contact handle IDs associated with a domain.
 type Contacts struct {
 	Registrant string   `json:"registrant"`
 	Admin      string   `json:"admin"`
@@ -48,33 +58,65 @@ type Contacts struct {
 	Attributes []string `json:"attributes"`
 }
 
-// TODO
-// create pagination later when there are more than 100 domains in account
+const maxDomainListPageSize = 100
+
+// GetDomainList fetches all domains in the account, following pagination until
+// every page has been retrieved.
 func (c *Client) GetDomainList(ctx context.Context) (DomainList, error) {
-	var domainList DomainList
-
-	query := url.Values{}
-	query.Set("take", "100")
-	query.Set("skip", "0")
-	query.Set("orderBy", "name")
-
-	endpoint := c.endpointURL([]string{"domains"}, query)
-
-	if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainList); err != nil {
-		return domainList, err
-	}
-
-	return domainList, nil
+	return c.listDomains(ctx, maxDomainListPageSize)
 }
 
+// listDomains fetches all domains using the given page size, following
+// pagination. The page size is a parameter so tests can force multi-page
+// behavior against accounts with only a handful of domains; production callers
+// use GetDomainList, which passes the API maximum (100).
+func (c *Client) listDomains(ctx context.Context, pageSize int) (DomainList, error) {
+	var (
+		result DomainList
+		skip   = 0
+		total  = int64(-1)
+	)
+
+	for {
+		query := url.Values{}
+		query.Set("take", strconv.Itoa(pageSize))
+		query.Set("skip", strconv.Itoa(skip))
+		query.Set("orderBy", "name")
+
+		endpoint := c.endpointURL([]string{"domains"}, query)
+
+		var page DomainList
+		if _, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &page); err != nil {
+			return DomainList{}, err
+		}
+
+		result.Items = append(result.Items, page.Items...)
+
+		if total == -1 {
+			total = page.Total
+		}
+		if int64(len(result.Items)) >= total || len(page.Items) == 0 {
+			break
+		}
+
+		skip += pageSize
+	}
+
+	result.Total = total
+	return result, nil
+}
+
+// GetDomainInfo fetches details for a single domain.
+//
+// The dedicated domain-info endpoint is aggressively rate limited. On HTTP 429
+// this falls back to the domain list endpoint, which exposes the same data with
+// far higher limits, and returns the matching entry if present.
 func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, error) {
 	var domainInfo DomainInfo
 
 	endpoint := c.endpointURL([]string{"domains", domain}, nil)
 
-	// overcome insane API rate limiting
-	// by using alternative endpoint that does the same
-	// but has 60x times higher limits
+	// On 429, fall back to the higher-limit domain list endpoint.
 	statusCode, err := c.doJSON(ctx, http.MethodGet, endpoint, nil, &domainInfo)
 	if statusCode == http.StatusTooManyRequests {
 		domainList, _ := c.GetDomainList(ctx)
@@ -93,6 +135,8 @@ func (c *Client) GetDomainInfo(ctx context.Context, domain string) (DomainInfo, 
 	return domainInfo, nil
 }
 
+// findDomainByNameFromDomainList returns the domain entry matching name
+// (exact match) and whether it was found.
 func findDomainByNameFromDomainList(dl DomainList, domain string) (DomainInfo, bool) {
 	for _, domainItem := range dl.Items {
 		if domainItem.Name == domain {
@@ -102,10 +146,13 @@ func findDomainByNameFromDomainList(dl DomainList, domain string) (DomainInfo, b
 	return DomainInfo{}, false
 }
 
+// AutoRenewalResponse is the response from the auto-renew toggle endpoint.
 type AutoRenewalResponse struct {
 	IsEnabled bool `json:"isEnabled"`
 }
 
+// UpdateAutoRenew enables or disables auto-renewal for the domain and returns
+// the resulting state.
 func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool) (AutoRenewalResponse, error) {
 	var resp AutoRenewalResponse
 
@@ -126,22 +173,30 @@ func (c *Client) UpdateAutoRenew(ctx context.Context, domain string, value bool)
 
 }
 
+// NameserverProvider selects which nameservers a domain uses: Spaceship's
+// "basic" set or a caller-supplied "custom" host list.
 type NameserverProvider string
 
 const (
+	// BasicNameserverProvider uses Spaceship's default nameservers; Hosts must be empty.
 	BasicNameserverProvider NameserverProvider = "basic"
-	CustomNamerverProvider  NameserverProvider = "custom"
+	// CustomNameserverProvider uses a caller-supplied Hosts list.
+	CustomNameserverProvider NameserverProvider = "custom"
 )
 
+// Valid reports whether p is one of the recognized provider values.
 func (p NameserverProvider) Valid() bool {
-	return p == BasicNameserverProvider || p == CustomNamerverProvider
+	return p == BasicNameserverProvider || p == CustomNameserverProvider
 }
 
+// UpdateNameserverRequest is the input to UpdateDomainNameServers. When Provider
+// is basic, Hosts must be empty; when custom, Hosts lists the nameserver hostnames.
 type UpdateNameserverRequest struct {
 	Provider NameserverProvider
 	Hosts    []string
 }
 
+// DefaultBasicNameserverHosts returns Spaceship's default "basic" nameserver hosts.
 func DefaultBasicNameserverHosts() []string {
 	return []string{"launch1.spaceship.net", "launch2.spaceship.net"}
 }
@@ -149,7 +204,7 @@ func DefaultBasicNameserverHosts() []string {
 /*
 UpdateDomainNameServers updates the nameserver configuration for a domain.
 The request Provider must be one of BasicNameserverProvider or
-CustomNamerverProvider. When Provider is basic, Hosts must be empty and the
+CustomNameserverProvider. When Provider is basic, Hosts must be empty and the
 default Spaceship nameservers are used. When Provider is custom, Hosts must
 contain the desired nameserver hostnames.
 

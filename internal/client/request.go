@@ -9,6 +9,13 @@ import (
 	"net/http"
 )
 
+// doJSON performs a JSON HTTP request against the Spaceship API and decodes the
+// response. It marshals payload as the request body (skipped when nil), applies
+// the API auth headers, and sets Content-Type: application/json only when a body
+// is present. Any response status >= 300 is converted to a *SpaceshipApiError
+// via errorFromResponse. On success the body is decoded into out when out is
+// non-nil. The HTTP status code is always returned, even alongside an error, so
+// callers can branch on it — e.g. the 429 rate-limit fallback in GetDomainInfo.
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, payload any, out any) (int, error) {
 	status := 0
 	var body io.Reader
