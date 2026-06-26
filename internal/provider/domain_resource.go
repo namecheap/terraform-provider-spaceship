@@ -22,7 +22,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
-	"terraform-provider-spaceship/internal/client"
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 func NewDomainResource() resource.Resource {

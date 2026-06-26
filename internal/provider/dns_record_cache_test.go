@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"terraform-provider-spaceship/internal/client"
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 // newCountingRecordCache returns a cache backed by a mock API plus a counter of

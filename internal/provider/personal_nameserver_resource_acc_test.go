@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
-	"terraform-provider-spaceship/internal/client"
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 // Full lifecycle: create, empty-plan re-apply, IP update in place, host rename

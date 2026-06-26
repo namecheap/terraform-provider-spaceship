@@ -17,8 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
-	"terraform-provider-spaceship/internal/client"
 	"terraform-provider-spaceship/internal/provider/records"
+
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 var (

@@ -11,7 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 
-	"terraform-provider-spaceship/internal/client"
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 // txtHost returns a unique record name per test so parallel/repeat runs

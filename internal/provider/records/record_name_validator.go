@@ -5,7 +5,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	clientrecords "terraform-provider-spaceship/internal/client/records"
+	clientrecords "github.com/namecheap/go-spaceship-sdk/client/records"
 )
 
 type nameValidator struct{}
