@@ -2,9 +2,10 @@
 
 ## Layer Responsibilities
 
-### Client-layer unit tests (`internal/client/`, `internal/client/records/`)
+### Client-layer unit tests — live in the SDK repo
 
-These test the HTTP client and record validation logic. They are the **single source of truth** for:
+The HTTP client and record-validation logic now live in the external SDK
+[`github.com/namecheap/go-spaceship-sdk`](https://github.com/namecheap/go-spaceship-sdk), and so do their tests. The SDK is the **single source of truth** for:
 
 - API request/response serialization (JSON payloads, query parameters)
 - HTTP error handling (status codes, error mapping, retry/fallback logic)
@@ -12,13 +13,7 @@ These test the HTTP client and record validation logic. They are the **single so
 - Record validation (field formats, boundary values, required fields)
 - DNS record filtering (custom vs product vs personalNS groups)
 
-Use `httptest.Server` to mock the Spaceship API at the HTTP level.
-
-**Examples of good client-layer tests:**
-- `TestGetDNSRecords_FiltersOutNonCustomGroups` — verifies group filtering logic
-- `TestARecord_ValidateAddress` — verifies IP format validation
-- `TestSRVRecord_ValidateTarget_EdgeCases` — boundary testing at 253 chars
-- `TestDeleteDNSRecords_NotFoundIgnored` — verifies 404 is swallowed
+Do not add tests for any of the above in this repo — open them in the SDK, which mocks the Spaceship API with `httptest.Server`.
 
 ### Provider-layer unit tests (`internal/provider/`)
 
@@ -62,7 +57,7 @@ Do not create provider-layer tests that merely re-test client-layer logic throug
 
 Before writing a test, ask:
 
-1. **Is this testing something unique to this layer?** If the logic is in `internal/client/`, test it there.
+1. **Is this testing something unique to this layer?** If the logic lives in the SDK (`client/`, `client/records/`), test it there — in the SDK repo, not here.
 2. **Does this test a real branching decision?** A 3-line `if err != nil` block doesn't need its own test.
 3. **Is there already a test at another layer?** Check client tests and acceptance tests first.
 4. **Would a bug here be caught by existing tests?** If yes, the new test is redundant.
