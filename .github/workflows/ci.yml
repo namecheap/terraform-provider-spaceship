@@ -54,7 +54,10 @@ jobs:
               run: |
                   COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
                   echo "Total coverage: ${COVERAGE}%"
-                  THRESHOLD=40.0
+                  # Client/API logic moved to github.com/namecheap/go-spaceship-sdk, where it
+                  # is unit-tested and gated separately. This floor reflects provider-only code;
+                  # the record validator wrappers are covered by acceptance tests, not unit tests.
+                  THRESHOLD=35.0
                   if [ "$(echo "${COVERAGE} < ${THRESHOLD}" | bc -l)" -eq 1 ]; then
                       echo "::error::Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
                       exit 1
