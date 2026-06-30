@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.3...v0.5.4) (2026-06-30)
+
+
+### Bug Fixes
+
+* **deps:** build provider on external go-spaceship-sdk ([#98](https://github.com/namecheap/terraform-provider-spaceship/issues/98)) ([d7fc636](https://github.com/namecheap/terraform-provider-spaceship/commit/d7fc6364f2514bb7d99e1af3fab312260940d6a1))
+
 ## [0.5.3](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.2...v0.5.3) (2026-06-25)
 
 
