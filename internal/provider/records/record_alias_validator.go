@@ -43,6 +43,20 @@ func (v *aliasRecordValidator) ValidateObject(ctx context.Context, req validator
 		return
 	}
 
+	// Spaceship stores an apex ALIAS (name "@") as a root CNAME, not an ALIAS.
+	// Terraform matches records by type+name+data, so the record read back never
+	// matches the declared ALIAS and the provider recreates it on every apply.
+	// Reject early and point the user at the CNAME form the API actually keeps.
+	if nameAttr, ok := attrs["name"].(types.String); ok && !nameAttr.IsNull() && !nameAttr.IsUnknown() && nameAttr.ValueString() == "@" {
+		resp.Diagnostics.AddAttributeError(
+			req.Path.AtName("name"),
+			"Invalid Apex ALIAS Record",
+			`Spaceship stores an apex ALIAS (name "@") as a root CNAME, so Terraform cannot manage it as an ALIAS record (it would be recreated on every apply). `+
+				`Declare it as a CNAME instead: type = "CNAME", name = "@", cname = "<target>".`,
+		)
+		return
+	}
+
 	aliasNameAttr, ok := attrs["alias_name"].(types.String)
 	if !ok {
 		resp.Diagnostics.AddAttributeError(

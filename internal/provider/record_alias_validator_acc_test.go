@@ -69,8 +69,9 @@ func TestAccDNSRecords_aliasRecord(t *testing.T) {
 	})
 }
 
-// Verifies that "@" as alias_name is rejected at plan time (the API requires
-// a real domain name, not the zone-relative apex shorthand).
+// Verifies that "@" as the alias_name *target* is rejected at plan time (the
+// target must be a real domain name, not the apex shorthand). This is distinct
+// from an apex ALIAS record — see TestAccDNSRecords_aliasRecordApexNameFailsPlan.
 func TestAccDNSRecords_aliasRecordApexTargetFailsPlan(t *testing.T) {
 	testAccPreCheck(t)
 
@@ -93,6 +94,74 @@ func TestAccDNSRecords_aliasRecordApexTargetFailsPlan(t *testing.T) {
 			{
 				Config:      testAccDNSRecordsConfig(domain, records),
 				ExpectError: regexp.MustCompile("Invalid Alias Name Value"),
+			},
+		},
+	})
+}
+
+// Verifies that an apex ALIAS (name "@") is rejected at plan time. Spaceship
+// silently stores apex aliases as a root CNAME, which Terraform cannot
+// reconcile as an ALIAS, so the provider rejects it and points at the CNAME form.
+func TestAccDNSRecords_aliasRecordApexNameFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+
+	records := []testAccDNSRecord{
+		{
+			Type: "ALIAS",
+			Name: "@",
+			TTL:  intPtr(3600),
+			StringAttrs: map[string]string{
+				"alias_name": "target.example.com",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Invalid Apex ALIAS Record"),
+			},
+		},
+	})
+}
+
+// Verifies that an apex ALIAS (name "@") is rejected even when it sits among
+// other valid records — the per-element validator must fire on the offending
+// record, not just when the ALIAS is the sole record in the list.
+func TestAccDNSRecords_aliasRecordApexNameAmongMultipleFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: aliasHost("multi-a"),
+			TTL:  intPtr(3600),
+			StringAttrs: map[string]string{
+				"address": "192.0.2.1",
+			},
+		},
+		{
+			Type: "ALIAS",
+			Name: "@",
+			TTL:  intPtr(3600),
+			StringAttrs: map[string]string{
+				"alias_name": "target.example.com",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Invalid Apex ALIAS Record"),
 			},
 		},
 	})
