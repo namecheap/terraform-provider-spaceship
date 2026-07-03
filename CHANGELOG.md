@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.4...v0.5.5) (2026-07-03)
+
+
+### Bug Fixes
+
+* **records:** reject apex ALIAS records at plan time ([#100](https://github.com/namecheap/terraform-provider-spaceship/issues/100)) ([5d31d9f](https://github.com/namecheap/terraform-provider-spaceship/commit/5d31d9fd58e46106f1ed3cf57c1c28f1a969573e))
+
 ## [0.5.4](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.3...v0.5.4) (2026-06-30)
 
 
