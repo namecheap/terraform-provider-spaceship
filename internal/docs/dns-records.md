@@ -29,6 +29,8 @@ The provider's `recordValueSignature()` function follows the same rules. All fie
 ### Record type notes
 
 - **ALIAS**: Resolves a canonical (true) domain name. Implements CNAME-like behavior for the zone apex where CNAME is not allowed. The `aliasName` field is a hostname (1-253 chars, `hostNameValue` pattern).
+  - **Apex ALIAS (`name = "@"`) is rejected at plan time.** The published `name` regex permits `@`, but the Spaceship API silently stores an apex ALIAS as a **root CNAME** (verified via the UI — see the API's own "CNAME records applied at the domain root..." note). Since records are matched by type + name + data, the read-back CNAME never matches the declared ALIAS, so the provider would recreate it on every apply (non-convergence). The `aliasRecordValidator` rejects `name = "@"` and directs the user to declare it as `type = "CNAME", name = "@", cname = "<target>"` instead — which the API keeps as-is and Terraform can reconcile. This is a provider-side reconciliation guard, not an SDK validation rule: the SDK deliberately does not reject it because the API accepts it.
+  - The **`alias_name` target** is separate: the API returns a 422 for `alias_name = "@"` or `"*"`, so the SDK's `ValidateAliasName` rejects those (a verified live-API divergence from the shared hostname regex, which permits them).
 
 ### Data fields per record type
 

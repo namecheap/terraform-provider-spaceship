@@ -76,6 +76,34 @@ resource "spaceship_dns_record" "test" {
 	})
 }
 
+// Apex ALIAS (name "@") is rejected on the singular resource. Spaceship stores
+// it as a root CNAME, which Terraform cannot reconcile as an ALIAS.
+func TestAccDNSRecord_aliasApexNameFailsPlan(t *testing.T) {
+	testAccPreCheck(t)
+	domain := testAccDomainValue()
+
+	config := fmt.Sprintf(`
+provider "spaceship" {}
+
+resource "spaceship_dns_record" "test" {
+  domain     = %q
+  type       = "ALIAS"
+  name       = "@"
+  alias_name = "target.example.com"
+}
+`, domain)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile("Invalid Apex ALIAS Record"),
+			},
+		},
+	})
+}
+
 func TestAccDNSRecord_caaMissingTagAtPlanTime(t *testing.T) {
 	testAccPreCheck(t)
 	domain := testAccDomainValue()
