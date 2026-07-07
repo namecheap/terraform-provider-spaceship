@@ -43,7 +43,7 @@ jobs:
             CODEQL_ACTION_FILE_COVERAGE_ON_PRS: true
 
         steps:
-            - uses: actions/checkout@v5
+            - uses: actions/checkout@v7
 
             - name: Set up Go
               uses: actions/setup-go@v6
