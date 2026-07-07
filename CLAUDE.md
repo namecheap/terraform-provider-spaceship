@@ -70,3 +70,10 @@ Acc tests (`record_<type>_validator_acc_test.go`) own API edge cases: unusual va
 ## Release process
 
 Releases are semi-manual and maintainer-gated: merges to `master` accumulate into a release-please "Release PR"; a maintainer merges that PR to cut a tag, and GoReleaser publishes the binary. See [RELEASE.md](RELEASE.md) for the full flow, including the manual Terraform Registry resync that is occasionally required.
+
+**Only releasing commit types cut a release**: `fix:` → patch, `feat:` → minor, `feat!:`/`BREAKING CHANGE:` → major; `chore:`/`ci:`/`refactor:`/`test:`/`docs:` are non-releasing. The trap is **published artifacts** — anything shipped to users must ride a release:
+
+- **Runtime deps** (`go.mod`) ship in the binary → commit as `fix(deps):`, never `chore(deps):` (which never releases, so the bump reaches nobody).
+- **Registry docs** (the `docs/` tree) are ingested by the Terraform Registry only at a release tag → correct them with `fix(docs):`. Repo-internal markdown (README, `RELEASE.md`, `CLAUDE.md`) stays `docs:`.
+
+For Dependabot this is enforced via `commit-message.prefix` in `.github/dependabot.yml` (gomod → `fix`, github-actions → `ci`).
