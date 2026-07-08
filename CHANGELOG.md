@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.6](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.5...v0.5.6) (2026-07-08)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/hashicorp/terraform-plugin-testing ([#108](https://github.com/namecheap/terraform-provider-spaceship/issues/108)) ([1693bd8](https://github.com/namecheap/terraform-provider-spaceship/commit/1693bd8c20755976d8620a0b30683e7d6205fe10))
+* **deps:** bump golang.org/x/sync from 0.20.0 to 0.21.0 ([#106](https://github.com/namecheap/terraform-provider-spaceship/issues/106)) ([db7d6eb](https://github.com/namecheap/terraform-provider-spaceship/commit/db7d6eb05687ddc078ced8d81a0f4574dcbc80a9))
+* **deps:** bump golang.org/x/sync in the go-deps group ([#113](https://github.com/namecheap/terraform-provider-spaceship/issues/113)) ([98e974a](https://github.com/namecheap/terraform-provider-spaceship/commit/98e974ae9d575d21515d70af2934ac77a42591f9))
+* **domain:** apply configured auto_renew and nameservers on create ([#114](https://github.com/namecheap/terraform-provider-spaceship/issues/114)) ([63f92f2](https://github.com/namecheap/terraform-provider-spaceship/commit/63f92f228842d533b41e0dc76c6a4456fe3859f9))
+
 ## [0.5.5](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.4...v0.5.5) (2026-07-03)
 
 
