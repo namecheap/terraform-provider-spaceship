@@ -152,6 +152,13 @@ func TestAccDomain_autoRenewalMismatchOnCreate(t *testing.T) {
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
 				),
 			},
+			// converged for real: refresh-backed empty plan
+			{
+				Config: configAutoRenewTrue,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
 			// reverse direction on a forced recreate: infra true, config false
 			{
 				PreConfig: func() { testAccSetAutoRenew(t, true) },
@@ -322,6 +329,13 @@ resource "%s" "%s" {
 					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-669.awsdns-19.net"),
 					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
 				),
+			},
+			// converged for real: refresh-backed empty plan
+			{
+				Config: configCustom,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
 			},
 			// reverse direction on a forced recreate: infra custom, config basic
 			{

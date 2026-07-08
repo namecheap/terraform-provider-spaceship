@@ -287,7 +287,6 @@ func (d *domainResource) Configure(ctx context.Context, req resource.ConfigureRe
 
 func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan domainResourceModel
-	var domainInfo client.DomainInfo
 
 	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
