@@ -1,12 +1,16 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+
+	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 const (
@@ -130,6 +134,69 @@ resource "%s" "%s" {
 		}})
 }
 
+// TestAccDomain_autoRenewalMismatchOnCreate verifies the first apply converges
+// auto_renew when the config value differs from the domain's actual setting.
+func TestAccDomain_autoRenewalMismatchOnCreate(t *testing.T) {
+	configAutoRenewTrue := domainConfigWithAutoRenew(true)
+	configAutoRenewFalse := domainConfigWithAutoRenew(false)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// infra false, config true — Create must push the change
+			{
+				PreConfig: func() { testAccSetAutoRenew(t, false) },
+				Config:    configAutoRenewTrue,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
+				),
+			},
+			// reverse direction on a forced recreate: infra true, config false
+			{
+				PreConfig: func() { testAccSetAutoRenew(t, true) },
+				Taint:     []string{domainResourceFullName},
+				Config:    configAutoRenewFalse,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "false"),
+				),
+			},
+			// converged: re-plan is empty
+			{
+				Config: configAutoRenewFalse,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
+	})
+}
+
+// testAccSetAutoRenew sets the test domain's auto_renew out-of-band via the SDK.
+func testAccSetAutoRenew(t *testing.T, value bool) {
+	t.Helper()
+
+	testClient, err := testAccClient()
+	if err != nil {
+		t.Fatalf("failed to create test client: %v", err)
+	}
+	if _, err := testClient.UpdateAutoRenew(context.Background(), testAccDomainValue(), value); err != nil {
+		t.Fatalf("failed to set auto_renew=%v: %v", value, err)
+	}
+}
+
+func domainConfigWithAutoRenew(value bool) string {
+	return fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	auto_renew = %t
+}
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue(), value)
+}
+
 func TestAccDomain_nameservers(t *testing.T) {
 	nsProviderBasicConfig := fmt.Sprintf(`
 provider "%s" {}
@@ -204,6 +271,122 @@ resource "%s" "%s" {
 			},
 		},
 	})
+}
+
+// TestAccDomain_nameserversMismatchOnCreate verifies the first apply converges
+// nameservers when the config differs from the domain's actual setting.
+func TestAccDomain_nameserversMismatchOnCreate(t *testing.T) {
+	customHosts := []string{
+		"ns-669.awsdns-19.net",
+		"ns-1578.awsdns-05.co.uk",
+	}
+
+	configCustom := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	nameservers = {
+		provider = "custom"
+		hosts = [
+			"ns-669.awsdns-19.net",
+			"ns-1578.awsdns-05.co.uk",
+		]
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
+
+	configBasic := fmt.Sprintf(`
+provider "%s" {}
+
+resource "%s" "%s" {
+	domain = "%s"
+
+	nameservers = {
+		provider = "basic"
+	}
+}
+`, providerName, domainResourceRef, domainResourceName, testAccDomainValue())
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// infra basic, config custom — Create must push the change
+			{
+				PreConfig: func() { testAccSetNameservers(t, "basic", nil) },
+				Config:    configCustom,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceFullName, "nameservers.provider", "custom"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-669.awsdns-19.net"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "ns-1578.awsdns-05.co.uk"),
+				),
+			},
+			// reverse direction on a forced recreate: infra custom, config basic
+			{
+				PreConfig: func() { testAccSetNameservers(t, "custom", customHosts) },
+				Taint:     []string{domainResourceFullName},
+				Config:    configBasic,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(domainResourceFullName, "nameservers.provider", "basic"),
+					resource.TestCheckTypeSetElemAttr(domainResourceFullName, "nameservers.hosts.*", "launch1.spaceship.net"),
+				),
+			},
+			// converged: re-plan is empty
+			{
+				Config: configBasic,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
+	})
+}
+
+// testAccSetNameservers sets the test domain's nameservers out-of-band via the
+// SDK. The API rejects updates matching the current provider, so it skips when
+// the domain is already in the desired state.
+func testAccSetNameservers(t *testing.T, nsProvider string, hosts []string) {
+	t.Helper()
+
+	testClient, err := testAccClient()
+	if err != nil {
+		t.Fatalf("failed to create test client: %v", err)
+	}
+
+	info, err := testClient.GetDomainInfo(context.Background(), testAccDomainValue())
+	if err != nil {
+		t.Fatalf("failed to read domain info: %v", err)
+	}
+	if strings.EqualFold(info.Nameservers.Provider, nsProvider) &&
+		(strings.EqualFold(nsProvider, "basic") || sameHostSet(info.Nameservers.Hosts, hosts)) {
+		return
+	}
+
+	err = testClient.UpdateDomainNameServers(context.Background(), testAccDomainValue(), client.UpdateNameserverRequest{
+		Provider: client.NameserverProvider(nsProvider),
+		Hosts:    hosts,
+	})
+	if err != nil {
+		t.Fatalf("failed to set nameservers provider=%s: %v", nsProvider, err)
+	}
+}
+
+func sameHostSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[string]struct{}, len(a))
+	for _, h := range a {
+		set[strings.ToLower(h)] = struct{}{}
+	}
+	for _, h := range b {
+		if _, ok := set[strings.ToLower(h)]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func TestAccDomain_nameserversValidationErrors(t *testing.T) {

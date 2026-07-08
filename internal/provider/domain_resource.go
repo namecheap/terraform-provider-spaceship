@@ -295,11 +295,56 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, plan.Domain.ValueString())
+	domainName := plan.Domain.ValueString()
+
+	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
+	}
+
+	// Adoption must converge the domain to the configured settings. Otherwise
+	// a config/infra mismatch on the first apply stores the actual values
+	// while the plan promised the configured ones, and Terraform fails with
+	// "Provider produced inconsistent result after apply".
+	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && plan.AutoRenew.ValueBool() != domainInfo.AutoRenew {
+		_, err := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error updating domain auto_renew",
+				fmt.Sprintf("Could not update auto_renew for domain %s: %s", domainName, err),
+			)
+			return
+		}
+	}
+
+	// Nested attributes can still be unknown at create (there is no prior
+	// state for UseStateForUnknown to resolve them); in that case fall back
+	// to adopting the API values.
+	nsPlanKnown := false
+	if !plan.Nameservers.IsNull() && !plan.Nameservers.IsUnknown() {
+		var planNS nameservers
+		resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+		nsPlanKnown = !planNS.Provider.IsUnknown() && !planNS.Hosts.IsUnknown()
+	}
+
+	if nsPlanKnown {
+		infraNS, nsDiags := nameserversToTerraformObject(ctx, domainInfo.Nameservers)
+		resp.Diagnostics.Append(nsDiags...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+
+		if !plan.Nameservers.Equal(infraNS) {
+			resp.Diagnostics.Append(d.pushNameservers(ctx, domainName, plan.Nameservers)...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+		}
 	}
 
 	var state domainResourceModel
@@ -310,6 +355,16 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	// The autorenew and nameserver update APIs confirm changes synchronously;
+	// trust the plan values over the pre-update read (same rule as Update).
+	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() {
+		state.AutoRenew = plan.AutoRenew
+	}
+	if nsPlanKnown {
+		state.Nameservers = plan.Nameservers
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 
 }
@@ -354,33 +409,8 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if !plan.Nameservers.IsNull() && !plan.Nameservers.IsUnknown() {
 		// Use Terraform's built-in Equal() - it handles sets correctly (order-independent)
 		if !plan.Nameservers.Equal(state.Nameservers) {
-			var planNS nameservers
-			resp.Diagnostics.Append(plan.Nameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+			resp.Diagnostics.Append(d.pushNameservers(ctx, domainName, plan.Nameservers)...)
 			if resp.Diagnostics.HasError() {
-				return
-			}
-
-			provider := client.NameserverProvider(planNS.Provider.ValueString())
-
-			var hosts []string
-			if !planNS.Hosts.IsNull() && !planNS.Hosts.IsUnknown() {
-				resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
-				if resp.Diagnostics.HasError() {
-					return
-				}
-			}
-
-			// API ignores hosts for basic provider
-			if provider == client.BasicNameserverProvider {
-				hosts = nil
-			}
-
-			err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
-				Provider: provider,
-				Hosts:    hosts,
-			})
-			if err != nil {
-				resp.Diagnostics.AddError("Failed to update domain nameservers", err.Error())
 				return
 			}
 		}
@@ -470,6 +500,42 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 		return
 	}
 	resp.Plan.SetAttribute(ctx, path.Root("nameservers").AtName("hosts"), hostsSet)
+}
+
+// pushNameservers applies the planned nameservers object to the API.
+func (d *domainResource) pushNameservers(ctx context.Context, domainName string, planNameservers types.Object) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	var planNS nameservers
+	diags.Append(planNameservers.As(ctx, &planNS, basetypes.ObjectAsOptions{})...)
+	if diags.HasError() {
+		return diags
+	}
+
+	provider := client.NameserverProvider(planNS.Provider.ValueString())
+
+	var hosts []string
+	if !planNS.Hosts.IsNull() && !planNS.Hosts.IsUnknown() {
+		diags.Append(planNS.Hosts.ElementsAs(ctx, &hosts, false)...)
+		if diags.HasError() {
+			return diags
+		}
+	}
+
+	// API ignores hosts for basic provider
+	if provider == client.BasicNameserverProvider {
+		hosts = nil
+	}
+
+	err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
+		Provider: provider,
+		Hosts:    hosts,
+	})
+	if err != nil {
+		diags.AddError("Failed to update domain nameservers", err.Error())
+	}
+
+	return diags
 }
 
 func applyDomainInfo(ctx context.Context, state *domainResourceModel, info client.DomainInfo) diag.Diagnostics {
