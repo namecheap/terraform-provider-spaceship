@@ -2,7 +2,7 @@ module terraform-provider-spaceship
 
 go 1.25.9
 
-toolchain go1.26.4
+toolchain go1.26.5
 
 require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
