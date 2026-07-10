@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.7](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.6...v0.5.7) (2026-07-10)
+
+
+### Bug Fixes
+
+* **deps:** bump Go toolchain to 1.26.5 to patch crypto/tls (GO-2026-5856) ([d81e4ee](https://github.com/namecheap/terraform-provider-spaceship/commit/d81e4eed6369cfac059f5395827cb27fb242a3e0))
+* **records:** reject duplicate records in one list at plan time ([#115](https://github.com/namecheap/terraform-provider-spaceship/issues/115)) ([d81e4ee](https://github.com/namecheap/terraform-provider-spaceship/commit/d81e4eed6369cfac059f5395827cb27fb242a3e0))
+
 ## [0.5.6](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.5...v0.5.6) (2026-07-08)
 
 
