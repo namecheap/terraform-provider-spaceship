@@ -34,9 +34,10 @@ After making changes, follow this order:
 - Internal design notes live in `internal/docs/`.
 - Provider reads `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET` env vars or inline HCL attributes.
 
-## Git privacy
+## Open-source hygiene
 
-Before creating git commits, check that `git config user.email` is set. If it is not configured, suggest the contributor set one. Do not override an already-configured email.
+- Before creating git commits, check that `git config user.email` is set. If it is not configured, suggest the contributor set one. Do not override an already-configured email.
+- **No internal tracker IDs** (e.g. Jira `DEVOPS-*`) in code, comments, tests, or docs — they mean nothing to outside readers. Describe the behavior or failure itself instead; ticket references belong in the internal tracker, not the repo.
 
 ## Testing strategy
 

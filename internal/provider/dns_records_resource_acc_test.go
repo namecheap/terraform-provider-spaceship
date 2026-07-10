@@ -506,6 +506,70 @@ func TestAccDNSRecords_matchingRecordsNoChanges(t *testing.T) {
 	})
 }
 
+// Two identical entries in one records list are rejected at plan time. The
+// API would dedup them on write, so the apply could never converge.
+func TestAccDNSRecords_duplicateRecordsFailPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+
+	record := testAccDNSRecord{
+		Type: "A",
+		Name: "dup-a",
+		TTL:  intPtr(3600),
+		StringAttrs: map[string]string{
+			"address": "192.0.2.1",
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, []testAccDNSRecord{record, record}),
+				ExpectError: regexp.MustCompile("Duplicate DNS Record"),
+			},
+		},
+	})
+}
+
+// Duplicate detection mirrors the API's case-insensitive matching: entries
+// differing only in name case are the same record and are rejected at plan time.
+func TestAccDNSRecords_duplicateRecordsCaseFoldedFailPlan(t *testing.T) {
+	testAccPreCheck(t)
+
+	domain := testAccDomainValue()
+
+	records := []testAccDNSRecord{
+		{
+			Type: "A",
+			Name: "DUP-CASE",
+			TTL:  intPtr(3600),
+			StringAttrs: map[string]string{
+				"address": "192.0.2.1",
+			},
+		},
+		{
+			Type: "A",
+			Name: "dup-case",
+			TTL:  intPtr(3600),
+			StringAttrs: map[string]string{
+				"address": "192.0.2.1",
+			},
+		},
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccDNSRecordsConfig(domain, records),
+				ExpectError: regexp.MustCompile("Duplicate DNS Record"),
+			},
+		},
+	})
+}
+
 type testAccDNSRecord struct {
 	Type        string
 	Name        string

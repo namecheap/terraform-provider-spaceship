@@ -26,6 +26,12 @@ The `PUT /dns/records/{domain}` endpoint matches existing records by **type + na
 
 The provider's `recordValueSignature()` function follows the same rules. All fields are lowercased in the signature except TXT `value`, ensuring the provider's diff logic agrees with the API about what constitutes "the same record".
 
+### Duplicate entries are rejected at plan time
+
+Because the API dedups a submitted set by that identity, two entries in one `spaceship_dns_records.records` list that share type + name + data (however they differ in case or TTL) can never converge: the plan holds N elements, the post-apply read returns fewer, and Terraform fails with "Provider produced inconsistent result after apply". `duplicateRecordsValidator` (a `validator.List` on the `records` attribute) rejects such configs at plan time using `client.RecordKey` as the identity. Elements containing unknown values are skipped — their identity is not computable during plan.
+
+This guard is list-scoped only. Two *separate* resources (e.g. two `spaceship_dns_record` instances, or a record repeated across two `spaceship_dns_records` lists for different modules) declaring the same record cannot be detected at plan time; the second writer silently adopts the first's record.
+
 ### Record type notes
 
 - **ALIAS**: Resolves a canonical (true) domain name. Implements CNAME-like behavior for the zone apex where CNAME is not allowed. The `aliasName` field is a hostname (1-253 chars, `hostNameValue` pattern).

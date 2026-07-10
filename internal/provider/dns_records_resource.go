@@ -86,6 +86,9 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
+				Validators: []validator.List{
+					duplicateRecordsValidator{},
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Validators: recordTypeObjectValidators(),
 					Attributes: recordAttributes(),
