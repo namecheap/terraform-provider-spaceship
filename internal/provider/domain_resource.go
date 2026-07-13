@@ -61,11 +61,11 @@ func (d *domainResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages domain settings for Spaceship domain",
+		Description: "Manages settings of a domain registered with Spaceship — auto-renew and nameserver delegation — and exposes the domain's registration details (dates, contacts, privacy protection, lifecycle and verification status).",
 		Attributes: map[string]schema.Attribute{
 			"domain": schema.StringAttribute{
 				Required:    true,
-				Description: "Indicate domain name which you want to manage",
+				Description: "The domain name to manage (for example example.com). The domain must already exist in the Spaceship account. Changing this forces a new resource.",
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(4, 255),
 				},
@@ -98,7 +98,7 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 			"nameservers": schema.SingleNestedAttribute{
 				Computed:    true,
 				Optional:    true,
-				Description: "Information about nameservers",
+				Description: "Nameserver delegation for the domain.",
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
@@ -106,7 +106,7 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 					"provider": schema.StringAttribute{
 						Computed:    true,
 						Optional:    true,
-						Description: "type: basic or custom",
+						Description: "Nameserver provider: basic (Spaceship's default nameservers) or custom (the hosts listed in hosts).",
 						Validators: []validator.String{
 							stringvalidator.OneOf("basic", "custom"),
 						},
@@ -118,6 +118,7 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 						Computed:    true,
 						Optional:    true,
 						ElementType: types.StringType,
+						Description: "Nameserver host names (2 to 12 entries). Required when provider is custom.",
 						Validators: []validator.Set{
 							setvalidator.SizeBetween(2, 12),
 							setvalidator.ValueStringsAre(
@@ -132,19 +133,22 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				Validators: []validator.Object{&nameserversValidator{}},
 			},
 			"is_premium": schema.BoolAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Whether the domain is a premium-priced domain.",
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"registration_date": schema.StringAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Date and time when the domain was registered.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"expiration_date": schema.StringAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Date and time when the domain registration expires.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -187,7 +191,8 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				},
 			},
 			"contacts": schema.SingleNestedAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Contact handles assigned to the domain.",
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
@@ -216,7 +221,8 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				},
 			},
 			"privacy_protection": schema.SingleNestedAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "WHOIS privacy protection settings for the domain.",
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},

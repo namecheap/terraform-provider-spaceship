@@ -57,14 +57,15 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 func (d *domainInfoDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	attrs := domainAttributes()
 	attrs["domain"] = schema.StringAttribute{
-		Required: true,
+		Required:    true,
+		Description: "The domain name to look up (for example example.com).",
 		Validators: []validator.String{
 			stringvalidator.LengthBetween(4, 255),
 		},
 	}
 
 	resp.Schema = schema.Schema{
-		Description: "Get all info about single domain",
+		Description: "Reads the details of a single domain in the Spaceship account: registration and expiration dates, nameserver delegation, contacts, privacy protection, lifecycle and verification status.",
 		Attributes:  attrs,
 	}
 }

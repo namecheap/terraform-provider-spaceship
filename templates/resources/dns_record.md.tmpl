@@ -10,7 +10,11 @@ description: |-
 
 {{ .Description | trimspace }}
 
-> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
+~> **Warning:** Never use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource owns the entire custom DNS group and deletes any record not in its list — including records created by this resource — producing a permanent plan/apply thrash. Pick one resource per domain.
+
+-> **Note:** The Spaceship API matches records by `(type, name, data)` and has no in-place update for record data — changing any field other than `ttl` replaces the record. Set `lifecycle { create_before_destroy = true }` so the replacement is added before the old record is removed, avoiding a window where the host does not resolve.
+
+-> **Note:** Spaceship permits a CNAME at the zone apex (`name = "@"`), and the provider passes it through. An apex ALIAS is rejected at plan time because Spaceship stores it as a CNAME — declare the apex record as a CNAME instead.
 
 ## Example Usage
 
@@ -20,8 +24,8 @@ description: |-
 
 ## Import
 
-Import is supported using the following syntax:
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) takes the composite resource ID `domain/TYPE/name/<data-signature>`. The `<data-signature>` is the record's type-specific data fields, lowercased and joined by `|` — a single field for an A record (just the address, so no `|` appears), several for other types, e.g. `flag|tag|value` for CAA or `service|protocol|priority|weight` for SRV. See the `id` attribute documentation for the per-type field list.
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+-> **Note:** You often don't need import at all — if a record with identical `(type, name, data)` already exists, just declare the resource and apply: create is idempotent and adopts the existing record, aligning its TTL to your configuration. When you do import, `terraform state show <address>` after a create prints the exact ID format for that record type.
 
 {{ codefile "shell" .ImportFile }}

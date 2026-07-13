@@ -10,15 +10,15 @@ description: |-
 
 Manages custom DNS records for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched. On each apply, the provider computes a diff and only deletes removed records and upserts new or changed ones.
 
-> **Caution:** This resource takes ownership of the *entire* custom DNS group for the domain — any record present in the live zone but absent from the `records` list will be deleted on the next apply. Do not mix this with `spaceship_dns_record` (singular) for the same domain: records created by the singular resource will be silently destroyed when this resource next reconciles. Pick one resource per domain.
+!> **Warning:** This resource takes ownership of the *entire* custom DNS group for the domain. Any custom record absent from the `records` list — including records added manually in the Spaceship console — is deleted on the next apply.
+
+~> **Warning:** Never mix this resource with `spaceship_dns_record` (singular) on the same domain: each apply of one destroys the records of the other, producing a permanent plan/apply thrash. Pick one resource per domain.
+
+-> **Note:** Spaceship permits a CNAME at the zone apex (`name = "@"`), and the provider passes it through. An apex ALIAS is rejected at plan time because Spaceship stores it as a CNAME — declare the apex record as a CNAME instead.
 
 ## Example Usage
 
 ```terraform
-# Manage the entire custom DNS record set for a domain in one resource.
-# On every apply this diffs the list against what's in the live zone and
-# deletes any custom record not present here.
-
 resource "spaceship_dns_records" "example" {
   domain = "example.com"
 
@@ -91,28 +91,28 @@ Required:
 Optional:
 
 - `address` (String) IPv4 or IPv6 address for A and AAAA records
-- `alias_name` (String) Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.
-- `association_data` (String) Association data (hex) for TLSA records.
+- `alias_name` (String) Canonical domain name for ALIAS records. Not allowed at the zone apex (`name = "@"`) — declare an apex CNAME instead.
+- `association_data` (String) Certificate association data for TLSA records: 64-65535 hex characters, as byte pairs optionally separated by single spaces. Required for TLSA records.
 - `cname` (String) Canonical name for CNAME records.
 - `exchange` (String) Mail exchange host for MX records.
 - `flag` (Number) Flag for CAA records (0 or 128).
-- `matching` (Number) Matching type for TLSA records (0-255).
+- `matching` (Number) Matching type for TLSA records (0-255). Required for TLSA records.
 - `nameserver` (String) Nameserver host for NS records.
 - `pointer` (String) Pointer target for PTR records.
-- `port` (String) Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).
+- `port` (String) Port for HTTPS, SVCB and TLSA records: `*` or `_N` with N between 1 and 65535. Required for TLSA records.
 - `port_number` (Number) Port for SRV records (1-65535).
 - `preference` (Number) Preference value for MX records (0-65535).
 - `priority` (Number) Priority for SRV records (0-65535).
-- `protocol` (String) Protocol label for SRV/TLSA records (e.g. `_tcp`).
+- `protocol` (String) Protocol label for SRV and TLSA records (e.g. `_tcp`). Required for both.
 - `scheme` (String) Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)
-- `selector` (Number) Selector value for TLSA records (0-255).
+- `selector` (Number) Selector value for TLSA records (0-255). Required for TLSA records.
 - `service` (String) Service label for SRV records (for example `_sip`).
 - `svc_params` (String) SvcParams string for HTTPS/SVCB records.
 - `svc_priority` (Number) Service priority for HTTPS/SVCB records (0-65535).
 - `tag` (String) Tag for CAA records (e.g. `issue`)
 - `target` (String) Target host for SRV records.
 - `target_name` (String) Target name for HTTPS/SVCB records.
-- `ttl` (Number) Record TTL in seconds. Defaults to 3600 if omitted.
-- `usage` (Number) Usage value for TLSA records (0-255).
+- `ttl` (Number) Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.
+- `usage` (Number) Usage value for TLSA records (0-255). Required for TLSA records.
 - `value` (String) Generic value field used by several record types (CAA, TXT).
 - `weight` (Number) Weight for SRV records (0-65535).

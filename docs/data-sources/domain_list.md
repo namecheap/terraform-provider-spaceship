@@ -3,12 +3,12 @@
 page_title: "spaceship_domain_list Data Source - spaceship"
 subcategory: ""
 description: |-
-  Provides full list of domain in account with domain details for each domain
+  Lists every domain in the Spaceship account, with the same details for each entry as the spaceship_domain_info data source.
 ---
 
 # spaceship_domain_list (Data Source)
 
-Provides full list of domain in account with domain details for each domain
+Lists every domain in the Spaceship account, with the same details for each entry as the `spaceship_domain_info` data source.
 
 ## Example Usage
 
@@ -33,41 +33,35 @@ output "first_domain" {
 
 ### Read-Only
 
-- `items` (Attributes List) (see [below for nested schema](#nestedatt--items))
-- `total` (Number)
+- `items` (Attributes List) Details of each domain in the account. (see [below for nested schema](#nestedatt--items))
+- `total` (Number) Total number of domains in the account.
 
 <a id="nestedatt--items"></a>
 ### Nested Schema for `items`
 
-Optional:
-
-- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
-
 Read-Only:
 
-- `auto_renew` (Boolean)
-- `contacts` (Attributes) (see [below for nested schema](#nestedatt--items--contacts))
+- `auto_renew` (Boolean) Whether the auto-renew option is enabled.
+- `contacts` (Attributes) Contact handles assigned to the domain. (see [below for nested schema](#nestedatt--items--contacts))
 - `epp_statuses` (List of String) Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited
-- `expiration_date` (String)
-- `is_premium` (Boolean)
+- `expiration_date` (String) Date and time when the domain registration expires.
+- `is_premium` (Boolean) Whether the domain is a premium-priced domain.
 - `lifecycle_status` (String) Lifecycle phase. One of creating, registered, grace1, grace2, redemption.
-- `name` (String)
-- `nameservers` (Attributes) (see [below for nested schema](#nestedatt--items--nameservers))
-- `privacy_protection` (Attributes) (see [below for nested schema](#nestedatt--items--privacy_protection))
-- `registration_date` (String)
+- `name` (String) Domain name in ASCII format (A-label).
+- `nameservers` (Attributes) Nameserver delegation for the domain. (see [below for nested schema](#nestedatt--items--nameservers))
+- `privacy_protection` (Attributes) WHOIS privacy protection settings for the domain. (see [below for nested schema](#nestedatt--items--privacy_protection))
+- `registration_date` (String) Date and time when the domain was registered.
 - `suspensions` (Attributes List) Information about domain suspensions. May contain up to 2 items. (see [below for nested schema](#nestedatt--items--suspensions))
-- `unicode_name` (String)
+- `unicode_name` (String) Domain name in UTF-8 format (U-label).
+- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
 
 <a id="nestedatt--items--contacts"></a>
 ### Nested Schema for `items.contacts`
 
-Optional:
-
-- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
-
 Read-Only:
 
 - `admin` (String) Administrative contact handle when provided.
+- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
 - `billing` (String) Billing contact handle when provided.
 - `registrant` (String) Always present registrant handle.
 - `tech` (String) Technical contact handle when provided.
@@ -78,8 +72,8 @@ Read-Only:
 
 Read-Only:
 
-- `hosts` (Set of String)
-- `provider` (String) type: basic or custom
+- `hosts` (Set of String) Nameserver host names.
+- `provider` (String) Nameserver provider: basic (Spaceship's default nameservers) or custom (the hosts listed in hosts).
 
 
 <a id="nestedatt--items--privacy_protection"></a>

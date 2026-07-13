@@ -64,23 +64,37 @@ func flattenContacts(ctx context.Context, c client.Contacts) (contacts, diag.Dia
 
 func domainAttributes() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
-		"name":              schema.StringAttribute{Computed: true},
-		"unicode_name":      schema.StringAttribute{Computed: true},
-		"is_premium":        schema.BoolAttribute{Computed: true},
-		"auto_renew":        schema.BoolAttribute{Computed: true},
-		"registration_date": schema.StringAttribute{Computed: true},
-		"expiration_date":   schema.StringAttribute{Computed: true},
+		"name": schema.StringAttribute{
+			Computed:    true,
+			Description: "Domain name in ASCII format (A-label).",
+		},
+		"unicode_name": schema.StringAttribute{
+			Computed:    true,
+			Description: "Domain name in UTF-8 format (U-label).",
+		},
+		"is_premium": schema.BoolAttribute{
+			Computed:    true,
+			Description: "Whether the domain is a premium-priced domain.",
+		},
+		"auto_renew": schema.BoolAttribute{
+			Computed:    true,
+			Description: "Whether the auto-renew option is enabled.",
+		},
+		"registration_date": schema.StringAttribute{
+			Computed:    true,
+			Description: "Date and time when the domain was registered.",
+		},
+		"expiration_date": schema.StringAttribute{
+			Computed:    true,
+			Description: "Date and time when the domain registration expires.",
+		},
 		"lifecycle_status": schema.StringAttribute{
 			Computed:    true,
 			Description: "Lifecycle phase. One of creating, registered, grace1, grace2, redemption.",
 		},
 		"verification_status": schema.StringAttribute{
 			Computed:    true,
-			Optional:    true,
 			Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
-			Validators: []validator.String{
-				stringvalidator.OneOf("verification", "success", "failed"),
-			},
 		},
 
 		"epp_statuses": schema.ListAttribute{
@@ -103,7 +117,8 @@ func domainAttributes() map[string]schema.Attribute {
 		},
 
 		"privacy_protection": schema.SingleNestedAttribute{
-			Computed: true,
+			Computed:    true,
+			Description: "WHOIS privacy protection settings for the domain.",
 			Attributes: map[string]schema.Attribute{
 				"contact_form": schema.BoolAttribute{
 					Computed:    true,
@@ -119,11 +134,12 @@ func domainAttributes() map[string]schema.Attribute {
 			},
 		},
 		"nameservers": schema.SingleNestedAttribute{
-			Computed: true,
+			Computed:    true,
+			Description: "Nameserver delegation for the domain.",
 			Attributes: map[string]schema.Attribute{
 				"provider": schema.StringAttribute{
 					Computed:    true,
-					Description: "type: basic or custom",
+					Description: "Nameserver provider: basic (Spaceship's default nameservers) or custom (the hosts listed in hosts).",
 					Validators: []validator.String{
 						stringvalidator.OneOf("basic", "custom"),
 					},
@@ -131,11 +147,13 @@ func domainAttributes() map[string]schema.Attribute {
 				"hosts": schema.SetAttribute{
 					Computed:    true,
 					ElementType: types.StringType,
+					Description: "Nameserver host names.",
 				},
 			},
 		},
 		"contacts": schema.SingleNestedAttribute{
-			Computed: true,
+			Computed:    true,
+			Description: "Contact handles assigned to the domain.",
 			Attributes: map[string]schema.Attribute{
 				"registrant": schema.StringAttribute{
 					Computed:    true,
@@ -156,7 +174,6 @@ func domainAttributes() map[string]schema.Attribute {
 				"attributes": schema.ListAttribute{
 					Computed:    true,
 					ElementType: types.StringType,
-					Optional:    true,
 					Description: "Optional list of contact attributes supplied by Spaceship.",
 				},
 			},

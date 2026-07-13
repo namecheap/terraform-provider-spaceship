@@ -3,12 +3,14 @@
 page_title: "spaceship_domain Resource - spaceship"
 subcategory: ""
 description: |-
-  Manages domain settings for Spaceship domain
+  Manages settings of a domain registered with Spaceship — auto-renew and nameserver delegation — and exposes the domain's registration details (dates, contacts, privacy protection, lifecycle and verification status).
 ---
 
 # spaceship_domain (Resource)
 
-Manages domain settings for Spaceship domain
+Manages settings of a domain registered with Spaceship — auto-renew and nameserver delegation — and exposes the domain's registration details (dates, contacts, privacy protection, lifecycle and verification status).
+
+-> **Note:** This resource does not register or release domains. Creating it adopts a domain that already exists in your Spaceship account and converges its settings (`auto_renew`, `nameservers`) to the configuration. `terraform destroy` is a safe no-op: it only removes the domain from Terraform state — the domain stays registered and its settings remain intact.
 
 ## Example Usage
 
@@ -32,23 +34,23 @@ resource "spaceship_domain" "example" {
 
 ### Required
 
-- `domain` (String) Indicate domain name which you want to manage
+- `domain` (String) The domain name to manage (for example example.com). The domain must already exist in the Spaceship account. Changing this forces a new resource.
 
 ### Optional
 
 - `auto_renew` (Boolean) Indicates whether the auto-renew option is enabled
-- `nameservers` (Attributes) Information about nameservers (see [below for nested schema](#nestedatt--nameservers))
+- `nameservers` (Attributes) Nameserver delegation for the domain. (see [below for nested schema](#nestedatt--nameservers))
 
 ### Read-Only
 
-- `contacts` (Attributes) (see [below for nested schema](#nestedatt--contacts))
+- `contacts` (Attributes) Contact handles assigned to the domain. (see [below for nested schema](#nestedatt--contacts))
 - `epp_statuses` (List of String) Possible values clientDeleteProhibited clientHold clientRenewProhibited clientTransferProhibited clientUpdateProhibited
-- `expiration_date` (String)
-- `is_premium` (Boolean)
+- `expiration_date` (String) Date and time when the domain registration expires.
+- `is_premium` (Boolean) Whether the domain is a premium-priced domain.
 - `lifecycle_status` (String) Lifecycle phase. One of creating, registered, grace1, grace2, redemption.
 - `name` (String) Domain name in ASCII format (A-label)
-- `privacy_protection` (Attributes) (see [below for nested schema](#nestedatt--privacy_protection))
-- `registration_date` (String)
+- `privacy_protection` (Attributes) WHOIS privacy protection settings for the domain. (see [below for nested schema](#nestedatt--privacy_protection))
+- `registration_date` (String) Date and time when the domain was registered.
 - `suspensions` (Attributes List) Information about domain suspensions. May contain up to 2 items. (see [below for nested schema](#nestedatt--suspensions))
 - `unicode_name` (String) Domain name in UTF-8 format (U-label)
 - `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
@@ -58,8 +60,8 @@ resource "spaceship_domain" "example" {
 
 Optional:
 
-- `hosts` (Set of String)
-- `provider` (String) type: basic or custom
+- `hosts` (Set of String) Nameserver host names (2 to 12 entries). Required when provider is custom.
+- `provider` (String) Nameserver provider: basic (Spaceship's default nameservers) or custom (the hosts listed in hosts).
 
 
 <a id="nestedatt--contacts"></a>
@@ -89,3 +91,11 @@ Read-Only:
 Read-Only:
 
 - `reason_code` (String) Suspension reason code (raaVerification, abuse, promoAbuse, fraud, pendingAccountVerification, unauthorizedAccess, tosViolation, transferDispute, restrictedSecurity, lockCourt, suspendCourt, udrpUrs, restrictedLegal, paymentPending, unpaidService, restrictedWhois, lockedWhois)
+
+## Import
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) takes the domain name as the import ID:
+
+```shell
+terraform import spaceship_domain.example example.com
+```

@@ -33,7 +33,7 @@ func recordAttributes() map[string]schema.Attribute {
 		"ttl": schema.Int64Attribute{
 			Optional:            true,
 			Computed:            true,
-			MarkdownDescription: "Record TTL in seconds. Defaults to 3600 if omitted.",
+			MarkdownDescription: "Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.",
 			Default:             int64default.StaticInt64(defaultRecordTTL),
 			Validators: []validator.Int64{
 				int64validator.Between(60, 3600),
@@ -45,7 +45,7 @@ func recordAttributes() map[string]schema.Attribute {
 		},
 		"alias_name": schema.StringAttribute{
 			Optional:            true,
-			MarkdownDescription: "Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.",
+			MarkdownDescription: "Canonical domain name for ALIAS records. Not allowed at the zone apex (`name = \"@\"`) — declare an apex CNAME instead.",
 		},
 		"cname": schema.StringAttribute{
 			Optional:            true,
@@ -65,7 +65,7 @@ func recordAttributes() map[string]schema.Attribute {
 		},
 		"port": schema.StringAttribute{
 			Optional:            true,
-			MarkdownDescription: "Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).",
+			MarkdownDescription: "Port for HTTPS, SVCB and TLSA records: `*` or `_N` with N between 1 and 65535. Required for TLSA records.",
 		},
 		"scheme": schema.StringAttribute{
 			Optional:            true,
@@ -105,7 +105,7 @@ func recordAttributes() map[string]schema.Attribute {
 		},
 		"protocol": schema.StringAttribute{
 			Optional:            true,
-			MarkdownDescription: "Protocol label for SRV/TLSA records (e.g. `_tcp`).",
+			MarkdownDescription: "Protocol label for SRV and TLSA records (e.g. `_tcp`). Required for both.",
 		},
 		"priority": schema.Int64Attribute{
 			Optional:            true,
@@ -125,19 +125,19 @@ func recordAttributes() map[string]schema.Attribute {
 		},
 		"usage": schema.Int64Attribute{
 			Optional:            true,
-			MarkdownDescription: "Usage value for TLSA records (0-255).",
+			MarkdownDescription: "Usage value for TLSA records (0-255). Required for TLSA records.",
 		},
 		"selector": schema.Int64Attribute{
 			Optional:            true,
-			MarkdownDescription: "Selector value for TLSA records (0-255).",
+			MarkdownDescription: "Selector value for TLSA records (0-255). Required for TLSA records.",
 		},
 		"matching": schema.Int64Attribute{
 			Optional:            true,
-			MarkdownDescription: "Matching type for TLSA records (0-255).",
+			MarkdownDescription: "Matching type for TLSA records (0-255). Required for TLSA records.",
 		},
 		"association_data": schema.StringAttribute{
 			Optional:            true,
-			MarkdownDescription: "Association data (hex) for TLSA records.",
+			MarkdownDescription: "Certificate association data for TLSA records: 64-65535 hex characters, as byte pairs optionally separated by single spaces. Required for TLSA records.",
 		},
 	}
 }
