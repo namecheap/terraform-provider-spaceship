@@ -10,7 +10,9 @@ description: |-
 
 {{ .Description | trimspace }}
 
-> **Caution:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
+~> **Warning:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
+
+-> **Note:** The Spaceship API matches records by `(type, name, data)` and has no in-place update for record data — changing any field other than `ttl` replaces the record. Set `lifecycle { create_before_destroy = true }` so the replacement is added before the old record is removed, avoiding a window where the host does not resolve.
 
 ## Example Usage
 

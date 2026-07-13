@@ -10,6 +10,8 @@ description: |-
 
 Manages domain settings for Spaceship domain
 
+-> **Note:** This resource does not register or release domains. Creating it adopts a domain that already exists in your Spaceship account and converges its settings (`auto_renew`, `nameservers`) to the configuration; destroying it only removes the domain from Terraform state and leaves the domain itself untouched.
+
 ## Example Usage
 
 ```terraform

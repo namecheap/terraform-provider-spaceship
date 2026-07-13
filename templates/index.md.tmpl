@@ -10,9 +10,13 @@ Use the Spaceship provider to manage domain settings (including auto-renew and n
 
 ## Getting Credentials
 
-Create an API key and secret in the [Spaceship API Manager](https://www.spaceship.com/application/api-manager/). When creating the key, grant it the permission scopes for the resources you plan to manage — see the [Spaceship API documentation](https://docs.spaceship.dev/) for authentication details and the list of available scopes.
+Create an API key and secret in the [Spaceship API Manager](https://www.spaceship.com/application/api-manager/).
+
+~> **Warning:** When creating the key, grant it the permission scopes for every resource type you plan to manage — see the [Spaceship API documentation](https://docs.spaceship.dev/) for authentication details and the list of available scopes.
 
 Provide the credentials via the `api_key` and `api_secret` provider attributes, or the `SPACESHIP_API_KEY` and `SPACESHIP_API_SECRET` environment variables.
+
+-> **Note:** Prefer the environment variables in shared configurations so the key and secret never appear in version-controlled `.tf` files or in plan output.
 
 ## Example Usage
 
