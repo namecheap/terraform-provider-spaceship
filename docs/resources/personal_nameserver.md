@@ -40,3 +40,11 @@ resource "spaceship_personal_nameserver" "ns2" {
 ### Read-Only
 
 - `id` (String) Composite identifier with the form `domain/host`.
+
+## Import
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) takes the composite resource ID `domain/host`:
+
+```shell
+terraform import spaceship_personal_nameserver.ns1 "example.com/ns1"
+```

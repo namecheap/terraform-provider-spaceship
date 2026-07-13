@@ -91,3 +91,11 @@ Read-Only:
 Read-Only:
 
 - `reason_code` (String) Suspension reason code (raaVerification, abuse, promoAbuse, fraud, pendingAccountVerification, unauthorizedAccess, tosViolation, transferDispute, restrictedSecurity, lockCourt, suspendCourt, udrpUrs, restrictedLegal, paymentPending, unpaidService, restrictedWhois, lockedWhois)
+
+## Import
+
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) takes the domain name as the import ID:
+
+```shell
+terraform import spaceship_domain.example example.com
+```
