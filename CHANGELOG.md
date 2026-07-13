@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.8](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.7...v0.5.8) (2026-07-13)
+
+
+### Bug Fixes
+
+* **docs:** improve registry documentation ([#118](https://github.com/namecheap/terraform-provider-spaceship/issues/118)) ([327419f](https://github.com/namecheap/terraform-provider-spaceship/commit/327419fc89063aa18a79897808ca559519f3d9df))
+
 ## [0.5.7](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.6...v0.5.7) (2026-07-10)
 
 
