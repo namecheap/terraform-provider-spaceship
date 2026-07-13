@@ -45,20 +45,20 @@ resource "spaceship_dns_record" "web" {
 
 - `address` (String) IPv4 or IPv6 address for A and AAAA records
 - `alias_name` (String) Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.
-- `association_data` (String) Association data (hex) for TLSA records.
+- `association_data` (String) Certificate association data for TLSA records: 64-65535 hex characters, as byte pairs optionally separated by single spaces. Required for TLSA records.
 - `cname` (String) Canonical name for CNAME records.
 - `exchange` (String) Mail exchange host for MX records.
 - `flag` (Number) Flag for CAA records (0 or 128).
-- `matching` (Number) Matching type for TLSA records (0-255).
+- `matching` (Number) Matching type for TLSA records (0-255). Required for TLSA records.
 - `nameserver` (String) Nameserver host for NS records.
 - `pointer` (String) Pointer target for PTR records.
-- `port` (String) Port for HTTPS, SVCB and TLSA records(accepts `*` or `_NNNN`).
+- `port` (String) Port for HTTPS, SVCB and TLSA records: `*` or `_N` with N between 1 and 65535. Required for TLSA records.
 - `port_number` (Number) Port for SRV records (1-65535).
 - `preference` (Number) Preference value for MX records (0-65535).
 - `priority` (Number) Priority for SRV records (0-65535).
-- `protocol` (String) Protocol label for SRV/TLSA records (e.g. `_tcp`).
+- `protocol` (String) Protocol label for SRV and TLSA records (e.g. `_tcp`). Required for both.
 - `scheme` (String) Scheme for HTTPS/SVCB/TLSA records (for example `_https`, `_tcp`)
-- `selector` (Number) Selector value for TLSA records (0-255).
+- `selector` (Number) Selector value for TLSA records (0-255). Required for TLSA records.
 - `service` (String) Service label for SRV records (for example `_sip`).
 - `svc_params` (String) SvcParams string for HTTPS/SVCB records.
 - `svc_priority` (Number) Service priority for HTTPS/SVCB records (0-65535).
@@ -66,7 +66,7 @@ resource "spaceship_dns_record" "web" {
 - `target` (String) Target host for SRV records.
 - `target_name` (String) Target name for HTTPS/SVCB records.
 - `ttl` (Number) Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.
-- `usage` (Number) Usage value for TLSA records (0-255).
+- `usage` (Number) Usage value for TLSA records (0-255). Required for TLSA records.
 - `value` (String) Generic value field used by several record types (CAA, TXT).
 - `weight` (Number) Weight for SRV records (0-65535).
 
