@@ -33,7 +33,7 @@ func recordAttributes() map[string]schema.Attribute {
 		"ttl": schema.Int64Attribute{
 			Optional:            true,
 			Computed:            true,
-			MarkdownDescription: "Record TTL in seconds. Defaults to 3600 if omitted.",
+			MarkdownDescription: "Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.",
 			Default:             int64default.StaticInt64(defaultRecordTTL),
 			Validators: []validator.Int64{
 				int64validator.Between(60, 3600),

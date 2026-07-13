@@ -108,7 +108,7 @@ Optional:
 - `tag` (String) Tag for CAA records (e.g. `issue`)
 - `target` (String) Target host for SRV records.
 - `target_name` (String) Target name for HTTPS/SVCB records.
-- `ttl` (Number) Record TTL in seconds. Defaults to 3600 if omitted.
+- `ttl` (Number) Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.
 - `usage` (Number) Usage value for TLSA records (0-255).
 - `value` (String) Generic value field used by several record types (CAA, TXT).
 - `weight` (Number) Weight for SRV records (0-65535).
