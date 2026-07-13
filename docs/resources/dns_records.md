@@ -15,10 +15,6 @@ Manages custom DNS records for a Spaceship-managed domain. Only records in the `
 ## Example Usage
 
 ```terraform
-# Manage the entire custom DNS record set for a domain in one resource.
-# On every apply this diffs the list against what's in the live zone and
-# deletes any custom record not present here.
-
 resource "spaceship_dns_records" "example" {
   domain = "example.com"
 

@@ -15,9 +15,6 @@ Manages a single personal nameserver host (a registry glue record) for a Spacesh
 ## Example Usage
 
 ```terraform
-# `host` is the label relative to `domain` (e.g. "ns1"), not an FQDN.
-# `ips` must be real, public, routable addresses — reserved ranges are rejected.
-
 resource "spaceship_personal_nameserver" "ns1" {
   domain = "example.com"
   host   = "ns1"
@@ -38,7 +35,7 @@ resource "spaceship_personal_nameserver" "ns2" {
 
 - `domain` (String) The domain the personal nameserver host belongs to (for example `example.com`). Changing this forces a new resource.
 - `host` (String) The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here is accepted by the API but produces the almost certainly unintended glue host `ns1.example.com.example.com`. Changing this renames the host in place via the API.
-- `ips` (Set of String) The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 addresses.
+- `ips` (Set of String) The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 publicly routable addresses — the API rejects reserved ranges (e.g. private or documentation addresses).
 
 ### Read-Only
 

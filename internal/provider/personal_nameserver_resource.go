@@ -89,7 +89,7 @@ func (r *personalNameserverResource) Schema(_ context.Context, _ resource.Schema
 			"ips": schema.SetAttribute{
 				Required:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 addresses.",
+				MarkdownDescription: "The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 publicly routable addresses — the API rejects reserved ranges (e.g. private or documentation addresses).",
 				Validators: []validator.Set{
 					setvalidator.SizeBetween(1, 16),
 					setvalidator.ValueStringsAre(records.IPAddressValidator()),
