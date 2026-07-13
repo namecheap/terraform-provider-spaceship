@@ -72,8 +72,16 @@ func (r *personalNameserverResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"host": schema.StringAttribute{
-				Required:            true,
-				MarkdownDescription: "The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here would produce `ns1.example.com.example.com`. Changing this renames the host in place via the API.",
+				Required: true,
+				// Intentionally no rejection of a host that ends with the domain
+				// (e.g. host = "ns1.example.com" for example.com, which the API
+				// accepts and turns into the glue host ns1.example.com.example.com).
+				// Dotted hosts are valid input — "ns1.sub" creates the multi-level
+				// glue host ns1.sub.example.com — so any such check would be a
+				// heuristic stricter than the API's own rules. We warn in the
+				// registry docs (see templates/resources/personal_nameserver.md.tmpl)
+				// and in the description below instead.
+				MarkdownDescription: "The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here is accepted by the API but produces the almost certainly unintended glue host `ns1.example.com.example.com`. Changing this renames the host in place via the API.",
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
 				},

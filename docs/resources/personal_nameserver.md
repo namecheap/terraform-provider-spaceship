@@ -10,6 +10,8 @@ description: |-
 
 Manages a single personal nameserver host (a registry glue record) for a Spaceship-managed domain. A personal nameserver is a host label (e.g. `ns1`) relative to the domain, plus the set of IP addresses the registry serves for it. Pointing the domain at these hosts is configured separately via the domain's `nameservers` block.
 
+~> **Warning:** `host` is a label relative to `domain`, not a fully qualified name. The API accepts an FQDN such as `ns1.example.com` and silently creates the glue host `ns1.example.com.example.com`. The provider does not reject this, because dotted labels (e.g. `ns1.sub` → `ns1.sub.example.com`) are valid input — double-check that `host` does not already include the domain.
+
 ## Example Usage
 
 ```terraform
@@ -35,7 +37,7 @@ resource "spaceship_personal_nameserver" "ns2" {
 ### Required
 
 - `domain` (String) The domain the personal nameserver host belongs to (for example `example.com`). Changing this forces a new resource.
-- `host` (String) The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here would produce `ns1.example.com.example.com`. Changing this renames the host in place via the API.
+- `host` (String) The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here is accepted by the API but produces the almost certainly unintended glue host `ns1.example.com.example.com`. Changing this renames the host in place via the API.
 - `ips` (Set of String) The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 addresses.
 
 ### Read-Only
