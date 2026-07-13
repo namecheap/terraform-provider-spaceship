@@ -34,10 +34,6 @@ output "domain_info" {
 
 - `domain` (String) The domain name to look up (for example example.com).
 
-### Optional
-
-- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
-
 ### Read-Only
 
 - `auto_renew` (Boolean) Whether the auto-renew option is enabled.
@@ -52,17 +48,15 @@ output "domain_info" {
 - `registration_date` (String) Date and time when the domain was registered.
 - `suspensions` (Attributes List) Information about domain suspensions. May contain up to 2 items. (see [below for nested schema](#nestedatt--suspensions))
 - `unicode_name` (String) Domain name in UTF-8 format (U-label).
+- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
 
 <a id="nestedatt--contacts"></a>
 ### Nested Schema for `contacts`
 
-Optional:
-
-- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
-
 Read-Only:
 
 - `admin` (String) Administrative contact handle when provided.
+- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
 - `billing` (String) Billing contact handle when provided.
 - `registrant` (String) Always present registrant handle.
 - `tech` (String) Technical contact handle when provided.

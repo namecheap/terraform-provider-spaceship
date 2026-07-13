@@ -94,11 +94,7 @@ func domainAttributes() map[string]schema.Attribute {
 		},
 		"verification_status": schema.StringAttribute{
 			Computed:    true,
-			Optional:    true,
 			Description: "Status of the RAA verification process. One of verification, success, failed. Null when not applicable.",
-			Validators: []validator.String{
-				stringvalidator.OneOf("verification", "success", "failed"),
-			},
 		},
 
 		"epp_statuses": schema.ListAttribute{
@@ -178,7 +174,6 @@ func domainAttributes() map[string]schema.Attribute {
 				"attributes": schema.ListAttribute{
 					Computed:    true,
 					ElementType: types.StringType,
-					Optional:    true,
 					Description: "Optional list of contact attributes supplied by Spaceship.",
 				},
 			},

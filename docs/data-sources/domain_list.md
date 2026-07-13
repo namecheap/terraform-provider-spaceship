@@ -39,10 +39,6 @@ output "first_domain" {
 <a id="nestedatt--items"></a>
 ### Nested Schema for `items`
 
-Optional:
-
-- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
-
 Read-Only:
 
 - `auto_renew` (Boolean) Whether the auto-renew option is enabled.
@@ -57,17 +53,15 @@ Read-Only:
 - `registration_date` (String) Date and time when the domain was registered.
 - `suspensions` (Attributes List) Information about domain suspensions. May contain up to 2 items. (see [below for nested schema](#nestedatt--items--suspensions))
 - `unicode_name` (String) Domain name in UTF-8 format (U-label).
+- `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
 
 <a id="nestedatt--items--contacts"></a>
 ### Nested Schema for `items.contacts`
 
-Optional:
-
-- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
-
 Read-Only:
 
 - `admin` (String) Administrative contact handle when provided.
+- `attributes` (List of String) Optional list of contact attributes supplied by Spaceship.
 - `billing` (String) Billing contact handle when provided.
 - `registrant` (String) Always present registrant handle.
 - `tech` (String) Technical contact handle when provided.
