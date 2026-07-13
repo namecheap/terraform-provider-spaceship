@@ -10,7 +10,7 @@ description: |-
 
 Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.
 
-~> **Warning:** Do not use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource takes ownership of the entire custom DNS group and will delete any record it does not see in its list — including records created by this singular resource. Pick one resource per domain.
+~> **Warning:** Never use this resource together with `spaceship_dns_records` (plural) for the same domain. The plural resource owns the entire custom DNS group and deletes any record not in its list — including records created by this resource — producing a permanent plan/apply thrash. Pick one resource per domain.
 
 -> **Note:** The Spaceship API matches records by `(type, name, data)` and has no in-place update for record data — changing any field other than `ttl` replaces the record. Set `lifecycle { create_before_destroy = true }` so the replacement is added before the old record is removed, avoiding a window where the host does not resolve.
 
