@@ -22,8 +22,8 @@ description: |-
 
 ## Import
 
-Import is supported using the following syntax:
+The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) takes the composite resource ID `domain/TYPE/name/<data-signature>`. The `<data-signature>` is the record's type-specific data fields, lowercased and joined by `|` — a single field for an A record (just the address, so no `|` appears), several for other types, e.g. `flag|tag|value` for CAA or `service|protocol|priority|weight` for SRV. See the `id` attribute documentation for the per-type field list.
 
-The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/commands/import) can be used, for example:
+-> **Note:** You often don't need import at all — if a record with identical `(type, name, data)` already exists, just declare the resource and apply: create is idempotent and adopts the existing record, aligning its TTL to your configuration. When you do import, `terraform state show <address>` after a create prints the exact ID format for that record type.
 
 {{ codefile "shell" .ImportFile }}
