@@ -34,6 +34,14 @@ After making changes, follow this order:
 - Internal design notes live in `internal/docs/`.
 - Provider reads `SPACESHIP_API_KEY` / `SPACESHIP_API_SECRET` env vars or inline HCL attributes.
 
+## Registry docs style
+
+- Attribute descriptions state the valid range/format and the default, nothing more — no explanations of what gets rejected or why, no comparisons with the Spaceship web UI.
+- **Never document API rate limits** — they can change server-side, and the provider may later implement internal rate limiting.
+- Callouts use registry admonition markers (`->` note, `~>` warning, `!>` danger), never plain `>` blockquotes (unstyled on the registry). Reserve `!>` for actual data loss.
+- Long guidance goes in page prose or admonitions in `templates/*.md.tmpl`, not as `#` comments inside example/import snippets — comments get copied along with the code. Keep only a short comment on a line that would otherwise look arbitrary (e.g. `create_before_destroy`).
+- Per-type field requirements on the flat DNS record schema can't be expressed as `Required:` — state them in the description ("Required for TLSA records.").
+
 ## Open-source hygiene
 
 - Before creating git commits, check that `git config user.email` is set. If it is not configured, suggest the contributor set one. Do not override an already-configured email.
