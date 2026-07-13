@@ -75,13 +75,15 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Provides full list of domain in account with domain details for each domain",
+		MarkdownDescription: "Lists every domain in the Spaceship account, with the same details for each entry as the `spaceship_domain_info` data source.",
 		Attributes: map[string]schema.Attribute{
 			"total": schema.Int64Attribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Total number of domains in the account.",
 			},
 			"items": schema.ListNestedAttribute{
-				Computed: true,
+				Computed:    true,
+				Description: "Details of each domain in the account.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: domainAttributes(),
 				},
