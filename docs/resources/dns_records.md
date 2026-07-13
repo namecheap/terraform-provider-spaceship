@@ -12,6 +12,8 @@ Manages custom DNS records for a Spaceship-managed domain. Only records in the `
 
 ~> **Warning:** This resource takes ownership of the *entire* custom DNS group for the domain — any record present in the live zone but absent from the `records` list will be deleted on the next apply. Do not mix this with `spaceship_dns_record` (singular) for the same domain: records created by the singular resource will be silently destroyed when this resource next reconciles. Pick one resource per domain.
 
+-> **Note:** Spaceship permits a CNAME at the zone apex (`name = "@"`), and the provider passes it through. An apex ALIAS is rejected at plan time because Spaceship stores it as a CNAME — declare the apex record as a CNAME instead.
+
 ## Example Usage
 
 ```terraform
@@ -87,7 +89,7 @@ Required:
 Optional:
 
 - `address` (String) IPv4 or IPv6 address for A and AAAA records
-- `alias_name` (String) Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.
+- `alias_name` (String) Canonical domain name for ALIAS records. Not allowed at the zone apex (`name = "@"`) — declare an apex CNAME instead.
 - `association_data` (String) Certificate association data for TLSA records: 64-65535 hex characters, as byte pairs optionally separated by single spaces. Required for TLSA records.
 - `cname` (String) Canonical name for CNAME records.
 - `exchange` (String) Mail exchange host for MX records.

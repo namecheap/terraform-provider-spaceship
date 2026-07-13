@@ -12,6 +12,8 @@ description: |-
 
 ~> **Warning:** This resource takes ownership of the *entire* custom DNS group for the domain — any record present in the live zone but absent from the `records` list will be deleted on the next apply. Do not mix this with `spaceship_dns_record` (singular) for the same domain: records created by the singular resource will be silently destroyed when this resource next reconciles. Pick one resource per domain.
 
+-> **Note:** Spaceship permits a CNAME at the zone apex (`name = "@"`), and the provider passes it through. An apex ALIAS is rejected at plan time because Spaceship stores it as a CNAME — declare the apex record as a CNAME instead.
+
 ## Example Usage
 
 {{ tffile .ExampleFile }}

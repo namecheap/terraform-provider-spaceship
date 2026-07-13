@@ -45,7 +45,7 @@ func recordAttributes() map[string]schema.Attribute {
 		},
 		"alias_name": schema.StringAttribute{
 			Optional:            true,
-			MarkdownDescription: "Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.",
+			MarkdownDescription: "Canonical domain name for ALIAS records. Not allowed at the zone apex (`name = \"@\"`) — declare an apex CNAME instead.",
 		},
 		"cname": schema.StringAttribute{
 			Optional:            true,

@@ -14,6 +14,8 @@ Manages a single DNS record for a Spaceship-managed domain. Only records in the 
 
 -> **Note:** The Spaceship API matches records by `(type, name, data)` and has no in-place update for record data — changing any field other than `ttl` replaces the record. Set `lifecycle { create_before_destroy = true }` so the replacement is added before the old record is removed, avoiding a window where the host does not resolve.
 
+-> **Note:** Spaceship permits a CNAME at the zone apex (`name = "@"`), and the provider passes it through. An apex ALIAS is rejected at plan time because Spaceship stores it as a CNAME — declare the apex record as a CNAME instead.
+
 ## Example Usage
 
 ```terraform
@@ -44,7 +46,7 @@ resource "spaceship_dns_record" "web" {
 ### Optional
 
 - `address` (String) IPv4 or IPv6 address for A and AAAA records
-- `alias_name` (String) Canonical domain name for ALIAS records. Implements CNAME-like behavior for the zone apex where CNAME is not allowed.
+- `alias_name` (String) Canonical domain name for ALIAS records. Not allowed at the zone apex (`name = "@"`) — declare an apex CNAME instead.
 - `association_data` (String) Certificate association data for TLSA records: 64-65535 hex characters, as byte pairs optionally separated by single spaces. Required for TLSA records.
 - `cname` (String) Canonical name for CNAME records.
 - `exchange` (String) Mail exchange host for MX records.
