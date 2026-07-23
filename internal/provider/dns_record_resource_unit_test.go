@@ -1,6 +1,23 @@
 package provider
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+)
+
+// The timeouts block covers all four operations; delete makes a real API call.
+func TestDNSRecordSchema_HasTimeoutsBlock(t *testing.T) {
+	resp := &fwresource.SchemaResponse{}
+	(&dnsRecordResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	if _, ok := resp.Schema.Blocks["timeouts"]; !ok {
+		t.Fatal("expected a timeouts block in the spaceship_dns_record schema")
+	}
+}
 
 func TestParseRecordID(t *testing.T) {
 	tests := []struct {
