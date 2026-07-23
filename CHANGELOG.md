@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.9](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.8...v0.5.9) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** bump google.golang.org/grpc to v1.82.1 and GitHub Actions group ([#120](https://github.com/namecheap/terraform-provider-spaceship/issues/120)) ([8728719](https://github.com/namecheap/terraform-provider-spaceship/commit/87287190cf480eb8e117a9af35cdbb81aab6e6a4))
+
 ## [0.5.8](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.7...v0.5.8) (2026-07-13)
 
 
