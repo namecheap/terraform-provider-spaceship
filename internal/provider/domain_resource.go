@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -25,6 +27,15 @@ import (
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
+// Worst case a create/update makes three rate-limitable calls (domain-info
+// read plus two writes), each of which may wait out a full throttling window;
+// a read makes one. See internal/docs/rate-limits.md.
+const (
+	domainCreateTimeout = 15 * time.Minute
+	domainReadTimeout   = 5 * time.Minute
+	domainUpdateTimeout = 15 * time.Minute
+)
+
 func NewDomainResource() resource.Resource {
 	return &domainResource{}
 }
@@ -37,8 +48,9 @@ type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
 
 	// Configurable
-	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
-	Nameservers types.Object `tfsdk:"nameservers"`
+	AutoRenew   types.Bool     `tfsdk:"auto_renew"`
+	Nameservers types.Object   `tfsdk:"nameservers"`
+	Timeouts    timeouts.Value `tfsdk:"timeouts"`
 
 	// Read only
 	Name        types.String `tfsdk:"name"`
@@ -59,7 +71,7 @@ func (d *domainResource) Metadata(_ context.Context, req resource.MetadataReques
 	resp.TypeName = req.ProviderTypeName + "_domain"
 }
 
-func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (d *domainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages settings of a domain registered with Spaceship — auto-renew and nameserver delegation — and exposes the domain's registration details (dates, contacts, privacy protection, lifecycle and verification status).",
 		Attributes: map[string]schema.Attribute{
@@ -238,6 +250,13 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Read:   true,
+				Update: true,
+			}),
+		},
 	}
 }
 
@@ -253,6 +272,14 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		})
 		return
 	}
+
+	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, domainReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
 
 	domain := state.Domain.ValueString()
 
@@ -299,6 +326,14 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, domainCreateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
 
 	domainName := plan.Domain.ValueString()
 
@@ -355,6 +390,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	var state domainResourceModel
 
 	state.Domain = plan.Domain
+	state.Timeouts = plan.Timeouts
 
 	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
 	if resp.Diagnostics.HasError() {
@@ -388,6 +424,14 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
+
+	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, domainUpdateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
 
 	domainName := plan.Domain.ValueString()
 
@@ -429,6 +473,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	state.Domain = plan.Domain
+	state.Timeouts = plan.Timeouts
 
 	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
 	if resp.Diagnostics.HasError() {
