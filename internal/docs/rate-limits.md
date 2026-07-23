@@ -122,8 +122,18 @@ Per the registry docs style rules: the `timeouts` block is documented via
 transient API throttling until the operation timeout elapses"). Rate-limit
 specifics live only in this internal note.
 
-## Rollout
+## Coverage
 
-`spaceship_domain` first. `withRetry` is resource-agnostic; wiring it into
-`spaceship_personal_nameserver` (also 5/300s) and the data sources is
-follow-up work, one resource per change.
+Every API call site is wrapped: `spaceship_domain` (create/read/update),
+`spaceship_personal_nameserver` and both DNS record resources (all four
+operations — their deletes call the API), and the domain data sources (read).
+The shared DNS call wrappers live in `dns_record_common.go`; the singular
+`dns_record` resource retries around the shared cache's `Find` rather than
+inside its singleflight fetch, so waits stay bounded by each caller's own
+deadline and concurrent re-fetches still collapse to one flight per round.
+
+Reactive retry only: no proactive client-side throttling. The generous
+per-user DNS limits (300/300s) are reachable with hundreds of per-record
+saves, and a 429 there is handled the same way — if real usage ever shows
+sustained 429 storms, a shared limiter can be added behind the `withRetry`
+seam without touching call sites.
