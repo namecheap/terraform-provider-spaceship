@@ -28,6 +28,13 @@ resource "spaceship_domain" "example" {
       "ns2.example.net",
     ]
   }
+
+  # Optional: bound how long operations wait out API throttling.
+  timeouts {
+    create = "30m"
+    read   = "10m"
+    update = "30m"
+  }
 }
 ```
 
