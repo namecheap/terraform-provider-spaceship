@@ -12,6 +12,8 @@ description: |-
 
 -> **Note:** This resource does not register or release domains. Creating it adopts a domain that already exists in your Spaceship account and converges its settings (`auto_renew`, `nameservers`) to the configuration. `terraform destroy` is a safe no-op: it only removes the domain from Terraform state — the domain stays registered and its settings remain intact.
 
+-> **Note:** API requests throttled by Spaceship are retried automatically until the operation timeout elapses. Use the `timeouts` block to bound how long each operation may wait.
+
 ## Example Usage
 
 {{ tffile .ExampleFile }}
