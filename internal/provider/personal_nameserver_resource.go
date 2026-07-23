@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -28,6 +30,16 @@ var (
 	_ resource.ResourceWithImportState = &personalNameserverResource{}
 )
 
+// Every operation makes a single rate-limitable call (upsert, list fetch, or
+// delete), so each default covers one full throttling window with margin.
+// See internal/docs/rate-limits.md.
+const (
+	personalNSCreateTimeout = 10 * time.Minute
+	personalNSReadTimeout   = 5 * time.Minute
+	personalNSUpdateTimeout = 10 * time.Minute
+	personalNSDeleteTimeout = 5 * time.Minute
+)
+
 func NewPersonalNameserverResource() resource.Resource {
 	return &personalNameserverResource{}
 }
@@ -37,17 +49,18 @@ type personalNameserverResource struct {
 }
 
 type personalNameserverResourceModel struct {
-	ID     types.String `tfsdk:"id"`
-	Domain types.String `tfsdk:"domain"`
-	Host   types.String `tfsdk:"host"`
-	IPs    types.Set    `tfsdk:"ips"`
+	ID       types.String   `tfsdk:"id"`
+	Domain   types.String   `tfsdk:"domain"`
+	Host     types.String   `tfsdk:"host"`
+	IPs      types.Set      `tfsdk:"ips"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 }
 
 func (r *personalNameserverResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_personal_nameserver"
 }
 
-func (r *personalNameserverResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *personalNameserverResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a single personal nameserver host (a registry glue record) for a Spaceship-managed domain. A personal nameserver is a host label (e.g. `ns1`) relative to the domain, plus the set of IP addresses the registry serves for it. Pointing the domain at these hosts is configured separately via the domain's `nameservers` block.",
 		Attributes: map[string]schema.Attribute{
@@ -96,6 +109,14 @@ func (r *personalNameserverResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Read:   true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
@@ -124,6 +145,14 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
+	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, personalNSCreateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
+
 	domain := plan.Domain.ValueString()
 	host := plan.Host.ValueString()
 
@@ -135,7 +164,12 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 
 	// Create and rename share one endpoint; on create the path host equals the
 	// body host.
-	result, err := r.client.UpsertPersonalNameserver(ctx, domain, host, ns)
+	var result client.PersonalNameserver
+	err := withRetry(ctx, "create personal nameserver", func() error {
+		var apiErr error
+		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, host, ns)
+		return apiErr
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to create personal nameserver: %s", err))
 		return
@@ -163,10 +197,23 @@ func (r *personalNameserverResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
+	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, personalNSReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	// The single-host GET is under development (HTTP 501), so FindPersonalNameserver
 	// reads the working list endpoint and filters by host. See the TODO(api-501)
 	// note on FindPersonalNameserver for the future switch to the direct endpoint.
-	ns, err := r.client.FindPersonalNameserver(ctx, domain, host)
+	var ns client.PersonalNameserver
+	err := withRetry(ctx, "read personal nameserver", func() error {
+		var apiErr error
+		ns, apiErr = r.client.FindPersonalNameserver(ctx, domain, host)
+		return apiErr
+	})
 	// Two ways this resource can be gone: the host is absent from an existing
 	// domain's list (ErrPersonalNameserverNotFound), or the domain itself was
 	// deleted and the list endpoint 404s (a raw SpaceshipApiError). Treat both
@@ -197,6 +244,14 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
+	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, personalNSUpdateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
+
 	domain := plan.Domain.ValueString()
 
 	ns, diags := r.expand(ctx, plan)
@@ -208,7 +263,12 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 	// The PUT path carries the current (state) host while the body carries the
 	// desired (plan) host, so a host change renames in place and an IP-only
 	// change updates the same host.
-	result, err := r.client.UpsertPersonalNameserver(ctx, domain, state.Host.ValueString(), ns)
+	var result client.PersonalNameserver
+	err := withRetry(ctx, "update personal nameserver", func() error {
+		var apiErr error
+		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, state.Host.ValueString(), ns)
+		return apiErr
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update personal nameserver: %s", err))
 		return
@@ -230,7 +290,18 @@ func (r *personalNameserverResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	if err := r.client.DeletePersonalNameserver(ctx, state.Domain.ValueString(), state.Host.ValueString()); err != nil {
+	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, personalNSDeleteTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
+	defer cancel()
+
+	err := withRetry(ctx, "delete personal nameserver", func() error {
+		return r.client.DeletePersonalNameserver(ctx, state.Domain.ValueString(), state.Host.ValueString())
+	})
+	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete personal nameserver: %s", err))
 		return
 	}
