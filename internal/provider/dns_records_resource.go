@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -27,6 +29,16 @@ var (
 	_ resource.ResourceWithImportState = &dnsRecordsResource{}
 )
 
+// Worst case create/update makes four rate-limitable calls (read, delete,
+// upsert, re-read) and delete makes two (clear = read + delete), each of
+// which may wait out a full throttling window. See internal/docs/rate-limits.md.
+const (
+	dnsRecordsCreateTimeout = 20 * time.Minute
+	dnsRecordsReadTimeout   = 5 * time.Minute
+	dnsRecordsUpdateTimeout = 20 * time.Minute
+	dnsRecordsDeleteTimeout = 10 * time.Minute
+)
+
 func NewDNSRecordsResource() resource.Resource {
 	return &dnsRecordsResource{}
 }
@@ -36,17 +48,18 @@ type dnsRecordsResource struct {
 }
 
 type dnsRecordsResourceModel struct {
-	ID      types.String `tfsdk:"id"`
-	Domain  types.String `tfsdk:"domain"`
-	Force   types.Bool   `tfsdk:"force"`
-	Records types.List   `tfsdk:"records"`
+	ID       types.String   `tfsdk:"id"`
+	Domain   types.String   `tfsdk:"domain"`
+	Force    types.Bool     `tfsdk:"force"`
+	Records  types.List     `tfsdk:"records"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 }
 
 func (r *dnsRecordsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_dns_records"
 }
 
-func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *dnsRecordsResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages custom DNS records for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched. On each apply, the provider computes a diff and only deletes removed records and upserts new or changed ones.",
 		Attributes: map[string]schema.Attribute{
@@ -95,6 +108,14 @@ func (r *dnsRecordsResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Read:   true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
@@ -123,6 +144,14 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, dnsRecordsCreateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
+
 	force := boolOrDefault(plan.Force, true)
 	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
@@ -130,26 +159,26 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	existingRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	existingRecords, err := getDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("failed to read existing DNS records: %s", err))
 		return
 	}
 
 	toDelete, toUpsert := diffDNSRecords(existingRecords, desiredRecords)
-	if err := r.client.DeleteDNSRecords(ctx, plan.Domain.ValueString(), toDelete); err != nil {
+	if err := deleteDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString(), toDelete); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS records: %s", err))
 		return
 	}
 
 	if len(toUpsert) > 0 {
-		if err := r.client.UpsertDNSRecords(ctx, plan.Domain.ValueString(), force, toUpsert); err != nil {
+		if err := upsertDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString(), force, toUpsert); err != nil {
 			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to apply DNS records: %s", err))
 			return
 		}
 	}
 
-	updatedRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	updatedRecords, err := getDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to refresh DNS records: %s", err))
 		return
@@ -182,13 +211,21 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
+	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, dnsRecordsReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	stateRecords, diags := expandDNSRecords(ctx, state.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	apiRecords, err := r.client.GetDNSRecords(ctx, state.Domain.ValueString())
+	apiRecords, err := getDNSRecordsWithRetry(ctx, r.client, state.Domain.ValueString())
 	if err != nil {
 		if client.IsNotFoundError(err) {
 			resp.State.RemoveResource(ctx)
@@ -224,6 +261,14 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, dnsRecordsUpdateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
+
 	force := boolOrDefault(plan.Force, true)
 	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
@@ -231,7 +276,7 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	existingRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	existingRecords, err := getDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("failed to read existing DNS Records: %s", err))
 		return
@@ -239,19 +284,19 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 
 	toDelete, toUpsert := diffDNSRecords(existingRecords, desiredRecords)
 
-	if err := r.client.DeleteDNSRecords(ctx, plan.Domain.ValueString(), toDelete); err != nil {
+	if err := deleteDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString(), toDelete); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS records: %s", err))
 		return
 	}
 
 	if len(toUpsert) > 0 {
-		if err := r.client.UpsertDNSRecords(ctx, plan.Domain.ValueString(), force, toUpsert); err != nil {
+		if err := upsertDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString(), force, toUpsert); err != nil {
 			resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update DNS records: %s", err))
 			return
 		}
 	}
 
-	updatedRecords, err := r.client.GetDNSRecords(ctx, plan.Domain.ValueString())
+	updatedRecords, err := getDNSRecordsWithRetry(ctx, r.client, plan.Domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to refresh DNS records: %s", err))
 		return
@@ -283,8 +328,16 @@ func (r *dnsRecordsResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
+	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, dnsRecordsDeleteTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
+	defer cancel()
+
 	force := boolOrDefault(state.Force, true)
-	if err := r.client.ClearDNSRecords(ctx, state.Domain.ValueString(), force); err != nil {
+	if err := clearDNSRecordsWithRetry(ctx, r.client, state.Domain.ValueString(), force); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to clear DNS records: %s", err))
 		return
 	}

@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -11,6 +12,41 @@ import (
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
+
+// The DNS endpoints have generous per-user rate limits, but per-record saves
+// and paginated reads can still exhaust them; every DNS call shared by the
+// record resources goes through withRetry so a 429's Retry-After is honored.
+
+func getDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string) ([]client.DNSRecord, error) {
+	var records []client.DNSRecord
+	err := withRetry(ctx, "read DNS records", func() error {
+		var apiErr error
+		records, apiErr = c.GetDNSRecords(ctx, domain)
+		return apiErr
+	})
+	return records, err
+}
+
+func upsertDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool, records []client.DNSRecord) error {
+	return withRetry(ctx, "save DNS records", func() error {
+		return c.UpsertDNSRecords(ctx, domain, force, records)
+	})
+}
+
+func deleteDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, records []client.DNSRecord) error {
+	return withRetry(ctx, "delete DNS records", func() error {
+		return c.DeleteDNSRecords(ctx, domain, records)
+	})
+}
+
+// clearDNSRecordsWithRetry retries the whole read+delete clear on a 429: the
+// read is idempotent and DeleteDNSRecords treats already-gone records as
+// success, so re-running the sequence converges.
+func clearDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool) error {
+	return withRetry(ctx, "clear DNS records", func() error {
+		return c.ClearDNSRecords(ctx, domain, force)
+	})
+}
 
 // defaultRecordTTL is the TTL applied when a record omits one. It is the single
 // source of truth: the schema Default (recordAttributes) and the conversion
