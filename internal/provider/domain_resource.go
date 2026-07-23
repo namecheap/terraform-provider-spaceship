@@ -3,7 +3,9 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -25,6 +27,15 @@ import (
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
+// Worst case a create/update makes three rate-limitable calls (domain-info
+// read plus two writes), each of which may wait out a full throttling window;
+// a read makes one. See internal/docs/rate-limits.md.
+const (
+	domainCreateTimeout = 15 * time.Minute
+	domainReadTimeout   = 5 * time.Minute
+	domainUpdateTimeout = 15 * time.Minute
+)
+
 func NewDomainResource() resource.Resource {
 	return &domainResource{}
 }
@@ -37,8 +48,9 @@ type domainResourceModel struct {
 	Domain types.String `tfsdk:"domain"`
 
 	// Configurable
-	AutoRenew   types.Bool   `tfsdk:"auto_renew"`
-	Nameservers types.Object `tfsdk:"nameservers"`
+	AutoRenew   types.Bool     `tfsdk:"auto_renew"`
+	Nameservers types.Object   `tfsdk:"nameservers"`
+	Timeouts    timeouts.Value `tfsdk:"timeouts"`
 
 	// Read only
 	Name        types.String `tfsdk:"name"`
@@ -59,7 +71,7 @@ func (d *domainResource) Metadata(_ context.Context, req resource.MetadataReques
 	resp.TypeName = req.ProviderTypeName + "_domain"
 }
 
-func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (d *domainResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "Manages settings of a domain registered with Spaceship — auto-renew and nameserver delegation — and exposes the domain's registration details (dates, contacts, privacy protection, lifecycle and verification status).",
 		Attributes: map[string]schema.Attribute{
@@ -238,6 +250,13 @@ func (d *domainResource) Schema(_ context.Context, req resource.SchemaRequest, r
 				},
 			},
 		},
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Read:   true,
+				Update: true,
+			}),
+		},
 	}
 }
 
@@ -254,6 +273,14 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
+	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, domainReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
 	domain := state.Domain.ValueString()
 
 	tflog.Debug(ctx, "About to call API to read domain state", map[string]interface{}{
@@ -261,7 +288,12 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		"domain_is_null": state.Domain.IsNull(),
 	})
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, domain)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domain)
+		return apiErr
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
@@ -300,9 +332,22 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
+	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, domainCreateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
+
 	domainName := plan.Domain.ValueString()
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
+		return apiErr
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
@@ -314,7 +359,10 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	// while the plan promised the configured ones, and Terraform fails with
 	// "Provider produced inconsistent result after apply".
 	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && plan.AutoRenew.ValueBool() != domainInfo.AutoRenew {
-		_, err := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+		err := withRetry(ctx, "update auto_renew", func() error {
+			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+			return apiErr
+		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -355,6 +403,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	var state domainResourceModel
 
 	state.Domain = plan.Domain
+	state.Timeouts = plan.Timeouts
 
 	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
 	if resp.Diagnostics.HasError() {
@@ -389,6 +438,14 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
+	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, domainUpdateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
+
 	domainName := plan.Domain.ValueString()
 
 	// check autorenewal change
@@ -400,7 +457,10 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"new": newValue,
 		})
 
-		_, err := d.client.UpdateAutoRenew(ctx, domainName, newValue)
+		err := withRetry(ctx, "update auto_renew", func() error {
+			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, newValue)
+			return apiErr
+		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -422,13 +482,19 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	// reread domain info configuration
-	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
+		return apiErr
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
 	}
 
 	state.Domain = plan.Domain
+	state.Timeouts = plan.Timeouts
 
 	resp.Diagnostics.Append(applyDomainInfo(ctx, &state, domainInfo)...)
 	if resp.Diagnostics.HasError() {
@@ -532,9 +598,11 @@ func (d *domainResource) pushNameservers(ctx context.Context, domainName string,
 		hosts = nil
 	}
 
-	err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
-		Provider: provider,
-		Hosts:    hosts,
+	err := withRetry(ctx, "update nameservers", func() error {
+		return d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
+			Provider: provider,
+			Hosts:    hosts,
+		})
 	})
 	if err != nil {
 		diags.AddError("Failed to update domain nameservers", err.Error())

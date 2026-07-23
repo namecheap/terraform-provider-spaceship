@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -255,6 +256,7 @@ type contacts struct {
 }
 
 type domainInfoModel struct {
-	Domain types.String `tfsdk:"domain"`
+	Domain   types.String   `tfsdk:"domain"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 	domainModel
 }

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -18,6 +20,17 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
+)
+
+// Create and delete make one rate-limitable call; update makes two (cache
+// find + upsert); read makes one zone fetch through the shared cache. Each
+// default covers the calls' throttling windows with margin. See
+// internal/docs/rate-limits.md.
+const (
+	dnsRecordCreateTimeout = 10 * time.Minute
+	dnsRecordReadTimeout   = 5 * time.Minute
+	dnsRecordUpdateTimeout = 10 * time.Minute
+	dnsRecordDeleteTimeout = 5 * time.Minute
 )
 
 func NewDNSRecordResource() resource.Resource {
@@ -33,8 +46,9 @@ type dnsRecordResource struct {
 }
 
 type dnsRecordResourceModel struct {
-	ID     types.String `tfsdk:"id"`
-	Domain types.String `tfsdk:"domain"`
+	ID       types.String   `tfsdk:"id"`
+	Domain   types.String   `tfsdk:"domain"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 
 	dnsRecordModel
 }
@@ -43,7 +57,7 @@ func (r *dnsRecordResource) Metadata(_ context.Context, req resource.MetadataReq
 	resp.TypeName = req.ProviderTypeName + "_dns_record"
 }
 
-func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *dnsRecordResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	attrs := map[string]schema.Attribute{
 		"id": schema.StringAttribute{
 			Computed:            true,
@@ -79,6 +93,14 @@ func (r *dnsRecordResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages a single DNS record for a Spaceship-managed domain. Only records in the `custom` DNS group are managed — records owned by Spaceship features (e.g. URL redirect, personal nameservers) are left untouched.",
 		Attributes:          attrs,
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx, timeouts.Opts{
+				Create: true,
+				Read:   true,
+				Update: true,
+				Delete: true,
+			}),
+		},
 	}
 }
 
@@ -125,6 +147,14 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, dnsRecordCreateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, createTimeout)
+	defer cancel()
+
 	domain := plan.Domain.ValueString()
 
 	// No "fetch existing record before creating" / adopt-on-create logic here
@@ -144,7 +174,10 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	if err := r.client.CreateDNSRecord(ctx, domain, record); err != nil {
+	err := withRetry(ctx, "create DNS record", func() error {
+		return r.client.CreateDNSRecord(ctx, domain, record)
+	})
+	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to create DNS record: %s", err))
 		return
 	}
@@ -187,6 +220,14 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
+	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, dnsRecordDeleteTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
+	defer cancel()
+
 	domain := state.Domain.ValueString()
 
 	// Build the API record from full state (which Read has hydrated from the
@@ -199,7 +240,10 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	if err := r.client.DeleteDNSRecord(ctx, domain, record); err != nil {
+	err := withRetry(ctx, "delete DNS record", func() error {
+		return r.client.DeleteDNSRecord(ctx, domain, record)
+	})
+	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to delete DNS record: %s", err))
 		return
 	}
@@ -230,7 +274,23 @@ func (r *dnsRecordResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	record, err := r.records.Find(ctx, domain, recordType, name, signature)
+	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, dnsRecordReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	// Retry wraps the cache lookup, not the cache's internal fetch: a 429 from
+	// the shared singleflight fetch fails every waiter, and each retries here
+	// under its own deadline; the re-fetches collapse into one flight per round.
+	var record client.DNSRecord
+	err := withRetry(ctx, "read DNS record", func() error {
+		var apiErr error
+		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
+		return apiErr
+	})
 	if errors.Is(err, client.ErrRecordNotFound) {
 		// Record no longer exists in the custom group — drop it from state so
 		// Terraform will plan a recreate on the next apply.
@@ -272,7 +332,20 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	record, err := r.records.Find(ctx, domain, recordType, name, signature)
+	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, dnsRecordUpdateTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
+
+	var record client.DNSRecord
+	err := withRetry(ctx, "read DNS record", func() error {
+		var apiErr error
+		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
+		return apiErr
+	})
 	if errors.Is(err, client.ErrRecordNotFound) {
 		resp.Diagnostics.AddError(
 			"DNS record not found",
@@ -287,7 +360,10 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 
 	record.TTL = int(plan.TTL.ValueInt64())
 
-	if err := r.client.CreateDNSRecord(ctx, domain, record); err != nil {
+	err = withRetry(ctx, "update DNS record", func() error {
+		return r.client.CreateDNSRecord(ctx, domain, record)
+	})
+	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update DNS record TTL: %s", err))
 		return
 	}

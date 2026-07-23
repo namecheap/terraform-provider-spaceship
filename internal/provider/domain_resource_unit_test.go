@@ -1,14 +1,17 @@
 package provider
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
@@ -227,4 +230,89 @@ resource "spaceship_domain" "test" {
 			},
 		},
 	})
+}
+
+// The timeouts block is declared so users can bound how long operations wait
+// out API throttling.
+func TestDomainResourceSchema_HasTimeoutsBlock(t *testing.T) {
+	resp := &fwresource.SchemaResponse{}
+	(&domainResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	if _, ok := resp.Schema.Blocks["timeouts"]; !ok {
+		t.Fatal("expected a timeouts block in the spaceship_domain schema")
+	}
+}
+
+// A rate-limited read retries after the server-requested wait and converges.
+// The domain-list fallback is answered with an empty list so the original 429
+// (carrying Retry-After) propagates to the provider's retry loop.
+func TestDomainResource_RetriesRateLimitedRead(t *testing.T) {
+	waits := fakeSleep(t)
+
+	var mu sync.Mutex
+	infoCalls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mu.Lock()
+		defer mu.Unlock()
+
+		switch {
+		// GET /v1/domains/{domain} — first call rate-limited, then healthy
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/domains/"):
+			infoCalls++
+			if infoCalls == 1 {
+				w.Header().Set("Retry-After", "3")
+				w.WriteHeader(http.StatusTooManyRequests)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(baseDomainInfo())
+
+		// GET /v1/domains — fallback list: empty, forces the 429 to propagate
+		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/domains"):
+			_ = json.NewEncoder(w).Encode(client.DomainList{Items: []client.DomainInfo{}, Total: 0})
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("SPACESHIP_BASE_URL", server.URL+"/v1")
+	t.Setenv("SPACESHIP_API_KEY", "test-key")
+	t.Setenv("SPACESHIP_API_SECRET", "test-secret")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testMockProviderFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "spaceship" {}
+
+resource "spaceship_domain" "test" {
+  domain = "example.com"
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("spaceship_domain.test", "name", "example.com"),
+				),
+			},
+		},
+	})
+
+	mu.Lock()
+	defer mu.Unlock()
+	if infoCalls < 2 {
+		t.Errorf("expected the rate-limited read to be retried, got %d info calls", infoCalls)
+	}
+	found := false
+	for _, w := range *waits {
+		if w == 4*time.Second { // Retry-After 3s + 1s margin
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a recorded wait of 4s (Retry-After + margin), got %v", *waits)
+	}
 }

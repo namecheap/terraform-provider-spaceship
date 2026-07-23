@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -25,8 +26,9 @@ func (r *domainListDataSource) Metadata(_ context.Context, req datasource.Metada
 }
 
 type domainListDataSourceModel struct {
-	Items []domainModel `tfsdk:"items"`
-	Total types.Int64   `tfsdk:"total"`
+	Items    []domainModel  `tfsdk:"items"`
+	Total    types.Int64    `tfsdk:"total"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 }
 
 func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -46,7 +48,20 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	response, err := r.client.GetDomainList(ctx)
+	readTimeout, timeoutDiags := data.Timeouts.Read(ctx, domainReadTimeout)
+	resp.Diagnostics.Append(timeoutDiags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	defer cancel()
+
+	var response client.DomainList
+	err = withRetry(ctx, "read domain list", func() error {
+		var apiErr error
+		response, apiErr = r.client.GetDomainList(ctx)
+		return apiErr
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -73,9 +88,12 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 }
 
-func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *domainListDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Lists every domain in the Spaceship account, with the same details for each entry as the `spaceship_domain_info` data source.",
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx),
+		},
 		Attributes: map[string]schema.Attribute{
 			"total": schema.Int64Attribute{
 				Computed:    true,

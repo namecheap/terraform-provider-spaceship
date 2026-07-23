@@ -7,10 +7,24 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
+
+// The timeouts block covers all four operations — create/update make up to
+// four rate-limitable calls, delete clears via read+delete.
+func TestDNSRecordsSchema_HasTimeoutsBlock(t *testing.T) {
+	resp := &fwresource.SchemaResponse{}
+	(&dnsRecordsResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	if _, ok := resp.Schema.Blocks["timeouts"]; !ok {
+		t.Fatal("expected a timeouts block in the spaceship_dns_records schema")
+	}
+}
 
 var testRecordAttrTypes = map[string]attr.Type{
 	"type":             types.StringType,

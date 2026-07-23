@@ -1,6 +1,24 @@
 package provider
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+)
+
+// The timeouts block covers all four operations — unlike spaceship_domain,
+// Delete here makes a real API call.
+func TestPersonalNameserverSchema_HasTimeoutsBlock(t *testing.T) {
+	resp := &fwresource.SchemaResponse{}
+	(&personalNameserverResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
+	}
+	if _, ok := resp.Schema.Blocks["timeouts"]; !ok {
+		t.Fatal("expected a timeouts block in the spaceship_personal_nameserver schema")
+	}
+}
 
 func TestPersonalNameserverID_RoundTrip(t *testing.T) {
 	id := personalNameserverID("example.com", "ns1")
