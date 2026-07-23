@@ -288,7 +288,12 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		"domain_is_null": state.Domain.IsNull(),
 	})
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, domain)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domain)
+		return apiErr
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
@@ -337,7 +342,12 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 
 	domainName := plan.Domain.ValueString()
 
-	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
+		return apiErr
+	})
 
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
@@ -349,7 +359,10 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	// while the plan promised the configured ones, and Terraform fails with
 	// "Provider produced inconsistent result after apply".
 	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && plan.AutoRenew.ValueBool() != domainInfo.AutoRenew {
-		_, err := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+		err := withRetry(ctx, "update auto_renew", func() error {
+			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
+			return apiErr
+		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -444,7 +457,10 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"new": newValue,
 		})
 
-		_, err := d.client.UpdateAutoRenew(ctx, domainName, newValue)
+		err := withRetry(ctx, "update auto_renew", func() error {
+			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, newValue)
+			return apiErr
+		})
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -466,7 +482,12 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	// reread domain info configuration
-	domainInfo, err := d.client.GetDomainInfo(ctx, domainName)
+	var domainInfo client.DomainInfo
+	err := withRetry(ctx, "read domain info", func() error {
+		var apiErr error
+		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
+		return apiErr
+	})
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
@@ -577,9 +598,11 @@ func (d *domainResource) pushNameservers(ctx context.Context, domainName string,
 		hosts = nil
 	}
 
-	err := d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
-		Provider: provider,
-		Hosts:    hosts,
+	err := withRetry(ctx, "update nameservers", func() error {
+		return d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
+			Provider: provider,
+			Hosts:    hosts,
+		})
 	})
 	if err != nil {
 		diags.AddError("Failed to update domain nameservers", err.Error())
