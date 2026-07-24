@@ -175,7 +175,9 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	err := withRetry(ctx, "create DNS record", domain, func() error {
+	// Create and update share one endpoint and thus one API bucket — a single
+	// "save" op name keeps their limiter waits coordinated.
+	err := withRetry(ctx, "save DNS record", domain, func() error {
 		return r.client.CreateDNSRecord(ctx, domain, record)
 	})
 	if err != nil {
@@ -361,7 +363,7 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 
 	record.TTL = int(plan.TTL.ValueInt64())
 
-	err = withRetry(ctx, "update DNS record", domain, func() error {
+	err = withRetry(ctx, "save DNS record", domain, func() error {
 		return r.client.CreateDNSRecord(ctx, domain, record)
 	})
 	if err != nil {

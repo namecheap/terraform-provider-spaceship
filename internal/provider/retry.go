@@ -55,11 +55,19 @@ func newRateLimiter() *rateLimiter {
 }
 
 // block records that the bucket stays exhausted for wait; a later deadline
-// wins so concurrent 429s never shorten an existing wait.
+// wins so concurrent 429s never shorten an existing wait. Expired entries are
+// swept here so buckets that are never queried again (e.g. after a fail-fast)
+// don't accumulate for the process lifetime.
 func (rl *rateLimiter) block(key string, wait time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	until := retryNow().Add(wait)
+	now := retryNow()
+	for k, until := range rl.until {
+		if !until.After(now) {
+			delete(rl.until, k)
+		}
+	}
+	until := now.Add(wait)
 	if until.After(rl.until[key]) {
 		rl.until[key] = until
 	}
@@ -126,7 +134,7 @@ func waitTurn(ctx context.Context, opName, key string, cause error) error {
 			if wait+retryDeadlineHeadroom > remaining {
 				msg := fmt.Sprintf(
 					"%s: rate limited, and the requested wait of %s exceeds the %s left of the operation timeout — raise the resource timeouts block or retry later",
-					opName, wait, remaining.Round(time.Second),
+					opName, wait.Round(time.Second), max(remaining, 0).Round(time.Second),
 				)
 				if cause != nil {
 					return fmt.Errorf("%s: %w", msg, cause)

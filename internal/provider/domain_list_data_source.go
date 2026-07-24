@@ -41,8 +41,6 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	tflog.Debug(ctx, "reading domain list")
 
-	var err error
-
 	if r.client == nil {
 		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please run terraform init or configure the provider block.")
 		return
@@ -57,8 +55,10 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	defer cancel()
 
 	var response client.DomainList
-	// The domain list bucket is per user, not per domain — empty domain key.
-	err = withRetry(ctx, "read domain list", "", func() error {
+	// The domain list bucket is per user, not per domain. Key the shared wait
+	// by client instance so aliased providers (different accounts) never wait
+	// on each other's throttling.
+	err := withRetry(ctx, "read domain list", fmt.Sprintf("%p", r.client), func() error {
 		var apiErr error
 		response, apiErr = r.client.GetDomainList(ctx)
 		return apiErr

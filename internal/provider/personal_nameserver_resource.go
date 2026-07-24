@@ -165,8 +165,10 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 
 	// Create and rename share one endpoint; on create the path host equals the
 	// body host.
+	// Create and update share the upsert endpoint and thus one API bucket — a
+	// single "save" op name keeps their limiter waits coordinated.
 	var result client.PersonalNameserver
-	err := withRetry(ctx, "create personal nameserver", domain, func() error {
+	err := withRetry(ctx, "save personal nameserver", domain, func() error {
 		var apiErr error
 		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, host, ns)
 		return apiErr
@@ -265,7 +267,7 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 	// desired (plan) host, so a host change renames in place and an IP-only
 	// change updates the same host.
 	var result client.PersonalNameserver
-	err := withRetry(ctx, "update personal nameserver", domain, func() error {
+	err := withRetry(ctx, "save personal nameserver", domain, func() error {
 		var apiErr error
 		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, state.Host.ValueString(), ns)
 		return apiErr

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,14 +15,22 @@ import (
 // fakeSleep swaps retrySleep for an instant recorder and retryNow for a fake
 // clock the recorder advances, and resets the shared limiter so buckets from
 // other tests cannot leak in. Tests using it must not run in parallel
-// (package-level overrides).
+// (package-level overrides). The mutex guards the fake clock so a test
+// driving concurrent goroutines through withRetry stays race-free.
 func fakeSleep(t *testing.T) *[]time.Duration {
 	t.Helper()
+	var mu sync.Mutex
 	var recorded []time.Duration
 	now := time.Unix(0, 0)
 	origSleep, origNow, origLimiter := retrySleep, retryNow, retryLimiter
-	retryNow = func() time.Time { return now }
+	retryNow = func() time.Time {
+		mu.Lock()
+		defer mu.Unlock()
+		return now
+	}
 	retrySleep = func(_ context.Context, d time.Duration) error {
+		mu.Lock()
+		defer mu.Unlock()
 		recorded = append(recorded, d)
 		now = now.Add(d)
 		return nil

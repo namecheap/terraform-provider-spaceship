@@ -3,11 +3,18 @@ package provider
 import (
 	"context"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
+
+// dnsRecordCacheFetchTimeout bounds the detached singleflight fetch. The
+// fetch is a plain paginated zone read with no retries, so a couple of
+// minutes is generous; without a cap an abandoned fetch (every waiter gave
+// up) would run unbounded, detached from any caller's deadline.
+const dnsRecordCacheFetchTimeout = 2 * time.Minute
 
 // dnsRecordCache memoizes per-domain DNS record fetches for the lifetime of a
 // provider process (i.e. a single Terraform command). The singular
@@ -87,9 +94,12 @@ func (c *dnsRecordCache) records(ctx context.Context, domain string) ([]client.D
 	// DoChan + select lets each caller observe its own context cancellation,
 	// and context.WithoutCancel detaches the shared fetch from any single
 	// caller's ctx so one caller's cancellation can't fail waiters that still
-	// need the result.
+	// need the result; the fetch keeps its own deadline so it cannot outlive
+	// every waiter indefinitely.
 	ch := c.sf.DoChan(domain, func() (any, error) {
-		records, err := c.client.GetDNSRecords(context.WithoutCancel(ctx), domain)
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dnsRecordCacheFetchTimeout)
+		defer cancel()
+		records, err := c.client.GetDNSRecords(fetchCtx, domain)
 		if err != nil {
 			return nil, err
 		}
