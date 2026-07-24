@@ -57,7 +57,8 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	defer cancel()
 
 	var response client.DomainList
-	err = withRetry(ctx, "read domain list", func() error {
+	// The domain list bucket is per user, not per domain — empty domain key.
+	err = withRetry(ctx, "read domain list", "", func() error {
 		var apiErr error
 		response, apiErr = r.client.GetDomainList(ctx)
 		return apiErr

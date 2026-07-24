@@ -289,7 +289,7 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 	})
 
 	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", func() error {
+	err := withRetry(ctx, "read domain info", domain, func() error {
 		var apiErr error
 		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domain)
 		return apiErr
@@ -343,7 +343,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	domainName := plan.Domain.ValueString()
 
 	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", func() error {
+	err := withRetry(ctx, "read domain info", domainName, func() error {
 		var apiErr error
 		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
 		return apiErr
@@ -359,7 +359,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	// while the plan promised the configured ones, and Terraform fails with
 	// "Provider produced inconsistent result after apply".
 	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && plan.AutoRenew.ValueBool() != domainInfo.AutoRenew {
-		err := withRetry(ctx, "update auto_renew", func() error {
+		err := withRetry(ctx, "update auto_renew", domainName, func() error {
 			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
 			return apiErr
 		})
@@ -457,7 +457,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"new": newValue,
 		})
 
-		err := withRetry(ctx, "update auto_renew", func() error {
+		err := withRetry(ctx, "update auto_renew", domainName, func() error {
 			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, newValue)
 			return apiErr
 		})
@@ -483,7 +483,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	// reread domain info configuration
 	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", func() error {
+	err := withRetry(ctx, "read domain info", domainName, func() error {
 		var apiErr error
 		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
 		return apiErr
@@ -598,7 +598,7 @@ func (d *domainResource) pushNameservers(ctx context.Context, domainName string,
 		hosts = nil
 	}
 
-	err := withRetry(ctx, "update nameservers", func() error {
+	err := withRetry(ctx, "update nameservers", domainName, func() error {
 		return d.client.UpdateDomainNameServers(ctx, domainName, client.UpdateNameserverRequest{
 			Provider: provider,
 			Hosts:    hosts,

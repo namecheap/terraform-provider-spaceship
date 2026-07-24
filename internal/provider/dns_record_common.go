@@ -19,7 +19,7 @@ import (
 
 func getDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string) ([]client.DNSRecord, error) {
 	var records []client.DNSRecord
-	err := withRetry(ctx, "read DNS records", func() error {
+	err := withRetry(ctx, "read DNS records", domain, func() error {
 		var apiErr error
 		records, apiErr = c.GetDNSRecords(ctx, domain)
 		return apiErr
@@ -28,13 +28,13 @@ func getDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string
 }
 
 func upsertDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool, records []client.DNSRecord) error {
-	return withRetry(ctx, "save DNS records", func() error {
+	return withRetry(ctx, "save DNS records", domain, func() error {
 		return c.UpsertDNSRecords(ctx, domain, force, records)
 	})
 }
 
 func deleteDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, records []client.DNSRecord) error {
-	return withRetry(ctx, "delete DNS records", func() error {
+	return withRetry(ctx, "delete DNS records", domain, func() error {
 		return c.DeleteDNSRecords(ctx, domain, records)
 	})
 }
@@ -43,7 +43,7 @@ func deleteDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain str
 // read is idempotent and DeleteDNSRecords treats already-gone records as
 // success, so re-running the sequence converges.
 func clearDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool) error {
-	return withRetry(ctx, "clear DNS records", func() error {
+	return withRetry(ctx, "clear DNS records", domain, func() error {
 		return c.ClearDNSRecords(ctx, domain, force)
 	})
 }

@@ -165,7 +165,7 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 	// Create and rename share one endpoint; on create the path host equals the
 	// body host.
 	var result client.PersonalNameserver
-	err := withRetry(ctx, "create personal nameserver", func() error {
+	err := withRetry(ctx, "create personal nameserver", domain, func() error {
 		var apiErr error
 		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, host, ns)
 		return apiErr
@@ -209,7 +209,7 @@ func (r *personalNameserverResource) Read(ctx context.Context, req resource.Read
 	// reads the working list endpoint and filters by host. See the TODO(api-501)
 	// note on FindPersonalNameserver for the future switch to the direct endpoint.
 	var ns client.PersonalNameserver
-	err := withRetry(ctx, "read personal nameserver", func() error {
+	err := withRetry(ctx, "read personal nameserver", domain, func() error {
 		var apiErr error
 		ns, apiErr = r.client.FindPersonalNameserver(ctx, domain, host)
 		return apiErr
@@ -264,7 +264,7 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 	// desired (plan) host, so a host change renames in place and an IP-only
 	// change updates the same host.
 	var result client.PersonalNameserver
-	err := withRetry(ctx, "update personal nameserver", func() error {
+	err := withRetry(ctx, "update personal nameserver", domain, func() error {
 		var apiErr error
 		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, state.Host.ValueString(), ns)
 		return apiErr
@@ -298,7 +298,7 @@ func (r *personalNameserverResource) Delete(ctx context.Context, req resource.De
 	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
 	defer cancel()
 
-	err := withRetry(ctx, "delete personal nameserver", func() error {
+	err := withRetry(ctx, "delete personal nameserver", state.Domain.ValueString(), func() error {
 		return r.client.DeletePersonalNameserver(ctx, state.Domain.ValueString(), state.Host.ValueString())
 	})
 	if err != nil {

@@ -47,7 +47,7 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	defer cancel()
 
 	var response client.DomainInfo
-	err := withRetry(ctx, "read domain info", func() error {
+	err := withRetry(ctx, "read domain info", domain.ValueString(), func() error {
 		var apiErr error
 		response, apiErr = d.client.GetDomainInfo(ctx, domain.ValueString())
 		return apiErr

@@ -174,7 +174,7 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	err := withRetry(ctx, "create DNS record", func() error {
+	err := withRetry(ctx, "create DNS record", domain, func() error {
 		return r.client.CreateDNSRecord(ctx, domain, record)
 	})
 	if err != nil {
@@ -240,7 +240,7 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	err := withRetry(ctx, "delete DNS record", func() error {
+	err := withRetry(ctx, "delete DNS record", domain, func() error {
 		return r.client.DeleteDNSRecord(ctx, domain, record)
 	})
 	if err != nil {
@@ -286,7 +286,7 @@ func (r *dnsRecordResource) Read(ctx context.Context, req resource.ReadRequest, 
 	// the shared singleflight fetch fails every waiter, and each retries here
 	// under its own deadline; the re-fetches collapse into one flight per round.
 	var record client.DNSRecord
-	err := withRetry(ctx, "read DNS record", func() error {
+	err := withRetry(ctx, "read DNS record", domain, func() error {
 		var apiErr error
 		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
 		return apiErr
@@ -341,7 +341,7 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 	defer cancel()
 
 	var record client.DNSRecord
-	err := withRetry(ctx, "read DNS record", func() error {
+	err := withRetry(ctx, "read DNS record", domain, func() error {
 		var apiErr error
 		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
 		return apiErr
@@ -360,7 +360,7 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 
 	record.TTL = int(plan.TTL.ValueInt64())
 
-	err = withRetry(ctx, "update DNS record", func() error {
+	err = withRetry(ctx, "update DNS record", domain, func() error {
 		return r.client.CreateDNSRecord(ctx, domain, record)
 	})
 	if err != nil {

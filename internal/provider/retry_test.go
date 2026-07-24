@@ -11,17 +11,23 @@ import (
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
-// fakeSleep swaps retrySleep for an instant recorder. Tests using it must not
-// run in parallel (package-level override).
+// fakeSleep swaps retrySleep for an instant recorder and retryNow for a fake
+// clock the recorder advances, and resets the shared limiter so buckets from
+// other tests cannot leak in. Tests using it must not run in parallel
+// (package-level overrides).
 func fakeSleep(t *testing.T) *[]time.Duration {
 	t.Helper()
 	var recorded []time.Duration
-	orig := retrySleep
+	now := time.Unix(0, 0)
+	origSleep, origNow, origLimiter := retrySleep, retryNow, retryLimiter
+	retryNow = func() time.Time { return now }
 	retrySleep = func(_ context.Context, d time.Duration) error {
 		recorded = append(recorded, d)
+		now = now.Add(d)
 		return nil
 	}
-	t.Cleanup(func() { retrySleep = orig })
+	retryLimiter = newRateLimiter()
+	t.Cleanup(func() { retrySleep, retryNow, retryLimiter = origSleep, origNow, origLimiter })
 	return &recorded
 }
 
@@ -33,7 +39,7 @@ func rateLimitErr(retryAfter time.Duration) error {
 func TestWithRetry_SuccessFirstTry(t *testing.T) {
 	waits := fakeSleep(t)
 	calls := 0
-	err := withRetry(context.Background(), "op", func() error {
+	err := withRetry(context.Background(), "op", "example.com", func() error {
 		calls++
 		return nil
 	})
@@ -49,7 +55,7 @@ func TestWithRetry_SuccessFirstTry(t *testing.T) {
 func TestWithRetry_RetriesRateLimitThenSucceeds(t *testing.T) {
 	waits := fakeSleep(t)
 	calls := 0
-	err := withRetry(context.Background(), "op", func() error {
+	err := withRetry(context.Background(), "op", "example.com", func() error {
 		calls++
 		if calls == 1 {
 			return rateLimitErr(120 * time.Second)
@@ -72,7 +78,7 @@ func TestWithRetry_NonRateLimitErrorPassesThrough(t *testing.T) {
 	waits := fakeSleep(t)
 	sentinel := errors.New("boom")
 	calls := 0
-	err := withRetry(context.Background(), "op", func() error {
+	err := withRetry(context.Background(), "op", "example.com", func() error {
 		calls++
 		return sentinel
 	})
@@ -88,7 +94,7 @@ func TestWithRetry_NonRateLimitErrorPassesThrough(t *testing.T) {
 func TestWithRetry_MissingRetryAfterUsesDefault(t *testing.T) {
 	waits := fakeSleep(t)
 	calls := 0
-	err := withRetry(context.Background(), "op", func() error {
+	err := withRetry(context.Background(), "op", "example.com", func() error {
 		calls++
 		if calls == 1 {
 			return rateLimitErr(0)
@@ -110,7 +116,7 @@ func TestWithRetry_FailsFastWhenWaitExceedsDeadline(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	calls := 0
-	err := withRetry(ctx, "read domain info", func() error {
+	err := withRetry(ctx, "read domain info", "example.com", func() error {
 		calls++
 		return rateLimitErr(300 * time.Second)
 	})
@@ -130,15 +136,19 @@ func TestWithRetry_FailsFastWhenWaitExceedsDeadline(t *testing.T) {
 }
 
 // Cancelling ctx during the wait aborts promptly with ctx.Err() (Ctrl-C path).
-// Uses the real sleepContext.
+// Uses the real sleepContext and clock.
 func TestWithRetry_CancelledDuringSleep(t *testing.T) {
+	origLimiter := retryLimiter
+	retryLimiter = newRateLimiter()
+	t.Cleanup(func() { retryLimiter = origLimiter })
+
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		cancel()
 	}()
 	start := time.Now()
-	err := withRetry(ctx, "op", func() error {
+	err := withRetry(ctx, "op", "example.com", func() error {
 		return rateLimitErr(30 * time.Second)
 	})
 	if !errors.Is(err, context.Canceled) {
@@ -146,5 +156,46 @@ func TestWithRetry_CancelledDuringSleep(t *testing.T) {
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Errorf("cancellation took %s, expected prompt abort", elapsed)
+	}
+}
+
+// A caller entering a bucket another goroutine already blocked waits out the
+// remaining window before its first attempt instead of burning a request.
+func TestWithRetry_JoinsWaitStartedByAnotherCaller(t *testing.T) {
+	waits := fakeSleep(t)
+	retryLimiter.block("read domain info|example.com", 50*time.Second)
+
+	calls := 0
+	err := withRetry(context.Background(), "read domain info", "example.com", func() error {
+		calls++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls != 1 {
+		t.Errorf("expected 1 call, got %d", calls)
+	}
+	if len(*waits) != 1 || (*waits)[0] != 50*time.Second {
+		t.Errorf("expected one joined sleep of 50s, got %v", *waits)
+	}
+}
+
+// Buckets are keyed per operation and domain: one throttled domain must not
+// pause work on another.
+func TestWithRetry_IndependentBucketsDoNotWait(t *testing.T) {
+	waits := fakeSleep(t)
+	retryLimiter.block("read domain info|throttled.com", 300*time.Second)
+
+	calls := 0
+	err := withRetry(context.Background(), "read domain info", "other.com", func() error {
+		calls++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls != 1 || len(*waits) != 0 {
+		t.Errorf("expected no wait for an unrelated bucket, got %d calls, %v", calls, *waits)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -19,47 +20,121 @@ const (
 	retryWaitMargin = 1 * time.Second
 )
 
-// retrySleep is a package variable so tests can replace the wait with an
-// instant recorder.
-var retrySleep = sleepContext
+// Test seams: tests swap the sleep for an instant recorder that advances a
+// fake clock, keeping the limiter's bucket arithmetic deterministic, and
+// reset the limiter so buckets cannot leak between tests.
+var (
+	retrySleep   = sleepContext
+	retryNow     = time.Now
+	retryLimiter = newRateLimiter()
+)
 
-// withRetry runs fn, retrying while it fails with HTTP 429 and sleeping the
-// server-requested Retry-After between attempts. The ctx deadline (set from
-// the resource timeouts block) is the only retry budget: when the requested
-// wait cannot fit before the deadline, withRetry fails immediately instead of
-// sleeping into a guaranteed timeout. Only 429s are retried — the server
-// rejects those before execution, so writes are safe to repeat.
-func withRetry(ctx context.Context, opName string, fn func() error) error {
+// rateLimiter shares rate-limit wait state across concurrent operations.
+// Terraform runs resources in parallel (user-configurable via -parallelism),
+// so when one request exhausts an API bucket every sibling goroutine would
+// otherwise burn a request discovering the same thing and then wait on its
+// own. Recording "bucket blocked until T" lets later callers join the wait
+// before their first attempt.
+//
+// Keys are "operation|domain", matching the API's per-domain buckets: a
+// throttled domain never pauses work on other domains. Distinct operations
+// that share one API bucket under-coordinate, which is safe — the second
+// caller's 429 simply joins it to the wait.
+type rateLimiter struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{until: make(map[string]time.Time)}
+}
+
+// block records that the bucket stays exhausted for wait; a later deadline
+// wins so concurrent 429s never shorten an existing wait.
+func (rl *rateLimiter) block(key string, wait time.Duration) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	until := retryNow().Add(wait)
+	if until.After(rl.until[key]) {
+		rl.until[key] = until
+	}
+}
+
+// remaining reports how long the bucket stays blocked; zero or negative means
+// clear. Expired entries are dropped to keep the map from accumulating.
+func (rl *rateLimiter) remaining(key string) time.Duration {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	d := rl.until[key].Sub(retryNow())
+	if d <= 0 {
+		delete(rl.until, key)
+	}
+	return d
+}
+
+// withRetry runs fn, retrying while it fails with HTTP 429. The wait honors
+// the server-requested Retry-After, and is shared through retryLimiter so
+// concurrent operations on the same bucket join one wait instead of each
+// discovering the 429 themselves. The ctx deadline (set from the resource
+// timeouts block) is the only retry budget: when the wait cannot fit before
+// the deadline, withRetry fails immediately instead of sleeping into a
+// guaranteed timeout. Only 429s are retried — the server rejects those before
+// execution, so writes are safe to repeat.
+func withRetry(ctx context.Context, opName, domain string, fn func() error) error {
+	key := opName + "|" + domain
+
+	// Join a wait another goroutine may already have started for this bucket.
+	if err := waitTurn(ctx, opName, key, nil); err != nil {
+		return err
+	}
+
 	for {
 		err := fn()
 		if !client.IsRateLimitError(err) {
 			return err
 		}
 
-		wait := retryWait(err)
+		retryLimiter.block(key, retryWait(err))
 
-		if deadline, ok := ctx.Deadline(); ok {
-			remaining := time.Until(deadline)
-			if wait > remaining {
-				return fmt.Errorf(
-					"%s: rate limited, and the requested wait of %s exceeds the %s left of the operation timeout — raise the resource timeouts block or retry later: %w",
-					opName, wait, remaining.Round(time.Second), err,
-				)
-			}
-		}
-
-		tflog.Warn(ctx, "rate limited by the Spaceship API, waiting before retry", map[string]any{
-			"operation": opName,
-			"wait":      wait.String(),
-		})
-
-		if sleepErr := retrySleep(ctx, wait); sleepErr != nil {
-			return sleepErr
+		if waitErr := waitTurn(ctx, opName, key, err); waitErr != nil {
+			return waitErr
 		}
 	}
 }
 
-// retryWait converts a rate-limit error into the sleep duration: the
+// waitTurn sleeps out any active wait on the bucket, failing fast when the
+// wait cannot fit before the ctx deadline. cause is the 429 that triggered
+// the wait when the caller has one; it is wrapped into the fail-fast error so
+// errors.As still surfaces the API error.
+func waitTurn(ctx context.Context, opName, key string, cause error) error {
+	wait := retryLimiter.remaining(key)
+	if wait <= 0 {
+		return nil
+	}
+
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if wait > remaining {
+			msg := fmt.Sprintf(
+				"%s: rate limited, and the requested wait of %s exceeds the %s left of the operation timeout — raise the resource timeouts block or retry later",
+				opName, wait, remaining.Round(time.Second),
+			)
+			if cause != nil {
+				return fmt.Errorf("%s: %w", msg, cause)
+			}
+			return errors.New(msg)
+		}
+	}
+
+	tflog.Warn(ctx, "rate limited by the Spaceship API, waiting before retry", map[string]any{
+		"operation": opName,
+		"wait":      wait.String(),
+	})
+
+	return retrySleep(ctx, wait)
+}
+
+// retryWait converts a rate-limit error into the wait duration: the
 // server-requested Retry-After when present, defaultRetryWait otherwise,
 // plus retryWaitMargin either way.
 func retryWait(err error) time.Duration {
