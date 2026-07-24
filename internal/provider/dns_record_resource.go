@@ -28,10 +28,10 @@ import (
 // slack so the last window's wait and the retried call still fit. See
 // internal/docs/rate-limits.md.
 const (
-	dnsRecordCreateTimeout = 10 * time.Minute
-	dnsRecordReadTimeout   = 6 * time.Minute
-	dnsRecordUpdateTimeout = 11 * time.Minute
-	dnsRecordDeleteTimeout = 6 * time.Minute
+	dnsRecordCreateTimeout = 2 * rateLimitWindow
+	dnsRecordReadTimeout   = rateLimitWindow + time.Minute
+	dnsRecordUpdateTimeout = 2*rateLimitWindow + time.Minute
+	dnsRecordDeleteTimeout = rateLimitWindow + time.Minute
 )
 
 func NewDNSRecordResource() resource.Resource {
@@ -148,13 +148,11 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, dnsRecordCreateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Create, dnsRecordCreateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, createTimeout)
-	defer cancel()
 
 	domain := plan.Domain.ValueString()
 
@@ -175,16 +173,10 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
-	// Create and update share one endpoint and thus one API bucket — a single
-	// "save" op name keeps their limiter waits coordinated.
-	err := withRetry(ctx, "save DNS record", domain, func() error {
-		return r.client.CreateDNSRecord(ctx, domain, record)
-	})
-	if err != nil {
+	if err := r.saveRecordWithRetry(ctx, domain, record); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to create DNS record: %s", err))
 		return
 	}
-	r.records.Invalidate(domain)
 
 	// Only `id` is computed — every other attribute came from the user's plan
 	// and is already populated on `plan`. Setting other fields here would
@@ -194,6 +186,29 @@ func (r *dnsRecordResource) Create(ctx context.Context, req resource.CreateReque
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 
+}
+
+// saveRecordWithRetry upserts the record and invalidates the domain's cache.
+// Create and update share the upsert endpoint and thus one API bucket — the
+// single "save" op name defined here keeps their limiter waits coordinated.
+func (r *dnsRecordResource) saveRecordWithRetry(ctx context.Context, domain string, record client.DNSRecord) error {
+	err := withRetry(ctx, "save DNS record", domain, func() error {
+		return r.client.CreateDNSRecord(ctx, domain, record)
+	})
+	if err == nil {
+		r.records.Invalidate(domain)
+	}
+	return err
+}
+
+// findRecordWithRetry looks the record up through the shared cache. Retry
+// wraps the cache lookup, not the cache's internal fetch: a 429 from the
+// shared singleflight fetch fails every waiter, and each retries here under
+// its own deadline; the re-fetches collapse into one flight per round.
+func (r *dnsRecordResource) findRecordWithRetry(ctx context.Context, domain, recordType, name, signature string) (client.DNSRecord, error) {
+	return withRetryValue(ctx, "read DNS record", domain, func() (client.DNSRecord, error) {
+		return r.records.Find(ctx, domain, recordType, name, signature)
+	})
 }
 
 // recordID builds the Terraform identifier for a single DNS record.
@@ -223,13 +238,11 @@ func (r *dnsRecordResource) Delete(ctx context.Context, req resource.DeleteReque
 		return
 	}
 
-	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, dnsRecordDeleteTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Delete, dnsRecordDeleteTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
-	defer cancel()
 
 	domain := state.Domain.ValueString()
 
@@ -277,23 +290,13 @@ func (r *dnsRecordResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, dnsRecordReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Read, dnsRecordReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
-	// Retry wraps the cache lookup, not the cache's internal fetch: a 429 from
-	// the shared singleflight fetch fails every waiter, and each retries here
-	// under its own deadline; the re-fetches collapse into one flight per round.
-	var record client.DNSRecord
-	err := withRetry(ctx, "read DNS record", domain, func() error {
-		var apiErr error
-		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
-		return apiErr
-	})
+	record, err := r.findRecordWithRetry(ctx, domain, recordType, name, signature)
 	if errors.Is(err, client.ErrRecordNotFound) {
 		// Record no longer exists in the custom group — drop it from state so
 		// Terraform will plan a recreate on the next apply.
@@ -335,20 +338,13 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, dnsRecordUpdateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Update, dnsRecordUpdateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
-	defer cancel()
 
-	var record client.DNSRecord
-	err := withRetry(ctx, "read DNS record", domain, func() error {
-		var apiErr error
-		record, apiErr = r.records.Find(ctx, domain, recordType, name, signature)
-		return apiErr
-	})
+	record, err := r.findRecordWithRetry(ctx, domain, recordType, name, signature)
 	if errors.Is(err, client.ErrRecordNotFound) {
 		resp.Diagnostics.AddError(
 			"DNS record not found",
@@ -363,14 +359,10 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 
 	record.TTL = int(plan.TTL.ValueInt64())
 
-	err = withRetry(ctx, "save DNS record", domain, func() error {
-		return r.client.CreateDNSRecord(ctx, domain, record)
-	})
-	if err != nil {
+	if err := r.saveRecordWithRetry(ctx, domain, record); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update DNS record TTL: %s", err))
 		return
 	}
-	r.records.Invalidate(domain)
 
 	// Data signature unchanged, so the composite ID remains stable.
 	plan.ID = state.ID

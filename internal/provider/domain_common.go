@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -12,6 +13,29 @@ import (
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
+
+// domainReadTimeout is the default for every operation that makes a single
+// domain read: the domain resource's Read and both domain data sources. One
+// throttling window for the call plus a minute of slack.
+// See internal/docs/rate-limits.md.
+const domainReadTimeout = rateLimitWindow + time.Minute
+
+// The domain-info and auto-renew endpoints are rate limited per domain; the
+// wrappers below define each operation's limiter bucket once so every caller
+// (resource and data sources) shares one wait.
+
+func getDomainInfoWithRetry(ctx context.Context, c *client.Client, domain string) (client.DomainInfo, error) {
+	return withRetryValue(ctx, "read domain info", domain, func() (client.DomainInfo, error) {
+		return c.GetDomainInfo(ctx, domain)
+	})
+}
+
+func updateAutoRenewWithRetry(ctx context.Context, c *client.Client, domain string, value bool) error {
+	return withRetry(ctx, "update auto_renew", domain, func() error {
+		_, apiErr := c.UpdateAutoRenew(ctx, domain, value)
+		return apiErr
+	})
+}
 
 func stringValueOrNull(value string) types.String {
 	if value == "" {

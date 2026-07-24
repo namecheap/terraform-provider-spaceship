@@ -46,24 +46,16 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	readTimeout, timeoutDiags := data.Timeouts.Read(ctx, domainReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, data.Timeouts.Read, domainReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
-	var response client.DomainList
-	// The domain list bucket is per user, not per domain. Key the shared wait
-	// by client instance so aliased providers (different accounts) never wait
-	// on each other's throttling.
-	err := withRetry(ctx, "read domain list", fmt.Sprintf("%p", r.client), func() error {
-		var apiErr error
-		response, apiErr = r.client.GetDomainList(ctx)
-		return apiErr
+	// The domain list bucket is per user, not per domain.
+	response, err := withRetryValue(ctx, "read domain list", perUserBucket(r.client), func() (client.DomainList, error) {
+		return r.client.GetDomainList(ctx)
 	})
-
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to read domain list",

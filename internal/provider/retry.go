@@ -7,12 +7,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
 
 const (
+	// rateLimitWindow is the API's throttling window: a Retry-After can request
+	// up to a full window's wait. The per-operation timeout defaults next to
+	// each resource's schema are expressed as multiples of it — one window per
+	// rate-limitable call, plus slack. See internal/docs/rate-limits.md.
+	rateLimitWindow = 5 * time.Minute
 	// defaultRetryWait applies when a 429 arrives without a Retry-After header.
 	defaultRetryWait = 30 * time.Second
 	// retryWaitMargin lands the follow-up just after the window resets rather
@@ -74,15 +80,12 @@ func (rl *rateLimiter) block(key string, wait time.Duration) {
 }
 
 // remaining reports how long the bucket stays blocked; zero or negative means
-// clear. Expired entries are dropped to keep the map from accumulating.
+// clear. Cleanup of expired entries stays in block(), the only place entries
+// are added.
 func (rl *rateLimiter) remaining(key string) time.Duration {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
-	d := rl.until[key].Sub(retryNow())
-	if d <= 0 {
-		delete(rl.until, key)
-	}
-	return d
+	return rl.until[key].Sub(retryNow())
 }
 
 // withRetry runs fn, retrying while it fails with HTTP 429. The wait honors
@@ -93,26 +96,44 @@ func (rl *rateLimiter) remaining(key string) time.Duration {
 // the deadline, withRetry fails immediately instead of sleeping into a
 // guaranteed timeout. Only 429s are retried — the server rejects those before
 // execution, so writes are safe to repeat.
-func withRetry(ctx context.Context, opName, domain string, fn func() error) error {
-	key := opName + "|" + domain
+//
+// scope identifies the rate-limit bucket the call draws from: the domain for
+// per-domain endpoints, or perUserBucket(c) for per-user endpoints.
+func withRetry(ctx context.Context, opName, scope string, fn func() error) error {
+	key := opName + "|" + scope
 
-	// Join a wait another goroutine may already have started for this bucket.
-	if err := waitTurn(ctx, opName, key, nil); err != nil {
-		return err
-	}
-
+	// The first waitTurn joins a wait another goroutine may already have
+	// started for this bucket; cause is nil until fn has returned a 429.
+	var cause error
 	for {
-		err := fn()
-		if !client.IsRateLimitError(err) {
+		if err := waitTurn(ctx, opName, key, cause); err != nil {
 			return err
 		}
-
-		retryLimiter.block(key, retryWait(err))
-
-		if waitErr := waitTurn(ctx, opName, key, err); waitErr != nil {
-			return waitErr
+		if cause = fn(); !client.IsRateLimitError(cause) {
+			return cause
 		}
+		retryLimiter.block(key, retryWait(cause))
 	}
+}
+
+// withRetryValue is withRetry for calls that return a value alongside the
+// error, sparing call sites the declare-outside-assign-inside closure dance.
+func withRetryValue[T any](ctx context.Context, opName, scope string, fn func() (T, error)) (T, error) {
+	var result T
+	err := withRetry(ctx, opName, scope, func() error {
+		var fnErr error
+		result, fnErr = fn()
+		return fnErr
+	})
+	return result, err
+}
+
+// perUserBucket keys a limiter bucket for endpoints whose rate limit is per
+// user rather than per domain. The client pointer stands in for the account:
+// aliased providers (different accounts) get distinct clients, so they never
+// wait on each other's throttling.
+func perUserBucket(c *client.Client) string {
+	return fmt.Sprintf("%p", c)
 }
 
 // waitTurn sleeps out any active wait on the bucket, failing fast when the
@@ -158,11 +179,25 @@ func waitTurn(ctx context.Context, opName, key string, cause error) error {
 // server-requested Retry-After when present, defaultRetryWait otherwise,
 // plus retryWaitMargin either way.
 func retryWait(err error) time.Duration {
+	wait := defaultRetryWait
 	var apiErr *client.SpaceshipApiError
-	if !errors.As(err, &apiErr) || apiErr.RetryAfter <= 0 {
-		return defaultRetryWait + retryWaitMargin
+	if errors.As(err, &apiErr) && apiErr.RetryAfter > 0 {
+		wait = apiErr.RetryAfter
 	}
-	return apiErr.RetryAfter + retryWaitMargin
+	return wait + retryWaitMargin
+}
+
+// operationContext bounds ctx by the operation's timeout — the retry loop's
+// only budget. resolve is the timeouts.Value method for the operation (e.g.
+// plan.Timeouts.Create); its diagnostics are appended to diags, and the caller
+// must defer cancel and return early when diags has errors.
+func operationContext(ctx context.Context, resolve func(context.Context, time.Duration) (time.Duration, diag.Diagnostics), fallback time.Duration, diags *diag.Diagnostics) (context.Context, context.CancelFunc) {
+	timeout, timeoutDiags := resolve(ctx, fallback)
+	diags.Append(timeoutDiags...)
+	if diags.HasError() {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
 }
 
 // sleepContext waits for d, aborting immediately with ctx.Err() when ctx is

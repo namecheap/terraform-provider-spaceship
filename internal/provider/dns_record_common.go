@@ -18,13 +18,9 @@ import (
 // record resources goes through withRetry so a 429's Retry-After is honored.
 
 func getDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string) ([]client.DNSRecord, error) {
-	var records []client.DNSRecord
-	err := withRetry(ctx, "read DNS records", domain, func() error {
-		var apiErr error
-		records, apiErr = c.GetDNSRecords(ctx, domain)
-		return apiErr
+	return withRetryValue(ctx, "read DNS records", domain, func() ([]client.DNSRecord, error) {
+		return c.GetDNSRecords(ctx, domain)
 	})
-	return records, err
 }
 
 func upsertDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool, records []client.DNSRecord) error {
@@ -39,13 +35,19 @@ func deleteDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain str
 	})
 }
 
-// clearDNSRecordsWithRetry retries the whole read+delete clear on a 429: the
-// read is idempotent and DeleteDNSRecords treats already-gone records as
-// success, so re-running the sequence converges.
-func clearDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string, force bool) error {
-	return withRetry(ctx, "clear DNS records", domain, func() error {
-		return c.ClearDNSRecords(ctx, domain, force)
-	})
+// clearDNSRecordsWithRetry removes every custom-group record for the domain.
+// It composes the read and delete from the per-call helpers above (mirroring
+// the SDK's ClearDNSRecords) rather than retrying the SDK composite, so a 429
+// from the delete half never re-runs an already-successful zone read.
+func clearDNSRecordsWithRetry(ctx context.Context, c *client.Client, domain string) error {
+	records, err := getDNSRecordsWithRetry(ctx, c, domain)
+	if err != nil {
+		if client.IsNotFoundError(err) {
+			return nil
+		}
+		return err
+	}
+	return deleteDNSRecordsWithRetry(ctx, c, domain, records)
 }
 
 // defaultRecordTTL is the TTL applied when a record omits one. It is the single

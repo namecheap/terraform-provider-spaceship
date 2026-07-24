@@ -35,10 +35,10 @@ var (
 // slack so the last window's wait and the retried call still fit. See
 // internal/docs/rate-limits.md.
 const (
-	dnsRecordsCreateTimeout = 21 * time.Minute
-	dnsRecordsReadTimeout   = 6 * time.Minute
-	dnsRecordsUpdateTimeout = 21 * time.Minute
-	dnsRecordsDeleteTimeout = 11 * time.Minute
+	dnsRecordsCreateTimeout = 4*rateLimitWindow + time.Minute
+	dnsRecordsReadTimeout   = rateLimitWindow + time.Minute
+	dnsRecordsUpdateTimeout = 4*rateLimitWindow + time.Minute
+	dnsRecordsDeleteTimeout = 2*rateLimitWindow + time.Minute
 )
 
 func NewDNSRecordsResource() resource.Resource {
@@ -146,13 +146,11 @@ func (r *dnsRecordsResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, dnsRecordsCreateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Create, dnsRecordsCreateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, createTimeout)
-	defer cancel()
 
 	force := boolOrDefault(plan.Force, true)
 	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
@@ -213,13 +211,11 @@ func (r *dnsRecordsResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, dnsRecordsReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Read, dnsRecordsReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
 	stateRecords, diags := expandDNSRecords(ctx, state.Records, path.Root("records"))
 	resp.Diagnostics.Append(diags...)
@@ -263,13 +259,11 @@ func (r *dnsRecordsResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, dnsRecordsUpdateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Update, dnsRecordsUpdateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
-	defer cancel()
 
 	force := boolOrDefault(plan.Force, true)
 	desiredRecords, diags := expandDNSRecords(ctx, plan.Records, path.Root("records"))
@@ -330,16 +324,13 @@ func (r *dnsRecordsResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, dnsRecordsDeleteTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Delete, dnsRecordsDeleteTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
-	defer cancel()
 
-	force := boolOrDefault(state.Force, true)
-	if err := clearDNSRecordsWithRetry(ctx, r.client, state.Domain.ValueString(), force); err != nil {
+	if err := clearDNSRecordsWithRetry(ctx, r.client, state.Domain.ValueString()); err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to clear DNS records: %s", err))
 		return
 	}

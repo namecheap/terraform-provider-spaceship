@@ -35,10 +35,10 @@ var (
 // minute of slack so the window's wait and the retried call still fit.
 // See internal/docs/rate-limits.md.
 const (
-	personalNSCreateTimeout = 10 * time.Minute
-	personalNSReadTimeout   = 6 * time.Minute
-	personalNSUpdateTimeout = 10 * time.Minute
-	personalNSDeleteTimeout = 6 * time.Minute
+	personalNSCreateTimeout = 2 * rateLimitWindow
+	personalNSReadTimeout   = rateLimitWindow + time.Minute
+	personalNSUpdateTimeout = 2 * rateLimitWindow
+	personalNSDeleteTimeout = rateLimitWindow + time.Minute
 )
 
 func NewPersonalNameserverResource() resource.Resource {
@@ -146,16 +146,13 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, personalNSCreateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Create, personalNSCreateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, createTimeout)
-	defer cancel()
 
 	domain := plan.Domain.ValueString()
-	host := plan.Host.ValueString()
 
 	ns, diags := r.expand(ctx, plan)
 	resp.Diagnostics.Append(diags...)
@@ -163,16 +160,8 @@ func (r *personalNameserverResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	// Create and rename share one endpoint; on create the path host equals the
-	// body host.
-	// Create and update share the upsert endpoint and thus one API bucket — a
-	// single "save" op name keeps their limiter waits coordinated.
-	var result client.PersonalNameserver
-	err := withRetry(ctx, "save personal nameserver", domain, func() error {
-		var apiErr error
-		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, host, ns)
-		return apiErr
-	})
+	// On create the path host equals the body host.
+	result, err := r.upsertWithRetry(ctx, domain, plan.Host.ValueString(), ns)
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to create personal nameserver: %s", err))
 		return
@@ -200,22 +189,17 @@ func (r *personalNameserverResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, personalNSReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Read, personalNSReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
 	// The single-host GET is under development (HTTP 501), so FindPersonalNameserver
 	// reads the working list endpoint and filters by host. See the TODO(api-501)
 	// note on FindPersonalNameserver for the future switch to the direct endpoint.
-	var ns client.PersonalNameserver
-	err := withRetry(ctx, "read personal nameserver", domain, func() error {
-		var apiErr error
-		ns, apiErr = r.client.FindPersonalNameserver(ctx, domain, host)
-		return apiErr
+	ns, err := withRetryValue(ctx, "read personal nameserver", domain, func() (client.PersonalNameserver, error) {
+		return r.client.FindPersonalNameserver(ctx, domain, host)
 	})
 	// Two ways this resource can be gone: the host is absent from an existing
 	// domain's list (ErrPersonalNameserverNotFound), or the domain itself was
@@ -247,13 +231,11 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, personalNSUpdateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Update, personalNSUpdateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
-	defer cancel()
 
 	domain := plan.Domain.ValueString()
 
@@ -266,12 +248,7 @@ func (r *personalNameserverResource) Update(ctx context.Context, req resource.Up
 	// The PUT path carries the current (state) host while the body carries the
 	// desired (plan) host, so a host change renames in place and an IP-only
 	// change updates the same host.
-	var result client.PersonalNameserver
-	err := withRetry(ctx, "save personal nameserver", domain, func() error {
-		var apiErr error
-		result, apiErr = r.client.UpsertPersonalNameserver(ctx, domain, state.Host.ValueString(), ns)
-		return apiErr
-	})
+	result, err := r.upsertWithRetry(ctx, domain, state.Host.ValueString(), ns)
 	if err != nil {
 		resp.Diagnostics.AddError("Spaceship API error", fmt.Sprintf("Failed to update personal nameserver: %s", err))
 		return
@@ -293,13 +270,11 @@ func (r *personalNameserverResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	deleteTimeout, timeoutDiags := state.Timeouts.Delete(ctx, personalNSDeleteTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Delete, personalNSDeleteTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, deleteTimeout)
-	defer cancel()
 
 	err := withRetry(ctx, "delete personal nameserver", state.Domain.ValueString(), func() error {
 		return r.client.DeletePersonalNameserver(ctx, state.Domain.ValueString(), state.Host.ValueString())
@@ -316,6 +291,17 @@ func (r *personalNameserverResource) ImportState(ctx context.Context, req resour
 	// Import string is the composite ID (domain/host). Read parses it and
 	// hydrates the remaining attributes.
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// upsertWithRetry saves the nameserver via the shared create/rename/update
+// endpoint; pathHost is the host addressed in the URL path (the current host
+// on a rename), while ns carries the desired host. Create and update draw
+// from one API bucket — the single "save" op name defined here keeps their
+// limiter waits coordinated.
+func (r *personalNameserverResource) upsertWithRetry(ctx context.Context, domain, pathHost string, ns client.PersonalNameserver) (client.PersonalNameserver, error) {
+	return withRetryValue(ctx, "save personal nameserver", domain, func() (client.PersonalNameserver, error) {
+		return r.client.UpsertPersonalNameserver(ctx, domain, pathHost, ns)
+	})
 }
 
 // expand converts the plan model into a client struct and validates it,

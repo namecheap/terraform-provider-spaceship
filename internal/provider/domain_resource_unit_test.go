@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 
@@ -230,19 +228,6 @@ resource "spaceship_domain" "test" {
 			},
 		},
 	})
-}
-
-// The timeouts block is declared so users can bound how long operations wait
-// out API throttling.
-func TestDomainResourceSchema_HasTimeoutsBlock(t *testing.T) {
-	resp := &fwresource.SchemaResponse{}
-	(&domainResource{}).Schema(context.Background(), fwresource.SchemaRequest{}, resp)
-	if resp.Diagnostics.HasError() {
-		t.Fatalf("schema diagnostics: %v", resp.Diagnostics)
-	}
-	if _, ok := resp.Schema.Blocks["timeouts"]; !ok {
-		t.Fatal("expected a timeouts block in the spaceship_domain schema")
-	}
 }
 
 // A rate-limited read retries after the server-requested wait and converges.

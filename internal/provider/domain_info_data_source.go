@@ -38,21 +38,13 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	readTimeout, timeoutDiags := configTimeouts.Read(ctx, domainReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, configTimeouts.Read, domainReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
-	var response client.DomainInfo
-	err := withRetry(ctx, "read domain info", domain.ValueString(), func() error {
-		var apiErr error
-		response, apiErr = d.client.GetDomainInfo(ctx, domain.ValueString())
-		return apiErr
-	})
-
+	response, err := getDomainInfoWithRetry(ctx, d.client, domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return

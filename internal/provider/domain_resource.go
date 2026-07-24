@@ -28,13 +28,13 @@ import (
 )
 
 // Worst case a create/update makes three rate-limitable calls (domain-info
-// read plus two writes), each of which may wait out a full throttling window;
-// a read makes one. Each default adds a minute of slack so the last window's
-// wait and the retried call still fit. See internal/docs/rate-limits.md.
+// read plus two writes), each of which may wait out a full throttling window,
+// plus a minute of slack so the last window's wait and the retried call still
+// fit. Read's default (one call) lives in domain_common.go, shared with the
+// domain data sources. See internal/docs/rate-limits.md.
 const (
-	domainCreateTimeout = 16 * time.Minute
-	domainReadTimeout   = 6 * time.Minute
-	domainUpdateTimeout = 16 * time.Minute
+	domainCreateTimeout = 3*rateLimitWindow + time.Minute
+	domainUpdateTimeout = 3*rateLimitWindow + time.Minute
 )
 
 func NewDomainResource() resource.Resource {
@@ -274,13 +274,11 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		return
 	}
 
-	readTimeout, timeoutDiags := state.Timeouts.Read(ctx, domainReadTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, state.Timeouts.Read, domainReadTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
-	defer cancel()
 
 	domain := state.Domain.ValueString()
 
@@ -289,13 +287,7 @@ func (d *domainResource) Read(ctx context.Context, req resource.ReadRequest, res
 		"domain_is_null": state.Domain.IsNull(),
 	})
 
-	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", domain, func() error {
-		var apiErr error
-		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domain)
-		return apiErr
-	})
-
+	domainInfo, err := getDomainInfoWithRetry(ctx, d.client, domain)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
@@ -333,23 +325,15 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	createTimeout, timeoutDiags := plan.Timeouts.Create(ctx, domainCreateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Create, domainCreateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, createTimeout)
-	defer cancel()
 
 	domainName := plan.Domain.ValueString()
 
-	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", domainName, func() error {
-		var apiErr error
-		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
-		return apiErr
-	})
-
+	domainInfo, err := getDomainInfoWithRetry(ctx, d.client, domainName)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
@@ -360,10 +344,7 @@ func (d *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 	// while the plan promised the configured ones, and Terraform fails with
 	// "Provider produced inconsistent result after apply".
 	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() && plan.AutoRenew.ValueBool() != domainInfo.AutoRenew {
-		err := withRetry(ctx, "update auto_renew", domainName, func() error {
-			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, plan.AutoRenew.ValueBool())
-			return apiErr
-		})
+		err := updateAutoRenewWithRetry(ctx, d.client, domainName, plan.AutoRenew.ValueBool())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -439,13 +420,11 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	updateTimeout, timeoutDiags := plan.Timeouts.Update(ctx, domainUpdateTimeout)
-	resp.Diagnostics.Append(timeoutDiags...)
+	ctx, cancel := operationContext(ctx, plan.Timeouts.Update, domainUpdateTimeout, &resp.Diagnostics)
+	defer cancel()
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, updateTimeout)
-	defer cancel()
 
 	domainName := plan.Domain.ValueString()
 
@@ -458,10 +437,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 			"new": newValue,
 		})
 
-		err := withRetry(ctx, "update auto_renew", domainName, func() error {
-			_, apiErr := d.client.UpdateAutoRenew(ctx, domainName, newValue)
-			return apiErr
-		})
+		err := updateAutoRenewWithRetry(ctx, d.client, domainName, newValue)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error updating domain auto_renew",
@@ -483,12 +459,7 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	}
 
 	// reread domain info configuration
-	var domainInfo client.DomainInfo
-	err := withRetry(ctx, "read domain info", domainName, func() error {
-		var apiErr error
-		domainInfo, apiErr = d.client.GetDomainInfo(ctx, domainName)
-		return apiErr
-	})
+	domainInfo, err := getDomainInfoWithRetry(ctx, d.client, domainName)
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
