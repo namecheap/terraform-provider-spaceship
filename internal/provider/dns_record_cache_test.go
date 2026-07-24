@@ -145,6 +145,52 @@ func TestDNSRecordCache_InvalidateIsPerDomain(t *testing.T) {
 	}
 }
 
+// A write that lands while a fetch is in flight must not let that fetch
+// re-cache its pre-write snapshot: the next Find re-fetches.
+func TestDNSRecordCache_InvalidateDuringFetchPreventsStaleCache(t *testing.T) {
+	var gets int64
+	started := make(chan struct{})
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt64(&gets, 1) == 1 {
+			close(started)
+			<-release
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"items": []map[string]any{{"type": "A", "name": "@", "ttl": 3600, "address": "1.2.3.4"}},
+			"total": 1,
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	c, err := client.NewClient(server.URL, "k", "s")
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	cache := newDNSRecordCache(c)
+
+	findErr := make(chan error, 1)
+	go func() {
+		_, err := cache.Find(t.Context(), "example.com", "A", "@", "1.2.3.4")
+		findErr <- err
+	}()
+	<-started
+	cache.Invalidate("example.com") // a write completed mid-fetch
+	close(release)
+	if err := <-findErr; err != nil {
+		t.Fatalf("Find racing the invalidation: %v", err)
+	}
+
+	// The pre-write snapshot must have been discarded: this Find re-fetches.
+	if _, err := cache.Find(t.Context(), "example.com", "A", "@", "1.2.3.4"); err != nil {
+		t.Fatalf("post-invalidate Find: %v", err)
+	}
+	if got := atomic.LoadInt64(&gets); got != 2 {
+		t.Fatalf("expected the stale snapshot to be dropped and re-fetched, got %d fetches", got)
+	}
+}
+
 // A cancelled caller fails alone; waiters sharing the same in-flight fetch
 // still get the result.
 func TestDNSRecordCache_CancelledCallerDoesNotFailWaiters(t *testing.T) {
