@@ -2,138 +2,73 @@
 
 ## Context
 
-Several Spaceship API endpoints are aggressively rate limited per domain (as of
-July 2026; server-side limits can change without notice):
+Several Spaceship endpoints are aggressively rate limited (as of July 2026;
+limits can change server-side): domain info, nameserver updates, and personal
+nameservers are 5–10 requests per domain per 300s; domain list and DNS record
+endpoints are 300 per user per 300s. On HTTP 429 the API sends `Retry-After`:
+integer **seconds** to wait (never an HTTP date), observed up to ~300. A 429
+is rejected *before execution*, so retrying is safe for writes as well as
+reads.
 
-| Endpoint | Limit |
-|---|---|
-| Domain info (GET) | 5 req / domain / 300s |
-| Nameserver update (PUT) | 5 req / domain / 300s |
-| Personal nameservers (GET) | 5 req / domain / 300s |
-| Domain list (GET) | 300 req / user / 300s |
-| DNS records list (GET) | 300 req / user / 300s |
+## Layering
 
-An ordinary plan → apply → re-plan cycle issues several domain-info reads and
-nameserver writes within minutes, so the 5/300s buckets exhaust in normal use.
-On HTTP 429 the API sends a `Retry-After` header: the number of **seconds** the
-client ought to wait before a follow-up request (delta-seconds only, never an
-HTTP date; observed values run up to ~300 — a full window).
+The SDK reports facts and never sleeps: `SpaceshipApiError.RetryAfter` (zero
+when the header is absent or unparsable) and `IsRateLimitError`. All policy —
+waiting, logging, deadline accounting, cancellation — lives in the provider's
+`withRetry` (`internal/provider/retry.go`). The SDK's `GetDomainInfo`
+list-fallback runs inside the wrapped call; provider retry fires only when
+both paths are exhausted.
 
-A 429 means the server rejected the request *before executing it*, so retrying
-is safe for writes as well as reads — there is no idempotency concern (unlike a
-timeout, where the write may have landed).
+## Retry invariants
 
-## Layering: SDK reports facts, provider owns policy
-
-- **SDK** (`go-spaceship-sdk`): `errorFromResponse` parses the `Retry-After`
-  header into `SpaceshipApiError.RetryAfter` (`time.Duration`; zero when absent
-  or unparsable). `IsRateLimitError(err)` mirrors the existing
-  `IsNotFoundError` idiom. The SDK never sleeps — a general-purpose client that
-  silently blocks for minutes would ambush non-Terraform consumers.
-- **Provider**: `withRetry` (`internal/provider/retry.go`) implements the wait
-  policy — sleeping, logging, deadline accounting, cancellation. Terraform UX
-  decisions belong in the Terraform layer.
-
-The SDK's existing `GetDomainInfo` 429 fallback (retry via the higher-limit
-domain-list endpoint) is unchanged and runs *inside* the wrapped call; provider
-retry fires only when both paths are exhausted. Do not defeat the fallback.
-
-## Retry policy
-
-`withRetry(ctx, opName, fn)` loops until the call stops returning 429:
-
-```
-for {
-    err := fn()
-    if err is not a 429 rate-limit error → return err
-    wait := err.RetryAfter (30s when the header is missing) + 1s margin
-    if wait > time remaining before ctx deadline
-        → fail immediately: report the server-requested wait and the
-          operation timeout so the user knows which knob to turn
-    tflog.Warn(ctx, "rate limited", op, wait, remaining)
-    sleep wait, aborting instantly if ctx is cancelled
-}
-```
-
-Deliberate choices:
-
-- **The ctx deadline is the only budget.** There is no max-attempts counter —
-  two limits that can disagree produce "failed after N retries with minutes
-  still on the clock". Same principle as `retry.RetryContext` in
-  terraform-plugin-sdk.
-- **Fail fast on an unfittable wait.** Sleeping into a deadline that cannot be
-  met converts a bounded failure into "hang, then fail anyway".
-- **Only HTTP 429 is retried.** Other errors (4xx, 5xx, transport) return
-  unchanged; retrying them here would mask real failures.
+- Only HTTP 429 is retried; every other error returns unchanged.
+- The wait is the server's `Retry-After` plus a 1s margin; 30s + margin when
+  the header is missing.
+- The ctx deadline (from the resource `timeouts` block) is the only budget —
+  no attempt counters. A wait that cannot fit fails immediately with the
+  requested wait, the remaining time, and the knob to turn, wrapping the
+  original API error.
+- Waits are shared: a limiter keyed `operation|domain` (matching the API's
+  per-domain buckets) lets concurrent goroutines join one wait instead of each
+  burning a request — correct at any `-parallelism`. A throttled domain never
+  pauses other domains; operations sharing one API bucket under-coordinate,
+  which self-heals.
+- Every wait selects on `ctx.Done()`: Ctrl-C aborts mid-sleep and returns
+  `ctx.Err()` so Terraform reports "cancelled", not "failed".
+- Each wait is logged via `tflog.Warn`; Terraform's native "Still modifying…"
+  heartbeat covers apply. Plan/refresh has no heartbeat (core limitation), so
+  the read timeout bounds the quiet period.
 
 ## Operation timeouts
 
-`spaceship_domain` exposes a `timeouts` block
-(`terraform-plugin-framework-timeouts`):
-
-| Operation | Default | Rationale |
-|---|---|---|
-| `create` | 15m | up to 3 rate-limitable calls × 300s worst case |
-| `update` | 15m | same call shape as create |
-| `read` | 5m | single domain-info read, one window + margin |
-
-Delete is a state-only no-op (no API call), so it takes no timeout. Each CRUD
-method resolves its timeout, wraps the request context with
-`context.WithTimeout`, and passes it down; the retry loop inherits the deadline.
-
-## Cancellation (Ctrl-C)
-
-Terraform cancels the operation context on interrupt. Every wait in the retry
-loop must select on `ctx.Done()` as well as the sleep timer, so a user pressing
-Ctrl-C during a 280s rate-limit wait gets an immediate, clean abort — never an
-orphaned sleep that holds the apply hostage. `ctx.Err()` is returned so
-Terraform reports the operation as cancelled, not failed.
-
-## Visibility
-
-- `tflog.Warn` on every wait (operation, wait duration, remaining budget) —
-  visible with `TF_LOG=WARN` and in HCP Terraform run logs.
-- During apply, Terraform core natively prints `Still modifying... [Xs elapsed]`
-  every ~10s, so long waits do not look frozen.
-- During plan/refresh there is no native heartbeat (a Terraform core
-  limitation); the `read` timeout keeps the quiet period bounded.
+Every resource and both data sources expose a `timeouts` block
+(`terraform-plugin-framework-timeouts`). Defaults = rate-limitable calls per
+operation × one full 300s window, with margin: domain 15/5/15m (delete is a
+state-only no-op); personal nameserver 10/5/10/5m; `dns_records` 20/5/20/10m
+(create/update make four calls, clear makes two); `dns_record` 10/5/10/5m;
+data source reads 5m. Each CRUD method resolves its timeout and wraps ctx via
+`context.WithTimeout`; the singular `dns_record` retries around the shared
+cache's `Find` (not inside its detached singleflight fetch) so waits stay
+bounded by each caller's own deadline.
 
 ## Testing
 
-Two-layer split, as everywhere in this codebase:
-
-- **SDK repo**: unit tests for `Retry-After` parsing — present, absent,
-  garbage, large values (httptest).
-- **Provider unit tests** (`retry_test.go`): 429-then-success retries and
-  returns the success; non-429 errors pass through without retry; missing
-  `RetryAfter` uses the 30s default; a wait larger than the remaining deadline
-  fails immediately (no sleep); ctx cancellation mid-sleep aborts promptly and
-  returns `ctx.Err()`. The sleep is injected so tests never actually wait.
-- **Provider unit tests** (domain resource): `timeouts` attribute present in
-  schema; defaults resolve when the block is omitted.
-- **Acceptance tests**: the existing `spaceship_domain` acc tests exercise the
-  wrapped paths end-to-end; deliberately provoking a real 429 is not worth the
-  5-minute lockout per run.
+Header parsing is tested in the SDK (mocked responses). The provider unit
+tests own the policy: retry/join/independent-bucket behavior, fail-fast,
+cancellation (`retry_test.go`, with an injected sleep that advances a fake
+clock), plus an end-to-end mock-server test that a rate-limited read retries
+after the exact requested wait. Do not try to provoke real 429s in acceptance
+tests — whitelisted accounts never see them.
 
 ## Registry docs
 
-Per the registry docs style rules: the `timeouts` block is documented via
-`make docs`; wording never mentions rate-limit numbers ("operations retry
-transient API throttling until the operation timeout elapses"). Rate-limit
-specifics live only in this internal note.
+Never mention rate-limit numbers in `docs/` or `templates/` — describe the
+behavior ("throttled requests are retried until the operation timeout
+elapses"). Specifics live only in this note.
 
-## Coverage
+## Future
 
-Every API call site is wrapped: `spaceship_domain` (create/read/update),
-`spaceship_personal_nameserver` and both DNS record resources (all four
-operations — their deletes call the API), and the domain data sources (read).
-The shared DNS call wrappers live in `dns_record_common.go`; the singular
-`dns_record` resource retries around the shared cache's `Find` rather than
-inside its singleflight fetch, so waits stay bounded by each caller's own
-deadline and concurrent re-fetches still collapse to one flight per round.
-
-Reactive retry only: no proactive client-side throttling. The generous
-per-user DNS limits (300/300s) are reachable with hundreds of per-record
-saves, and a 429 there is handled the same way — if real usage ever shows
-sustained 429 storms, a shared limiter can be added behind the `withRetry`
-seam without touching call sites.
+If more SDK consumers need retries, the policy can move into the SDK as an
+opt-in client option; `withRetry` is the single seam to swap. Reactive retry
+only — add proactive client-side throttling only if real usage shows
+sustained 429 storms.
