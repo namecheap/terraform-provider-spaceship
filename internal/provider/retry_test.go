@@ -135,6 +135,64 @@ func TestWithRetry_FailsFastWhenWaitExceedsDeadline(t *testing.T) {
 	}
 }
 
+// A wait that nominally fits the deadline but leaves no headroom for the
+// retried call itself fails fast with the actionable message instead of
+// sleeping into a guaranteed "context deadline exceeded".
+func TestWithRetry_FailsFastWhenWaitLeavesNoHeadroom(t *testing.T) {
+	waits := fakeSleep(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 32*time.Second)
+	defer cancel()
+	calls := 0
+	err := withRetry(ctx, "read domain info", "example.com", func() error {
+		calls++
+		return rateLimitErr(30 * time.Second) // wait 31s fits 32s, headroom does not
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "timeout") {
+		t.Errorf("expected actionable timeout message, got %q", err.Error())
+	}
+	if calls != 1 || len(*waits) != 0 {
+		t.Errorf("expected fail-fast with no sleep, got %d calls, %d sleeps", calls, len(*waits))
+	}
+}
+
+// A bucket re-blocked while a waiter sleeps (a sibling goroutine's 429) is
+// waited out again before the next attempt instead of burning a request the
+// limiter already knows is doomed.
+func TestWithRetry_WaitsAgainWhenBucketReblockedDuringSleep(t *testing.T) {
+	waits := fakeSleep(t)
+	const key = "read domain info|example.com"
+	retryLimiter.block(key, 10*time.Second)
+
+	inner := retrySleep
+	reblocked := false
+	retrySleep = func(ctx context.Context, d time.Duration) error {
+		err := inner(ctx, d)
+		if !reblocked {
+			reblocked = true
+			retryLimiter.block(key, 20*time.Second)
+		}
+		return err
+	}
+
+	calls := 0
+	err := withRetry(context.Background(), "read domain info", "example.com", func() error {
+		calls++
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls != 1 {
+		t.Errorf("expected 1 call after both waits, got %d", calls)
+	}
+	if len(*waits) != 2 || (*waits)[0] != 10*time.Second || (*waits)[1] != 20*time.Second {
+		t.Errorf("expected sleeps of 10s then 20s, got %v", *waits)
+	}
+}
+
 // Cancelling ctx during the wait aborts promptly with ctx.Err() (Ctrl-C path).
 // Uses the real sleepContext and clock.
 func TestWithRetry_CancelledDuringSleep(t *testing.T) {

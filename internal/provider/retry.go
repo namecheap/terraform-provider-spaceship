@@ -18,6 +18,11 @@ const (
 	// retryWaitMargin lands the follow-up just after the window resets rather
 	// than on its edge.
 	retryWaitMargin = 1 * time.Second
+	// retryDeadlineHeadroom is the budget the retried call itself needs after
+	// the wait. A wait that fits the deadline but leaves less than this would
+	// sleep into a guaranteed "context deadline exceeded" instead of failing
+	// fast with an actionable message.
+	retryDeadlineHeadroom = 5 * time.Second
 )
 
 // Test seams: tests swap the sleep for an instant recorder that advances a
@@ -103,35 +108,42 @@ func withRetry(ctx context.Context, opName, domain string, fn func() error) erro
 }
 
 // waitTurn sleeps out any active wait on the bucket, failing fast when the
-// wait cannot fit before the ctx deadline. cause is the 429 that triggered
-// the wait when the caller has one; it is wrapped into the fail-fast error so
-// errors.As still surfaces the API error.
+// wait (plus headroom for the retried call itself) cannot fit before the ctx
+// deadline. It re-checks the bucket after waking: another goroutine's 429 may
+// have re-blocked it during the sleep, and attempting then would burn a
+// request the limiter already knows is doomed. cause is the 429 that
+// triggered the wait when the caller has one; it is wrapped into the
+// fail-fast error so errors.As still surfaces the API error.
 func waitTurn(ctx context.Context, opName, key string, cause error) error {
-	wait := retryLimiter.remaining(key)
-	if wait <= 0 {
-		return nil
-	}
+	for {
+		wait := retryLimiter.remaining(key)
+		if wait <= 0 {
+			return nil
+		}
 
-	if deadline, ok := ctx.Deadline(); ok {
-		remaining := time.Until(deadline)
-		if wait > remaining {
-			msg := fmt.Sprintf(
-				"%s: rate limited, and the requested wait of %s exceeds the %s left of the operation timeout — raise the resource timeouts block or retry later",
-				opName, wait, remaining.Round(time.Second),
-			)
-			if cause != nil {
-				return fmt.Errorf("%s: %w", msg, cause)
+		if deadline, ok := ctx.Deadline(); ok {
+			remaining := time.Until(deadline)
+			if wait+retryDeadlineHeadroom > remaining {
+				msg := fmt.Sprintf(
+					"%s: rate limited, and the requested wait of %s exceeds the %s left of the operation timeout — raise the resource timeouts block or retry later",
+					opName, wait, remaining.Round(time.Second),
+				)
+				if cause != nil {
+					return fmt.Errorf("%s: %w", msg, cause)
+				}
+				return errors.New(msg)
 			}
-			return errors.New(msg)
+		}
+
+		tflog.Warn(ctx, "rate limited by the Spaceship API, waiting before retry", map[string]any{
+			"operation": opName,
+			"wait":      wait.String(),
+		})
+
+		if err := retrySleep(ctx, wait); err != nil {
+			return err
 		}
 	}
-
-	tflog.Warn(ctx, "rate limited by the Spaceship API, waiting before retry", map[string]any{
-		"operation": opName,
-		"wait":      wait.String(),
-	})
-
-	return retrySleep(ctx, wait)
 }
 
 // retryWait converts a rate-limit error into the wait duration: the

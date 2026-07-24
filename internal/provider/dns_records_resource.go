@@ -31,12 +31,14 @@ var (
 
 // Worst case create/update makes four rate-limitable calls (read, delete,
 // upsert, re-read) and delete makes two (clear = read + delete), each of
-// which may wait out a full throttling window. See internal/docs/rate-limits.md.
+// which may wait out a full throttling window. Each default adds a minute of
+// slack so the last window's wait and the retried call still fit. See
+// internal/docs/rate-limits.md.
 const (
-	dnsRecordsCreateTimeout = 20 * time.Minute
-	dnsRecordsReadTimeout   = 5 * time.Minute
-	dnsRecordsUpdateTimeout = 20 * time.Minute
-	dnsRecordsDeleteTimeout = 10 * time.Minute
+	dnsRecordsCreateTimeout = 21 * time.Minute
+	dnsRecordsReadTimeout   = 6 * time.Minute
+	dnsRecordsUpdateTimeout = 21 * time.Minute
+	dnsRecordsDeleteTimeout = 11 * time.Minute
 )
 
 func NewDNSRecordsResource() resource.Resource {

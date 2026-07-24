@@ -24,13 +24,14 @@ import (
 
 // Create and delete make one rate-limitable call; update makes two (cache
 // find + upsert); read makes one zone fetch through the shared cache. Each
-// default covers the calls' throttling windows with margin. See
+// default covers the calls' throttling windows plus at least a minute of
+// slack so the last window's wait and the retried call still fit. See
 // internal/docs/rate-limits.md.
 const (
 	dnsRecordCreateTimeout = 10 * time.Minute
-	dnsRecordReadTimeout   = 5 * time.Minute
-	dnsRecordUpdateTimeout = 10 * time.Minute
-	dnsRecordDeleteTimeout = 5 * time.Minute
+	dnsRecordReadTimeout   = 6 * time.Minute
+	dnsRecordUpdateTimeout = 11 * time.Minute
+	dnsRecordDeleteTimeout = 6 * time.Minute
 )
 
 func NewDNSRecordResource() resource.Resource {

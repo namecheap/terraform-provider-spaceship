@@ -31,13 +31,14 @@ var (
 )
 
 // Every operation makes a single rate-limitable call (upsert, list fetch, or
-// delete), so each default covers one full throttling window with margin.
+// delete), so each default covers one full throttling window plus at least a
+// minute of slack so the window's wait and the retried call still fit.
 // See internal/docs/rate-limits.md.
 const (
 	personalNSCreateTimeout = 10 * time.Minute
-	personalNSReadTimeout   = 5 * time.Minute
+	personalNSReadTimeout   = 6 * time.Minute
 	personalNSUpdateTimeout = 10 * time.Minute
-	personalNSDeleteTimeout = 5 * time.Minute
+	personalNSDeleteTimeout = 6 * time.Minute
 )
 
 func NewPersonalNameserverResource() resource.Resource {

@@ -25,9 +25,12 @@ both paths are exhausted.
 - The wait is the server's `Retry-After` plus a 1s margin; 30s + margin when
   the header is missing.
 - The ctx deadline (from the resource `timeouts` block) is the only budget —
-  no attempt counters. A wait that cannot fit fails immediately with the
-  requested wait, the remaining time, and the knob to turn, wrapping the
-  original API error.
+  no attempt counters. A wait that cannot fit (including a few seconds of
+  headroom for the retried call itself) fails immediately with the requested
+  wait, the remaining time, and the knob to turn, wrapping the original API
+  error. After every sleep the bucket is re-checked before attempting, so a
+  429 recorded by a sibling goroutine mid-sleep extends the wait instead of
+  burning a doomed request.
 - Waits are shared: a limiter keyed `operation|domain` (matching the API's
   per-domain buckets) lets concurrent goroutines join one wait instead of each
   burning a request — correct at any `-parallelism`. A throttled domain never
@@ -43,10 +46,12 @@ both paths are exhausted.
 
 Every resource and both data sources expose a `timeouts` block
 (`terraform-plugin-framework-timeouts`). Defaults = rate-limitable calls per
-operation × one full 300s window, with margin: domain 15/5/15m (delete is a
-state-only no-op); personal nameserver 10/5/10/5m; `dns_records` 20/5/20/10m
-(create/update make four calls, clear makes two); `dns_record` 10/5/10/5m;
-data source reads 5m. Each CRUD method resolves its timeout and wraps ctx via
+operation × one full 300s window, plus at least a minute of slack — the last
+window's wait is Retry-After (≤300s) + 1s margin, and the deadline must also
+fit the retried call: domain 16/6/16m (delete is a state-only no-op);
+personal nameserver 10/6/10/6m; `dns_records` 21/6/21/11m (create/update make
+four calls, clear makes two); `dns_record` 10/6/11/6m; data source reads 6m.
+Each CRUD method resolves its timeout and wraps ctx via
 `context.WithTimeout`; the singular `dns_record` retries around the shared
 cache's `Find` (not inside its detached singleflight fetch) so waits stay
 bounded by each caller's own deadline.

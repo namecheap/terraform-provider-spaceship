@@ -29,11 +29,12 @@ import (
 
 // Worst case a create/update makes three rate-limitable calls (domain-info
 // read plus two writes), each of which may wait out a full throttling window;
-// a read makes one. See internal/docs/rate-limits.md.
+// a read makes one. Each default adds a minute of slack so the last window's
+// wait and the retried call still fit. See internal/docs/rate-limits.md.
 const (
-	domainCreateTimeout = 15 * time.Minute
-	domainReadTimeout   = 5 * time.Minute
-	domainUpdateTimeout = 15 * time.Minute
+	domainCreateTimeout = 16 * time.Minute
+	domainReadTimeout   = 6 * time.Minute
+	domainUpdateTimeout = 16 * time.Minute
 )
 
 func NewDomainResource() resource.Resource {
