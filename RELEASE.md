@@ -59,11 +59,15 @@ At this point nothing is released — the commit simply sits on `master`.
   - updates `CHANGELOG.md` with a generated entry grouped by type,
   - updates `.release-please-manifest.json` with the new version,
   - opens (or updates) a PR titled `chore(master): release X.Y.Z`.
-- Authentication uses a dedicated GitHub App
-  (`SPS_RELEASE_APP_ID`, `SPS_RELEASE_PRIVATE_KEY`), **not** the default
+- Authentication uses a dedicated GitHub App (the `SPS_RELEASE_CLIENT_ID`
+  variable and `SPS_RELEASE_PRIVATE_KEY` secret), **not** the default
   `GITHUB_TOKEN`. This is required: events authored by `GITHUB_TOKEN` do
   not re-trigger workflows, so a token-authored Release PR would never run
-  CI. App-authored events do.
+  CI. App-authored events do. The App installation must grant **Repository
+  contents: Read & write** and **Pull requests: Read & write** — these
+  App-installation scopes (not the workflow's `permissions:` block, which
+  only governs the unused `GITHUB_TOKEN`) gate release-please's branch
+  push, Release PR, tag, and publish operations.
 
 The Release PR is long-lived. As more PRs merge to `master`, release-please
 keeps appending to the same PR, updating the CHANGELOG and (if the bump
@@ -129,7 +133,7 @@ GitHub Release going live.
 
 | Secret | Used by | Purpose |
 |---|---|---|
-| `SPS_RELEASE_APP_ID` | `versioning.yml` | GitHub App ID for release-please |
+| `SPS_RELEASE_CLIENT_ID` (variable, not secret) | `versioning.yml` | GitHub App client ID for release-please |
 | `SPS_RELEASE_PRIVATE_KEY` | `versioning.yml` | GitHub App private key |
 | `GPG_PRIVATE_KEY` | `release.yml` | Signing key for release artifacts |
 | `PASSPHRASE` | `release.yml` | GPG key passphrase |
@@ -144,14 +148,45 @@ GitHub Release going live.
 - Pre-1.0.0: minor versions may contain breaking changes. After 1.0.0,
   standard SemVer rules apply.
 
+## If a release doesn't appear (troubleshooting)
+
+`versioning.yml` only runs after a successful CI run on `master`, and
+release-please state is **cumulative** — every run re-scans all commits since
+the last tag, so a missed trigger delays a release rather than losing it.
+Known cases:
+
+- **CI failed or was flaky on a merge commit** (including the Release PR's
+  own merge commit): re-run the failed CI run — `workflow_run` fires again
+  when a re-run completes — or trigger versioning manually (Actions →
+  Versioning → Run workflow). A merged Release PR whose tag was never created
+  is reconciled the same way on the next successful run.
+- **The commit touched only files CI ignores** (see `paths-ignore` in
+  `ci.yml`): no CI run means no versioning run. The commit is picked up by
+  the next CI-triggering push (weekly Dependabot PRs guarantee one within
+  days) or a manual dispatch. Note the Release PR merge itself always
+  triggers CI — it touches `.release-please-manifest.json`, which is not
+  ignored.
+- **GoReleaser failed after the tag was created** (bad GPG key, upload
+  error): the GitHub Release exists without binaries. The Terraform Registry
+  will not ingest an artifact-less version, so nothing broken is served —
+  fix the cause and re-run the failed `release.yml` run for the tag.
+
 ## Manual / emergency release
 
 Prefer the normal flow. In rare cases (release-please unavailable, out-of-band
 hotfix, etc.) a release can be cut by hand:
 
 1. Bump the version in `.release-please-manifest.json` and add the
-   corresponding entry to `CHANGELOG.md`. Commit to `master`.
-2. Tag the commit: `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
+   corresponding entry to `CHANGELOG.md`. Merge to `master` **before
+   tagging** — if the tag is pushed first, the next release-please run
+   recomputes the same version from the stale manifest and fails on the
+   already-existing tag.
+2. Re-sync so the tag includes the bump commit (`git checkout master &&
+   git pull`), then tag it:
+   `git tag -a vX.Y.Z -m "Release vX.Y.Z" && git push origin vX.Y.Z`.
 3. `release.yml` runs on the pushed tag and publishes binaries as usual.
+   Caveat: in this path GoReleaser is the release *creator* and its changelog
+   is disabled, so the GitHub Release is published with an **empty body** —
+   edit the Release afterwards and paste the CHANGELOG entry in by hand.
 4. The next release-please run will reconcile its state with the updated
    manifest.

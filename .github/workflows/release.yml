@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 pulls the full history and all tags. GoReleaser needs
-      # both to compute the changelog (commits since the previous tag) and to
-      # identify the previous tag itself. The older `git fetch --unshallow`
+      # them to identify the previous tag (the changelog is owned by
+      # release-please, not GoReleaser). The older `git fetch --unshallow`
       # workaround is no longer needed since actions/checkout supports this
       # natively.
       - name: Checkout
