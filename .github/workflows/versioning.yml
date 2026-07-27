@@ -9,19 +9,32 @@ on:
       - master
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+# Serialize release-please runs: back-to-back merges to master produce
+# overlapping CI successes that would otherwise race on the same release PR.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+# The default GITHUB_TOKEN needs nothing — every write goes through the App
+# token generated below.
+permissions: {}
 
 jobs:
   release-please:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # The workflow_run branch filter matches the run's HEAD branch name, which
+    # a fork PR can spoof by naming its branch "master" — hence the
+    # head_repository guard. The conclusion guard is needed because
+    # workflow_run also fires for failed CI runs.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     steps:
       # Generate a token from GitHub App
       - name: Generate GitHub App Token
         id: generate-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.SPS_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.SPS_RELEASE_PRIVATE_KEY }}
@@ -29,7 +42,7 @@ jobs:
       # Use the generated token in release-please
       - name: Release Please
         id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
