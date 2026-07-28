@@ -319,8 +319,8 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
-	// Schema marks every non-ttl attribute RequiresReplace, so Update only
-	// runs when ttl is the only field that changed. Re-fetch the record by
+	// Schema marks every non-ttl attribute RequiresReplace, so Update runs
+	// only for ttl and/or timeouts-block changes. Re-fetch the record by
 	// identity to recover its full data, mutate the ttl, and re-upsert.
 	var plan, state dnsRecordResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -335,6 +335,14 @@ func (r *dnsRecordResource) Update(ctx context.Context, req resource.UpdateReque
 			"Invalid resource ID",
 			fmt.Sprintf("Expected format domain/TYPE/name/<signature>, got %q", state.ID.ValueString()),
 		)
+		return
+	}
+
+	// The timeouts block is client-side only: if ttl is unchanged there is
+	// nothing to write, so skip the lookup and upsert entirely.
+	if plan.TTL.Equal(state.TTL) {
+		plan.ID = state.ID
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 		return
 	}
 
