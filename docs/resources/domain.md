@@ -12,6 +12,8 @@ Manages settings of a domain registered with Spaceship — auto-renew and namese
 
 -> **Note:** This resource does not register or release domains. Creating it adopts a domain that already exists in your Spaceship account and converges its settings (`auto_renew`, `nameservers`) to the configuration. `terraform destroy` is a safe no-op: it only removes the domain from Terraform state — the domain stays registered and its settings remain intact.
 
+-> **Note:** API requests throttled by Spaceship are retried automatically until the operation timeout elapses. Use the `timeouts` block to bound how long each operation may wait.
+
 ## Example Usage
 
 ```terraform
@@ -25,6 +27,13 @@ resource "spaceship_domain" "example" {
       "ns1.example.net",
       "ns2.example.net",
     ]
+  }
+
+  # Optional: bound how long operations wait out API throttling.
+  timeouts {
+    create = "30m"
+    read   = "10m"
+    update = "30m"
   }
 }
 ```
@@ -40,6 +49,7 @@ resource "spaceship_domain" "example" {
 
 - `auto_renew` (Boolean) Indicates whether the auto-renew option is enabled
 - `nameservers` (Attributes) Nameserver delegation for the domain. (see [below for nested schema](#nestedatt--nameservers))
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
@@ -62,6 +72,16 @@ Optional:
 
 - `hosts` (Set of String) Nameserver host names (2 to 12 entries). Required when provider is custom.
 - `provider` (String) Nameserver provider: basic (Spaceship's default nameservers) or custom (the hosts listed in hosts).
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Read operations occur during any refresh or planning operation when refresh is enabled.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 
 
 <a id="nestedatt--contacts"></a>

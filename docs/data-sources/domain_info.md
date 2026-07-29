@@ -34,6 +34,10 @@ output "domain_info" {
 
 - `domain` (String) The domain name to look up (for example example.com).
 
+### Optional
+
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+
 ### Read-Only
 
 - `auto_renew` (Boolean) Whether the auto-renew option is enabled.
@@ -49,6 +53,14 @@ output "domain_info" {
 - `suspensions` (Attributes List) Information about domain suspensions. May contain up to 2 items. (see [below for nested schema](#nestedatt--suspensions))
 - `unicode_name` (String) Domain name in UTF-8 format (U-label).
 - `verification_status` (String) Status of the RAA verification process. One of verification, success, failed. Null when not applicable.
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+
 
 <a id="nestedatt--contacts"></a>
 ### Nested Schema for `contacts`

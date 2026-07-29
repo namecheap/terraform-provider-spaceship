@@ -67,6 +67,7 @@ resource "spaceship_dns_record" "web" {
 - `tag` (String) Tag for CAA records (e.g. `issue`)
 - `target` (String) Target host for SRV records.
 - `target_name` (String) Target name for HTTPS/SVCB records.
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `ttl` (Number) Record TTL in seconds, between `60` and `3600`. Defaults to `3600` if omitted.
 - `usage` (Number) Usage value for TLSA records (0-255). Required for TLSA records.
 - `value` (String) Generic value field used by several record types (CAA, TXT).
@@ -75,6 +76,16 @@ resource "spaceship_dns_record" "web" {
 ### Read-Only
 
 - `id` (String) Composite identifier with the form `domain/TYPE/name/<data-signature>`. The data signature is a normalized representation of the record's type-specific fields (lowercased, pipe-separated) and is the same key used internally for record matching. Stable across updates that don't change identity (e.g. TTL changes).
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Read operations occur during any refresh or planning operation when refresh is enabled.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 
 ## Import
 

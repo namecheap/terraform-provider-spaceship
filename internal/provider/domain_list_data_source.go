@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -25,8 +26,9 @@ func (r *domainListDataSource) Metadata(_ context.Context, req datasource.Metada
 }
 
 type domainListDataSourceModel struct {
-	Items []domainModel `tfsdk:"items"`
-	Total types.Int64   `tfsdk:"total"`
+	Items    []domainModel  `tfsdk:"items"`
+	Total    types.Int64    `tfsdk:"total"`
+	Timeouts timeouts.Value `tfsdk:"timeouts"`
 }
 
 func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
@@ -39,15 +41,21 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 	tflog.Debug(ctx, "reading domain list")
 
-	var err error
-
 	if r.client == nil {
 		resp.Diagnostics.AddError("Unconfigured provider", "The Spaceship provider was not configured. Please run terraform init or configure the provider block.")
 		return
 	}
 
-	response, err := r.client.GetDomainList(ctx)
+	ctx, cancel := operationContext(ctx, data.Timeouts.Read, domainReadTimeout, &resp.Diagnostics)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	// The domain list bucket is per user, not per domain.
+	response, err := withRetryValue(ctx, "read domain list", perUserBucket(r.client), func() (client.DomainList, error) {
+		return r.client.GetDomainList(ctx)
+	})
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Unable to read domain list",
@@ -73,9 +81,12 @@ func (r *domainListDataSource) Read(ctx context.Context, req datasource.ReadRequ
 
 }
 
-func (r *domainListDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (r *domainListDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Lists every domain in the Spaceship account, with the same details for each entry as the `spaceship_domain_info` data source.",
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx),
+		},
 		Attributes: map[string]schema.Attribute{
 			"total": schema.Int64Attribute{
 				Computed:    true,

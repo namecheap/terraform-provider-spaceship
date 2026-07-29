@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-timeouts/datasource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -30,12 +31,20 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 	var domain types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("domain"), &domain)...)
 
+	var configTimeouts timeouts.Value
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("timeouts"), &configTimeouts)...)
+
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	response, err := d.client.GetDomainInfo(ctx, domain.ValueString())
+	ctx, cancel := operationContext(ctx, configTimeouts.Read, domainReadTimeout, &resp.Diagnostics)
+	defer cancel()
+	if resp.Diagnostics.HasError() {
+		return
+	}
 
+	response, err := getDomainInfoWithRetry(ctx, d.client, domain.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Unable to read domain info", err.Error())
 		return
@@ -47,14 +56,14 @@ func (d *domainInfoDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 
-	data := domainInfoModel{Domain: domain}
+	data := domainInfoModel{Domain: domain, Timeouts: configTimeouts}
 	data.domainModel = domainDetails
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 
 }
 
-func (d *domainInfoDataSource) Schema(_ context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *domainInfoDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	attrs := domainAttributes()
 	attrs["domain"] = schema.StringAttribute{
 		Required:    true,
@@ -67,6 +76,9 @@ func (d *domainInfoDataSource) Schema(_ context.Context, req datasource.SchemaRe
 	resp.Schema = schema.Schema{
 		Description: "Reads the details of a single domain in the Spaceship account: registration and expiration dates, nameserver delegation, contacts, privacy protection, lifecycle and verification status.",
 		Attributes:  attrs,
+		Blocks: map[string]schema.Block{
+			"timeouts": timeouts.Block(ctx),
+		},
 	}
 }
 

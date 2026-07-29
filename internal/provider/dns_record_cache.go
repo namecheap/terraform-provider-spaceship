@@ -3,11 +3,18 @@ package provider
 import (
 	"context"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/singleflight"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
+
+// dnsRecordCacheFetchTimeout bounds the detached singleflight fetch. The
+// fetch is a plain paginated zone read with no retries, so a couple of
+// minutes is generous; without a cap an abandoned fetch (every waiter gave
+// up) would run unbounded, detached from any caller's deadline.
+const dnsRecordCacheFetchTimeout = 2 * time.Minute
 
 // dnsRecordCache memoizes per-domain DNS record fetches for the lifetime of a
 // provider process (i.e. a single Terraform command). The singular
@@ -36,12 +43,18 @@ type dnsRecordCache struct {
 
 	mu      sync.Mutex
 	entries map[string][]client.DNSRecord
+	// gen counts invalidations per domain. A fetch snapshots the generation
+	// when it starts and only stores its result if the generation is unchanged
+	// when it finishes — a detached fetch that raced a write can therefore
+	// never re-cache pre-write data after the write's Invalidate.
+	gen map[string]uint64
 }
 
 func newDNSRecordCache(c *client.Client) *dnsRecordCache {
 	return &dnsRecordCache{
 		client:  c,
 		entries: make(map[string][]client.DNSRecord),
+		gen:     make(map[string]uint64),
 	}
 }
 
@@ -65,7 +78,11 @@ func (c *dnsRecordCache) Find(ctx context.Context, domain, recordType, name, sig
 func (c *dnsRecordCache) Invalidate(domain string) {
 	c.mu.Lock()
 	delete(c.entries, domain)
+	c.gen[domain]++
 	c.mu.Unlock()
+	// Forget any in-flight fetch so callers arriving after the write start a
+	// fresh flight instead of joining one that snapshotted pre-write data.
+	c.sf.Forget(domain)
 }
 
 // records returns the domain's custom-group records, serving the cached slice
@@ -87,14 +104,23 @@ func (c *dnsRecordCache) records(ctx context.Context, domain string) ([]client.D
 	// DoChan + select lets each caller observe its own context cancellation,
 	// and context.WithoutCancel detaches the shared fetch from any single
 	// caller's ctx so one caller's cancellation can't fail waiters that still
-	// need the result.
+	// need the result; the fetch keeps its own deadline so it cannot outlive
+	// every waiter indefinitely.
 	ch := c.sf.DoChan(domain, func() (any, error) {
-		records, err := c.client.GetDNSRecords(context.WithoutCancel(ctx), domain)
+		c.mu.Lock()
+		startGen := c.gen[domain]
+		c.mu.Unlock()
+
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dnsRecordCacheFetchTimeout)
+		defer cancel()
+		records, err := c.client.GetDNSRecords(fetchCtx, domain)
 		if err != nil {
 			return nil, err
 		}
 		c.mu.Lock()
-		c.entries[domain] = records
+		if c.gen[domain] == startGen {
+			c.entries[domain] = records
+		}
 		c.mu.Unlock()
 		return records, nil
 	})

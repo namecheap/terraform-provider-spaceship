@@ -1,6 +1,8 @@
 package provider
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestPersonalNameserverID_RoundTrip(t *testing.T) {
 	id := personalNameserverID("example.com", "ns1")

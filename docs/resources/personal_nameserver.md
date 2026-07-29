@@ -37,9 +37,23 @@ resource "spaceship_personal_nameserver" "ns2" {
 - `host` (String) The host label of the nameserver, relative to `domain` (for example `ns1`, not `ns1.example.com`). The registry joins the label and the domain to form the full host name `ns1.example.com`; supplying a fully qualified name here is accepted by the API but produces the almost certainly unintended glue host `ns1.example.com.example.com`. Changing this renames the host in place via the API.
 - `ips` (Set of String) The glue record IP addresses (IPv4 or IPv6) served for this host. Must contain between 1 and 16 publicly routable addresses — the API rejects reserved ranges (e.g. private or documentation addresses).
 
+### Optional
+
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+
 ### Read-Only
 
 - `id` (String) Composite identifier with the form `domain/host`.
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Read operations occur during any refresh or planning operation when refresh is enabled.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
 
 ## Import
 

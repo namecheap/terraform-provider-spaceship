@@ -360,7 +360,9 @@ resource "%s" "%s" {
 
 // testAccSetNameservers sets the test domain's nameservers out-of-band via the
 // SDK. The API rejects updates matching the current provider, so it skips when
-// the domain is already in the desired state.
+// the domain is already in the desired state. Calls go through the provider's
+// retry wrappers: the raw client would surface a 429 when the domain-info
+// bucket and its domain-list fallback are both drained.
 func testAccSetNameservers(t *testing.T, nsProvider string, hosts []string) {
 	t.Helper()
 
@@ -369,7 +371,11 @@ func testAccSetNameservers(t *testing.T, nsProvider string, hosts []string) {
 		t.Fatalf("failed to create test client: %v", err)
 	}
 
-	info, err := testClient.GetDomainInfo(context.Background(), testAccDomainValue())
+	ctx, cancel := context.WithTimeout(context.Background(), domainUpdateTimeout)
+	defer cancel()
+
+	domain := testAccDomainValue()
+	info, err := getDomainInfoWithRetry(ctx, testClient, domain)
 	if err != nil {
 		t.Fatalf("failed to read domain info: %v", err)
 	}
@@ -378,9 +384,11 @@ func testAccSetNameservers(t *testing.T, nsProvider string, hosts []string) {
 		return
 	}
 
-	err = testClient.UpdateDomainNameServers(context.Background(), testAccDomainValue(), client.UpdateNameserverRequest{
-		Provider: client.NameserverProvider(nsProvider),
-		Hosts:    hosts,
+	err = withRetry(ctx, "update nameservers", domain, func() error {
+		return testClient.UpdateDomainNameServers(ctx, domain, client.UpdateNameserverRequest{
+			Provider: client.NameserverProvider(nsProvider),
+			Hosts:    hosts,
+		})
 	})
 	if err != nil {
 		t.Fatalf("failed to set nameservers provider=%s: %v", nsProvider, err)

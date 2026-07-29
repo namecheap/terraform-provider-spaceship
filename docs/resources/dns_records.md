@@ -75,6 +75,7 @@ resource "spaceship_dns_records" "example" {
 
 - `force` (Boolean) Deprecated: this attribute has no effect. The provider always applies DNS updates with force enabled.
 - `records` (Attributes List) DNS records that should be configured for the domain. The provider diffs this list against existing custom records — only removed records are deleted and new or changed records are upserted. Records in other DNS groups (product, personalNS) are not affected. (see [below for nested schema](#nestedatt--records))
+- `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
 ### Read-Only
 
@@ -116,3 +117,14 @@ Optional:
 - `usage` (Number) Usage value for TLSA records (0-255). Required for TLSA records.
 - `value` (String) Generic value field used by several record types (CAA, TXT).
 - `weight` (Number) Weight for SRV records (0-65535).
+
+
+<a id="nestedblock--timeouts"></a>
+### Nested Schema for `timeouts`
+
+Optional:
+
+- `create` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
+- `delete` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Setting a timeout for a Delete operation is only applicable if changes are saved into state before the destroy operation occurs.
+- `read` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours). Read operations occur during any refresh or planning operation when refresh is enabled.
+- `update` (String) A string that can be [parsed as a duration](https://pkg.go.dev/time#ParseDuration) consisting of numbers and unit suffixes, such as "30s" or "2h45m". Valid time units are "s" (seconds), "m" (minutes), "h" (hours).
