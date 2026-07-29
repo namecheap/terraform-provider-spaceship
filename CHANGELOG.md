@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.9...v0.6.0) (2026-07-29)
+
+
+### Features
+
+* retry rate-limited API calls with configurable operation timeouts ([#122](https://github.com/namecheap/terraform-provider-spaceship/issues/122)) ([d269a52](https://github.com/namecheap/terraform-provider-spaceship/commit/d269a524c08d05253a8d762627cc4d6df8a8961c))
+
 ## [0.5.9](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.8...v0.5.9) (2026-07-23)
 
 
