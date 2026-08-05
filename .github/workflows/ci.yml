@@ -1,24 +1,19 @@
 name: CI
 
+# No workflow-level paths-ignore here, on purpose. If this workflow does not
+# trigger at all, two things break: (1) required status checks are never
+# reported on PRs that touch only excluded files, which blocks them from
+# merging permanently, and (2) versioning.yml's `workflow_run: [CI]` trigger
+# never fires on pushes that touch only release files, stalling the
+# release-please -> tag -> GoReleaser chain. Instead, the `changes` job below
+# detects what changed and the expensive jobs skip themselves via `if:` —
+# skipped checks DO satisfy branch protection, and the workflow still
+# completes so workflow_run still fires. See CI.md.
 on:
     push:
         branches:
             - master
-        paths-ignore:
-            - "**.md"
-            - "LICENSE"
-            - "CLAUDE.md"
-            - "AGENTS.md"
-            - ".github/ISSUE_TEMPLATE/**"
-            - ".github/pull_request_template.md"
     pull_request:
-        paths-ignore:
-            - "**.md"
-            - "LICENSE"
-            - "CLAUDE.md"
-            - "AGENTS.md"
-            - ".github/ISSUE_TEMPLATE/**"
-            - ".github/pull_request_template.md"
 
 # Least-privilege default: CI only reads the repo. Codecov uses its own token
 # (CODECOV_TOKEN secret), and upload-artifact does not require write perms.
@@ -26,9 +21,49 @@ permissions:
     contents: read
 
 jobs:
+    # Gate job: decides whether the jobs below actually need to run for this
+    # change. `code` is false only when the diff touches nothing but
+    # root-level markdown (README/CHANGELOG/CLAUDE.md/...), LICENSE, or the
+    # release-please manifest — most notably the release-please Release PR
+    # (CHANGELOG.md + .release-please-manifest.json) and its merge to master,
+    # which previously re-ran the full acceptance suite twice per release on
+    # code that was already tested. docs/** and templates/** deliberately
+    # count as code: docs/ is published to the Terraform Registry at each
+    # release tag, so doc changes get the full pipeline like any user-visible
+    # change.
+    changes:
+        name: Detect Changes
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read # paths-filter reads PR files via the API on pull_request events
+        outputs:
+            code: ${{ steps.filter-code.outputs.code }}
+        steps:
+            # Checkout is required for push events, where paths-filter diffs
+            # with git (pull_request events use the API and would not need it).
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            # With predicate-quantifier=every a file counts as `code` only if
+            # it matches ALL patterns, i.e. it is none of the ignored kinds.
+            # `*.md` (no globstar) matches root-level markdown only, so nested
+            # markdown — docs/**, templates/** — still counts as code on
+            # purpose.
+            - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+              id: filter-code
+              with:
+                  predicate-quantifier: "every"
+                  filters: |
+                      code:
+                          - '!*.md'
+                          - '!LICENSE'
+                          - '!.release-please-manifest.json'
+
     check:
         name: Check
         runs-on: ubuntu-latest
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
             - name: Set up Go
@@ -109,6 +144,8 @@ jobs:
         # tooling can consume an inventory without re-running the scan.
         name: Security scan (Trivy)
         runs-on: ubuntu-latest
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -188,6 +225,8 @@ jobs:
         # advisory DB is fetched fresh each run.
         name: Security scan (govulncheck)
         runs-on: ubuntu-latest
+        needs: changes
+        if: needs.changes.outputs.code == 'true'
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -231,9 +270,12 @@ jobs:
         # pass/fail is taken verbatim from the gate jobs (needs.*.result), so a
         # green comment can never mask a red gate.
         name: Security scan summary
-        needs: [security, govulncheck]
-        # Run even when a gate above failed — that's when the summary matters most.
-        if: ${{ !cancelled() }}
+        needs: [changes, security, govulncheck]
+        # Run even when a scan above failed — that's when the summary matters
+        # most. `!cancelled()` alone would also run when the `changes` gate
+        # skipped the scans (status-check functions override the implicit
+        # success() on needs), so the gate output is re-checked explicitly.
+        if: ${{ !cancelled() && needs.changes.outputs.code == 'true' }}
         runs-on: ubuntu-latest
         permissions:
             contents: read # checkout + read go.mod for the dependency overview
@@ -308,7 +350,13 @@ jobs:
 
     acceptance:
         name: Acceptance Tests
-        needs: check
+        needs: [changes, check]
+        # The implicit success() still applies alongside this expression, so
+        # the job keeps requiring `check` to pass. The acceptance-secrets
+        # probe stays step-level (see below): when secrets are absent (fork /
+        # Dependabot PRs) the job still runs and passes with all steps
+        # skipped, exactly as before.
+        if: needs.changes.outputs.code == 'true'
         runs-on: ubuntu-latest
         concurrency:
             group: acceptance-tests
@@ -351,3 +399,25 @@ jobs:
                   SPACESHIP_TEST_DOMAIN: ${{ secrets.SPACESHIP_TEST_DOMAIN }}
                   TF_ACC: 1
               run: make testacc
+
+    # Always-run summary job with two purposes:
+    # 1. A workflow run whose jobs were ALL skipped by the gate would
+    #    otherwise have no executed job, making the run-level conclusion
+    #    (which gates versioning.yml via workflow_run) ambiguous. This job
+    #    always executes, so the run always concludes success or failure.
+    # 2. Branch protection can require just this one check instead of listing
+    #    every job: it fails if any needed job failed or was cancelled, and
+    #    passes when jobs succeeded or were legitimately skipped by the gate.
+    # Every job in this workflow must be listed in `needs` below.
+    ci-ok:
+        name: CI OK
+        runs-on: ubuntu-latest
+        needs: [changes, check, security, govulncheck, security-report, acceptance]
+        if: always()
+        steps:
+            - name: Check results of all jobs
+              env:
+                  NEEDS: ${{ toJSON(needs) }}
+              run: |
+                  echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+                  echo "$NEEDS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")' > /dev/null
