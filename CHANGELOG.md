@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.6.0...v1.0.0) (2026-08-05)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/hashicorp/terraform-plugin-log from 0.10.0 to 0.11.0 in the go-deps group ([#128](https://github.com/namecheap/terraform-provider-spaceship/issues/128)) ([7f70177](https://github.com/namecheap/terraform-provider-spaceship/commit/7f70177e649488358f229f890d015ece39e674e8))
+* **docs:** prepare v1.0 release ([#127](https://github.com/namecheap/terraform-provider-spaceship/issues/127)) ([899800f](https://github.com/namecheap/terraform-provider-spaceship/commit/899800fc5ebb477067c6d420fd622b4ffeee646a))
+
+
+### Miscellaneous Chores
+
+* release 1.0.0 ([97f6182](https://github.com/namecheap/terraform-provider-spaceship/commit/97f618273750caf085292736679fb8c45ae2f326))
+
 ## [0.6.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.5.9...v0.6.0) (2026-07-29)
 
 
