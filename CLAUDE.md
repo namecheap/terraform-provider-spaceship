@@ -86,3 +86,20 @@ Releases are semi-manual and maintainer-gated: merges to `master` accumulate int
 - **Registry docs** (the `docs/` tree) are ingested by the Terraform Registry only at a release tag → correct them with `fix(docs):`. Repo-internal markdown (README, `RELEASE.md`, `CLAUDE.md`) stays `docs:`.
 
 For Dependabot this is enforced via `commit-message.prefix` in `.github/dependabot.yml` (gomod → `fix`, github-actions → `ci`).
+
+**Forcing a specific version** (e.g. the 0.x → 1.0.0 jump): release-please needs a
+standalone `Release-As: X.Y.Z` trailer line in a commit body on `master` — canonical
+form is an empty commit, `git commit --allow-empty -m "chore: release 1.0.0" -m
+"Release-As: 1.0.0"` (direct push needs ruleset bypass). *Mentioning* the footer in
+prose does not parse: v1.0.0 was initially proposed as 0.6.1 because a merge commit
+described `Release-As: 1.0.0` in a sentence instead of carrying it as a trailer.
+release-please rewrites the Release PR only after a successful CI run on `master`;
+non-releasing merges (`ci:`, `docs:`) leave its version untouched.
+
+**CI changes gate** (`.github/workflows/ci.yml`, details in [CI.md](CI.md)): pushes
+touching only root-level `*.md`, `LICENSE`, or `.release-please-manifest.json` — and
+empty commits — skip all test jobs; the always-run `CI OK` job still concludes the
+run `success` (~30 s vs ~5 min), so versioning fires normally. On PRs the gate
+classifies the **whole PR diff**, not the head commit. `docs/`, `templates/` and
+`examples/` count as code. The gate fails open if `CI OK` is not a required check —
+keep it required (see CI.md "invariants").
