@@ -18,7 +18,7 @@ Three workflows participate:
 
 | Workflow | Trigger | Role |
 |---|---|---|
-| [`ci.yml`](.github/workflows/ci.yml) | push to `master`, PRs | Lint, unit tests, coverage threshold, doc validation, optional acceptance tests |
+| [`ci.yml`](.github/workflows/ci.yml) | push to `master`, PRs | Lint, unit tests, coverage threshold, doc validation, security scans, optional acceptance tests — jobs are gated on changed paths, see [CI.md](CI.md) |
 | [`versioning.yml`](.github/workflows/versioning.yml) | `ci.yml` success on `master`, manual dispatch | Runs release-please to open/update the Release PR |
 | [`release.yml`](.github/workflows/release.yml) | push of a `v*` tag | Runs GoReleaser to build, sign, and publish artifacts |
 
@@ -160,12 +160,12 @@ Known cases:
   when a re-run completes — or trigger versioning manually (Actions →
   Versioning → Run workflow). A merged Release PR whose tag was never created
   is reconciled the same way on the next successful run.
-- **The commit touched only files CI ignores** (see `paths-ignore` in
-  `ci.yml`): no CI run means no versioning run. The commit is picked up by
-  the next CI-triggering push (weekly Dependabot PRs guarantee one within
-  days) or a manual dispatch. Note the Release PR merge itself always
-  triggers CI — it touches `.release-please-manifest.json`, which is not
-  ignored.
+- **The commit touched only docs-like files** (root-level markdown,
+  `LICENSE`, the release-please manifest): CI still runs — its `changes`
+  gate skips the test jobs, but the always-run `CI OK` job completes the
+  workflow with `success`, so versioning fires as usual (see
+  [CI.md](CI.md)). Unlike the old workflow-level `paths-ignore`, this can
+  no longer stall a release.
 - **GoReleaser failed after the tag was created** (bad GPG key, upload
   error): the GitHub Release exists without binaries. The Terraform Registry
   will not ingest an artifact-less version, so nothing broken is served —
