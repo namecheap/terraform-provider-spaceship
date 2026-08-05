@@ -12,6 +12,8 @@ description: |-
 
 ~> **Warning:** `host` is a label relative to `domain`, not a fully qualified name. The API accepts an FQDN such as `ns1.example.com` and silently creates the glue host `ns1.example.com.example.com`. The provider does not reject this, because dotted labels (e.g. `ns1.sub` → `ns1.sub.example.com`) are valid input — double-check that `host` does not already include the domain.
 
+-> **Note:** API requests throttled by Spaceship are retried automatically until the operation timeout elapses. Use the `timeouts` block to bound how long each operation may wait.
+
 ## Example Usage
 
 {{ tffile .ExampleFile }}
