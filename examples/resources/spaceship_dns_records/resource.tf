@@ -22,16 +22,16 @@ resource "spaceship_dns_records" "example" {
       preference = 10
     },
     {
-      type       = "ALIAS"
-      name       = "@"
-      ttl        = 3600
-      alias_name = "origin.example.com"
-    },
-    {
       type  = "CNAME"
       name  = "www"
       ttl   = 3600
       cname = "example.com"
+    },
+    {
+      type       = "ALIAS"
+      name       = "docs"
+      ttl        = 3600
+      alias_name = "origin.example.com"
     },
     {
       type  = "TXT"

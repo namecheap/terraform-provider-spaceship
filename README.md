@@ -56,7 +56,7 @@ terraform {
   required_providers {
     spaceship = {
       source  = "registry.terraform.io/namecheap/spaceship"
-      version = ">= 0.4.0"
+      version = "~> 1.0"
     }
   }
 }
