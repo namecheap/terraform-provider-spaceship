@@ -400,24 +400,50 @@ jobs:
                   TF_ACC: 1
               run: make testacc
 
-    # Always-run summary job with two purposes:
+    # Summary job with two purposes:
     # 1. A workflow run whose jobs were ALL skipped by the gate would
     #    otherwise have no executed job, making the run-level conclusion
     #    (which gates versioning.yml via workflow_run) ambiguous. This job
-    #    always executes, so the run always concludes success or failure.
+    #    executes on every run that isn't cancelled, so the run always
+    #    concludes success/failure. `!cancelled()` rather than `always()`:
+    #    a superseded PR run cancelled by the concurrency group skips this
+    #    job instead of spending a runner to post a red check on a dead SHA
+    #    (checks are evaluated per-SHA, so the replacement run supplies the
+    #    required check).
     # 2. Branch protection can require just this one check instead of listing
     #    every job: it fails if any needed job failed or was cancelled, and
     #    passes when jobs succeeded or were legitimately skipped by the gate.
-    # Every job in this workflow must be listed in `needs` below.
+    # Every job in this workflow must be listed in `needs` below; the first
+    # step asserts that, so a job missing from the list fails this check
+    # instead of silently escaping it.
     ci-ok:
         name: CI OK
         runs-on: ubuntu-latest
         needs: [changes, check, security, govulncheck, security-report, acceptance]
-        if: always()
+        if: ${{ !cancelled() }}
         steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+            # "CI OK" only guards the jobs listed in its `needs`. A job added
+            # to the workflow but not to that list could fail without turning
+            # this check red — the exact gap this job exists to close — so
+            # assert the two lists match instead of relying on the note in
+            # CI.md.
+            - name: Assert every job is watched by this gate
+              run: |
+                  watched=$(yq '.jobs.ci-ok.needs[]' .github/workflows/ci.yml | sort)
+                  all=$(yq '.jobs | keys | .[]' .github/workflows/ci.yml | grep -vx 'ci-ok' | sort)
+                  if ! diff <(echo "$all") <(echo "$watched"); then
+                    echo "::error::ci.yml jobs and ci-ok's needs list have drifted (< missing from needs, > stale entry)."
+                    exit 1
+                  fi
+
             - name: Check results of all jobs
               env:
                   NEEDS: ${{ toJSON(needs) }}
               run: |
                   echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
-                  echo "$NEEDS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")' > /dev/null
+                  if ! echo "$NEEDS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")' > /dev/null; then
+                    echo "::error::One or more CI jobs failed or were cancelled — see the results above."
+                    exit 1
+                  fi
