@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.0...v1.0.1) (2026-08-13)
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/namecheap/go-spaceship-sdk from 0.2.0 to 0.2.1 ([#135](https://github.com/namecheap/terraform-provider-spaceship/issues/135)) ([32d27f4](https://github.com/namecheap/terraform-provider-spaceship/commit/32d27f453bee04b89989117fe3580b9bb144af04))
+
 ## [1.0.0](https://github.com/namecheap/terraform-provider-spaceship/compare/v0.6.0...v1.0.0) (2026-08-05)
 
 
