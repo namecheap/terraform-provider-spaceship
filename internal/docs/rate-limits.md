@@ -42,6 +42,30 @@ both paths are exhausted.
   heartbeat covers apply. Plan/refresh has no heartbeat (core limitation), so
   the read timeout bounds the quiet period.
 
+## Read-after-write propagation (auto_renew)
+
+The auto-renew update endpoint confirms the new value synchronously, but a
+`GetDomainInfo` issued straight afterwards can still serve the previous one.
+`Update` already trusts the plan value for fields it wrote, so the apply is
+correct — but the next refresh re-reads the API with no memory of the write
+and reports drift the user never asked for.
+
+`updateAutoRenewWithRetry` therefore pauses for `autoRenewSettleWait` (2s)
+after a successful write, so every later read is correct by construction. It
+does not read anything back: domain info allows only 5–10 requests per domain
+per 300s, and a confirmation read would spend one of them to learn what the
+wait already guarantees.
+
+The pause is only paid when the value actually changes — callers skip the
+write entirely when plan and state agree.
+
+An earlier implementation polled with backoff under a 30s budget. It always
+saw the new value on its first read after the 2s wait, which is what
+established that a plain pause is enough. Reverting the wait altogether was
+also tried, and acceptance failed immediately, so the pause is load-bearing
+rather than defensive. If drift ever reappears, raising `autoRenewSettleWait`
+is the single knob.
+
 ## Operation timeouts
 
 Every resource and both data sources expose a `timeouts` block

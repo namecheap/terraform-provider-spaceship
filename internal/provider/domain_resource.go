@@ -476,6 +476,8 @@ func (d *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 	// The autorenew and nameserver update APIs confirm changes synchronously
 	// (return the new value), but GetDomainInfo may return stale data due to
 	// eventual consistency. Trust the plan values for fields we successfully updated.
+	// updateAutoRenewWithRetry pauses for the write to propagate; this covers
+	// the apply itself, which happens before that pause can help a re-read.
 	if !plan.AutoRenew.IsNull() && !plan.AutoRenew.IsUnknown() {
 		state.AutoRenew = plan.AutoRenew
 	}

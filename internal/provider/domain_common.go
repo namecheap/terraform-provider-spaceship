@@ -20,6 +20,19 @@ import (
 // See internal/docs/rate-limits.md.
 const domainReadTimeout = rateLimitWindow + time.Minute
 
+// autoRenewSettleWait pauses after an auto_renew write so the change has time
+// to propagate before anything reads it back. The update endpoint confirms the
+// new value synchronously, but a GetDomainInfo issued straight afterwards can
+// still serve the previous one. Update survives that by trusting the plan
+// value it wrote, so the apply is correct — but the *next* refresh re-reads
+// with no memory of the write and reports drift the user never asked for.
+//
+// The lag measured under a second, so this pause covers it without reading
+// anything back: domain info allows only 5-10 requests per domain per 300s,
+// and a confirmation read would spend one of them to learn what the wait
+// already guarantees.
+const autoRenewSettleWait = 2 * time.Second
+
 // The domain-info and auto-renew endpoints are rate limited per domain; the
 // wrappers below define each operation's limiter bucket once so every caller
 // (resource and data sources) shares one wait.
@@ -31,10 +44,19 @@ func getDomainInfoWithRetry(ctx context.Context, c *client.Client, domain string
 }
 
 func updateAutoRenewWithRetry(ctx context.Context, c *client.Client, domain string, value bool) error {
-	return withRetry(ctx, "update auto_renew", domain, func() error {
+	if err := withRetry(ctx, "update auto_renew", domain, func() error {
 		_, apiErr := c.UpdateAutoRenew(ctx, domain, value)
 		return apiErr
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Let the write propagate before anything reads it back. The only error
+	// here is cancellation, and the write itself already succeeded, so the
+	// caller's next API call surfaces the cancelled context on its own.
+	_ = retrySleep(ctx, autoRenewSettleWait)
+
+	return nil
 }
 
 func stringValueOrNull(value string) types.String {
