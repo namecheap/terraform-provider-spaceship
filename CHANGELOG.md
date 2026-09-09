@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.1...v1.0.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* bump Go toolchain and vulnerable deps, let auto_renew writes propagate ([#137](https://github.com/namecheap/terraform-provider-spaceship/issues/137)) ([8732dcf](https://github.com/namecheap/terraform-provider-spaceship/commit/8732dcf478d13b062352de13bc19986882cd2a31))
+
 ## [1.0.1](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.0...v1.0.1) (2026-08-13)
 
 
