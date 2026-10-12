@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.2...v1.0.3) (2026-10-12)
+
+
+### Bug Fixes
+
+* **deps:** bump Go toolchain to 1.26.9 and golang.org/x/net to v0.60.0 ([#142](https://github.com/namecheap/terraform-provider-spaceship/issues/142)) ([9e052cf](https://github.com/namecheap/terraform-provider-spaceship/commit/9e052cf5f4a9480c254df0866b6155456618a28d))
+
 ## [1.0.2](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.1...v1.0.2) (2026-09-09)
 
 
