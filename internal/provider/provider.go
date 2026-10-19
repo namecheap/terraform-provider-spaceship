@@ -87,6 +87,31 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
+	// An unknown credential is set in config but resolved only during apply.
+	// Falling back to the environment here would plan with a different account
+	// than the one apply uses, so fail instead.
+	if config.APIKey.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("api_key"),
+			"Unknown Spaceship API key",
+			"The provider cannot create the Spaceship API client because the `api_key` value is not known until apply. "+
+				"Set it to a value known at plan time, or remove it and configure the SPACESHIP_API_KEY environment variable.",
+		)
+	}
+
+	if config.APISecret.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("api_secret"),
+			"Unknown Spaceship API secret",
+			"The provider cannot create the Spaceship API client because the `api_secret` value is not known until apply. "+
+				"Set it to a value known at plan time, or remove it and configure the SPACESHIP_API_SECRET environment variable.",
+		)
+	}
+
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	apiKey := resolveString(config.APIKey, "SPACESHIP_API_KEY")
 	apiSecret := resolveString(config.APISecret, "SPACESHIP_API_SECRET")
 
