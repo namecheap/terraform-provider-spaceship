@@ -49,6 +49,19 @@ func TestNameserversValidator_ValidateObject(t *testing.T) {
 			expectError: "",
 		},
 		{
+			// A host fed from a variable is unknown during the validate walk;
+			// it must be skipped, not decoded into a Go string.
+			name: "provider custom with an unknown host produces no errors",
+			configValue: types.ObjectValueMust(attrTypes, map[string]attr.Value{
+				"provider": types.StringValue("custom"),
+				"hosts": types.SetValueMust(types.StringType, []attr.Value{
+					types.StringValue("ns1.example.com"),
+					types.StringUnknown(),
+				}),
+			}),
+			expectError: "",
+		},
+		{
 			name: "provider custom with valid hosts produces no errors",
 			configValue: types.ObjectValueMust(attrTypes, map[string]attr.Value{
 				"provider": types.StringValue("custom"),

@@ -56,6 +56,12 @@ func (v *nameserversValidator) ValidateObject(ctx context.Context, req validator
 			return
 		}
 
+		// A host fed from a variable or another resource is not known yet;
+		// the check below runs again once every host resolves.
+		if setHasUnknownElement(hostsAttrSet) {
+			return
+		}
+
 		var hosts []string
 		resp.Diagnostics.Append(hostsAttrSet.ElementsAs(ctx, &hosts, false)...)
 		if resp.Diagnostics.HasError() {
@@ -103,4 +109,15 @@ func isDefaultBasicNameservers(hosts []string) bool {
 		}
 	}
 	return true
+}
+
+// setHasUnknownElement reports whether a known set holds an element that is
+// not known yet. Such a set cannot be decoded into []string.
+func setHasUnknownElement(set types.Set) bool {
+	for _, element := range set.Elements() {
+		if element.IsUnknown() {
+			return true
+		}
+	}
+	return false
 }

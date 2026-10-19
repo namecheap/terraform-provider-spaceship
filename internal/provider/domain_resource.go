@@ -530,7 +530,7 @@ func (d *domainResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	// ValueString() returns "" for null/unknown, which won't match "basic"
 	if planNS.Provider.ValueString() == string(client.BasicNameserverProvider) {
 		hostsToSet = client.DefaultBasicNameserverHosts()
-	} else if !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull() {
+	} else if !planNS.Hosts.IsUnknown() && !planNS.Hosts.IsNull() && !setHasUnknownElement(planNS.Hosts) {
 		resp.Diagnostics.Append(planNS.Hosts.ElementsAs(ctx, &hostsToSet, false)...)
 		if resp.Diagnostics.HasError() {
 			return
