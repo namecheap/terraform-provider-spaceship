@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.4](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.3...v1.0.4) (2026-10-19)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/sync from 0.23.0 to 0.24.0 in the go-deps group ([#144](https://github.com/namecheap/terraform-provider-spaceship/issues/144)) ([d053d83](https://github.com/namecheap/terraform-provider-spaceship/commit/d053d8334e02ca73bd8df86b2851fb7d9912f6ae))
+* **domain:** accept nameserver hosts that are not yet known ([#148](https://github.com/namecheap/terraform-provider-spaceship/issues/148)) ([cd2cc0c](https://github.com/namecheap/terraform-provider-spaceship/commit/cd2cc0c456208c17da26e775b4147de7535321ff))
+* **provider:** reject unknown credentials instead of using env vars ([#149](https://github.com/namecheap/terraform-provider-spaceship/issues/149)) ([9fd0434](https://github.com/namecheap/terraform-provider-spaceship/commit/9fd043436b528feeeaafc7c5d484ebaef75c0290))
+* **records:** accept unknown values for required record fields ([#147](https://github.com/namecheap/terraform-provider-spaceship/issues/147)) ([3819d27](https://github.com/namecheap/terraform-provider-spaceship/commit/3819d27b809189c7b00510331c0a219d7983a65c))
+
 ## [1.0.3](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.2...v1.0.3) (2026-10-12)
 
 
