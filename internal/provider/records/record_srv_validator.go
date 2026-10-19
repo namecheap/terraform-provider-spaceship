@@ -50,7 +50,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'service' field must be a string for SRV records.",
 		)
-	} else if serviceAttr.IsNull() || serviceAttr.IsUnknown() {
+	} else if serviceAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if serviceAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("service"),
 			"Missing Required Field",
@@ -74,7 +76,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'protocol' field must be a string for SRV records.",
 		)
-	} else if protocolAttr.IsNull() || protocolAttr.IsUnknown() {
+	} else if protocolAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if protocolAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("protocol"),
 			"Missing Required Field",
@@ -98,7 +102,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'priority' field is required for SRV records and must be an integer.",
 		)
-	} else if priorityAttr.IsNull() || priorityAttr.IsUnknown() {
+	} else if priorityAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if priorityAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("priority"),
 			"Missing Required Field",
@@ -122,7 +128,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'weight' field must be an integer for SRV records.",
 		)
-	} else if weightAttr.IsNull() || weightAttr.IsUnknown() {
+	} else if weightAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if weightAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("weight"),
 			"Missing Required Field",
@@ -146,7 +154,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'port_number' field must be an integer for SRV records.",
 		)
-	} else if portNumberAttr.IsNull() || portNumberAttr.IsUnknown() {
+	} else if portNumberAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if portNumberAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("port_number"),
 			"Missing Required Field",
@@ -170,7 +180,9 @@ func (v *srvRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'target' field must be a string for SRV records.",
 		)
-	} else if targetAttr.IsNull() || targetAttr.IsUnknown() {
+	} else if targetAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if targetAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("target"),
 			"Missing Required Field",

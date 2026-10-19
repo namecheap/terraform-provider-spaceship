@@ -52,7 +52,11 @@ func (v *ptrRecordValidator) ValidateObject(ctx context.Context, req validator.O
 		)
 		return
 	}
-	if pointerAttr.IsNull() || pointerAttr.IsUnknown() {
+	if pointerAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if pointerAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("pointer"),
 			"Missing Required Field",

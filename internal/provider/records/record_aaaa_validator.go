@@ -52,7 +52,11 @@ func (v *aaaaRecordValidator) ValidateObject(ctx context.Context, req validator.
 		)
 		return
 	}
-	if addressAttr.IsNull() || addressAttr.IsUnknown() {
+	if addressAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if addressAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("address"),
 			"Missing Required Field",

@@ -52,7 +52,9 @@ func (v *caaRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'flag' field must be an integer for CAA records.",
 		)
-	} else if flagAttr.IsNull() || flagAttr.IsUnknown() {
+	} else if flagAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if flagAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("flag"),
 			"Missing Required Field",
@@ -76,7 +78,9 @@ func (v *caaRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'tag' field must be a string for CAA records.",
 		)
-	} else if tagAttr.IsNull() || tagAttr.IsUnknown() {
+	} else if tagAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if tagAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("tag"),
 			"Missing Required Field",
@@ -100,7 +104,9 @@ func (v *caaRecordValidator) ValidateObject(ctx context.Context, req validator.O
 			"Invalid Field Type",
 			"The 'value' field must be a string for CAA records.",
 		)
-	} else if valueAttr.IsNull() || valueAttr.IsUnknown() {
+	} else if valueAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if valueAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("value"),
 			"Missing Required Field",

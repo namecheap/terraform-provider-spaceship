@@ -52,7 +52,11 @@ func (v *txtRecordValidator) ValidateObject(ctx context.Context, req validator.O
 		)
 		return
 	}
-	if valueAttr.IsNull() || valueAttr.IsUnknown() {
+	if valueAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if valueAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("value"),
 			"Missing Required Field",

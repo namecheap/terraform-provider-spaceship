@@ -52,7 +52,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'port' field must be a string for TLSA records.",
 		)
-	} else if portAttr.IsNull() || portAttr.IsUnknown() {
+	} else if portAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if portAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("port"),
 			"Missing Required Field",
@@ -76,7 +78,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'protocol' field must be a string for TLSA records.",
 		)
-	} else if protocolAttr.IsNull() || protocolAttr.IsUnknown() {
+	} else if protocolAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if protocolAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("protocol"),
 			"Missing Required Field",
@@ -100,7 +104,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'usage' field must be an integer for TLSA records.",
 		)
-	} else if usageAttr.IsNull() || usageAttr.IsUnknown() {
+	} else if usageAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if usageAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("usage"),
 			"Missing Required Field",
@@ -124,7 +130,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'selector' field must be an integer for TLSA records.",
 		)
-	} else if selectorAttr.IsNull() || selectorAttr.IsUnknown() {
+	} else if selectorAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if selectorAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("selector"),
 			"Missing Required Field",
@@ -148,7 +156,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'matching' field must be an integer for TLSA records.",
 		)
-	} else if matchingAttr.IsNull() || matchingAttr.IsUnknown() {
+	} else if matchingAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if matchingAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("matching"),
 			"Missing Required Field",
@@ -172,7 +182,9 @@ func (v *tlsaRecordValidator) ValidateObject(ctx context.Context, req validator.
 			"Invalid Field Type",
 			"The 'association_data' field must be a string for TLSA records.",
 		)
-	} else if assocAttr.IsNull() || assocAttr.IsUnknown() {
+	} else if assocAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if assocAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("association_data"),
 			"Missing Required Field",

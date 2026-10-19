@@ -52,7 +52,9 @@ func (v *mxRecordValidator) ValidateObject(ctx context.Context, req validator.Ob
 			"Invalid Field Type",
 			"The 'exchange' field must be a string for MX records.",
 		)
-	} else if exchangeAttr.IsNull() || exchangeAttr.IsUnknown() {
+	} else if exchangeAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if exchangeAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("exchange"),
 			"Missing Required Field",
@@ -76,7 +78,9 @@ func (v *mxRecordValidator) ValidateObject(ctx context.Context, req validator.Ob
 			"Invalid Field Type",
 			"The 'preference' field must be an integer for MX records.",
 		)
-	} else if preferenceAttr.IsNull() || preferenceAttr.IsUnknown() {
+	} else if preferenceAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if preferenceAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("preference"),
 			"Missing Required Field",
