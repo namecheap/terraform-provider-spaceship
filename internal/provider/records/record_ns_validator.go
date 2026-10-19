@@ -52,7 +52,11 @@ func (v *nsRecordValidator) ValidateObject(ctx context.Context, req validator.Ob
 		)
 		return
 	}
-	if nameserverAttr.IsNull() || nameserverAttr.IsUnknown() {
+	if nameserverAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if nameserverAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("nameserver"),
 			"Missing Required Field",

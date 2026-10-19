@@ -52,7 +52,9 @@ func (v *httpsRecordValidator) ValidateObject(ctx context.Context, req validator
 			"Invalid Field Type",
 			"The 'svc_priority' field must be an integer for HTTPS records.",
 		)
-	} else if svcPriorityAttr.IsNull() || svcPriorityAttr.IsUnknown() {
+	} else if svcPriorityAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if svcPriorityAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("svc_priority"),
 			"Missing Required Field",
@@ -76,7 +78,9 @@ func (v *httpsRecordValidator) ValidateObject(ctx context.Context, req validator
 			"Invalid Field Type",
 			"The 'target_name' field must be a string for HTTPS records.",
 		)
-	} else if targetNameAttr.IsNull() || targetNameAttr.IsUnknown() {
+	} else if targetNameAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+	} else if targetNameAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("target_name"),
 			"Missing Required Field",

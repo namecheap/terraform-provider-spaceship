@@ -52,7 +52,11 @@ func (v *cnameRecordValidator) ValidateObject(ctx context.Context, req validator
 		)
 		return
 	}
-	if cnameAttr.IsNull() || cnameAttr.IsUnknown() {
+	if cnameAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if cnameAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("cname"),
 			"Missing Required Field",

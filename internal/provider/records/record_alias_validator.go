@@ -66,7 +66,11 @@ func (v *aliasRecordValidator) ValidateObject(ctx context.Context, req validator
 		)
 		return
 	}
-	if aliasNameAttr.IsNull() || aliasNameAttr.IsUnknown() {
+	if aliasNameAttr.IsUnknown() {
+		// Set but not yet known (e.g. from a variable); validated once it resolves.
+		return
+	}
+	if aliasNameAttr.IsNull() {
 		resp.Diagnostics.AddAttributeError(
 			req.Path.AtName("alias_name"),
 			"Missing Required Field",
