@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.5](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.4...v1.0.5) (2026-10-22)
+
+
+### Bug Fixes
+
+* **deps:** bump Go toolchain to 1.26.10 ([#152](https://github.com/namecheap/terraform-provider-spaceship/issues/152)) ([7407994](https://github.com/namecheap/terraform-provider-spaceship/commit/7407994f773492f6f66dd0361c4d6bb614df4c91))
+
 ## [1.0.4](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.3...v1.0.4) (2026-10-19)
 
 
