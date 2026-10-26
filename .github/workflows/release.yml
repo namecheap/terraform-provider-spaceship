@@ -17,10 +17,6 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
-    # The GPG signing secrets belong in this environment, not at repo level,
-    # so it can require reviewer approval and restrict deployments to `v*`
-    # tags. See RELEASE.md "Required secrets".
-    environment: release
     steps:
       # fetch-depth: 0 pulls the full history and all tags. GoReleaser needs
       # them to identify the previous tag (the changelog is owned by
