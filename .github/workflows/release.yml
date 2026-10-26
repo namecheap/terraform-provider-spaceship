@@ -17,22 +17,33 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    # The GPG signing secrets belong in this environment, not at repo level,
+    # so it can require reviewer approval and restrict deployments to `v*`
+    # tags. See RELEASE.md "Required secrets".
+    environment: release
     steps:
       # fetch-depth: 0 pulls the full history and all tags. GoReleaser needs
       # them to identify the previous tag (the changelog is owned by
       # release-please, not GoReleaser). The older `git fetch --unshallow`
       # workaround is no longer needed since actions/checkout supports this
       # natively.
+      # persist-credentials: false keeps the token out of .git/config.
+      # GoReleaser never pushes; it reads GITHUB_TOKEN from env for the API.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
+      # cache: false — the signing build must not restore the Go module/build
+      # cache that `master` CI and CodeQL jobs write while running unpinned
+      # tools (e.g. `tfplugindocs@latest`). Modules are downloaded fresh and
+      # checked against go.sum instead.
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
       - name: Import GPG key
         id: import_gpg
@@ -44,6 +55,12 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
+          # Pin the GoReleaser binary to a specific release rather than the
+          # action's default `~> v2` range, so the signing build is
+          # reproducible. Dependabot bumps the action SHA but NOT this input —
+          # bump by hand after reviewing
+          # https://github.com/goreleaser/goreleaser/releases.
+          version: v2.19.0
           args: release --clean
         env:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
