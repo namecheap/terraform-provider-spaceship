@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"net/url"
 	"os"
 	"strings"
 
@@ -20,11 +21,22 @@ import (
 
 const defaultBaseURL = "https://spaceship.dev/api/v1"
 
-func baseURL() string {
-	if v := os.Getenv("SPACESHIP_BASE_URL"); v != "" {
-		return v
+// baseURL is the Spaceship API endpoint the provider sends credentials to.
+// Release builds always use defaultBaseURL; unit tests point it at an httptest
+// server via setTestBaseURL. It is deliberately not read from the environment,
+// so whoever can set the provider's environment cannot redirect the API key
+// and secret to another host.
+var baseURL = defaultBaseURL
+
+// redactURL returns raw with any userinfo password masked, for logs and
+// diagnostics. A value that does not parse is withheld entirely, since there
+// is no telling which part of it is secret.
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "<invalid URL>"
 	}
-	return defaultBaseURL
+	return u.Redacted()
 }
 
 // ensure spaceship provider satisfies expected interfaces
@@ -137,16 +149,18 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 		return
 	}
 
-	client, err := client.NewClient(baseURL(), apiKey, apiSecret)
+	client, err := client.NewClient(baseURL, apiKey, apiSecret)
 	if err != nil {
+		// The parse error quotes the raw URL, userinfo included, so it is not
+		// passed through.
 		resp.Diagnostics.AddError(
 			"Invalid Spaceship base URL",
-			err.Error(),
+			"The provider cannot create the Spaceship API client because its base URL does not parse.",
 		)
 		return
 	}
 	tflog.Info(ctx, "Configured Spaceship provider", map[string]any{
-		"base_url": defaultBaseURL,
+		"base_url": redactURL(baseURL),
 	})
 
 	// All resources and data sources receive the same providerData: the raw

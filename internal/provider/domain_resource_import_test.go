@@ -17,7 +17,7 @@ import (
 func TestDomainResource_ImportState(t *testing.T) {
 	server := mockDomainAPIReadOnly(t, baseDomainInfo())
 
-	t.Setenv("SPACESHIP_BASE_URL", server.URL+"/v1")
+	setTestBaseURL(t, server.URL+"/v1")
 	t.Setenv("SPACESHIP_API_KEY", "test-key")
 	t.Setenv("SPACESHIP_API_SECRET", "test-secret")
 
