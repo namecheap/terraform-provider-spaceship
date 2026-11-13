@@ -96,7 +96,12 @@ new binary — a single critical `fix:`, a batch of `feat:` entries, etc.
 ### 4. GoReleaser publishes the binary
 
 - `release.yml` triggers on the pushed `v*` tag.
+- It builds with a fresh Go module cache (no restore from CI caches) and a
+  pinned GoReleaser version (`version:` in `release.yml`, bumped by hand —
+  Dependabot only bumps the action SHA).
 - It runs GoReleaser against `.goreleaser.yml`, which:
+  - fails if `go.mod`/`go.sum` are not tidy (`go mod tidy -diff`) and runs
+    `go mod verify`,
   - cross-compiles the provider for `freebsd`, `windows`, `linux`, `darwin`
     across `amd64`, `386`, `arm`, `arm64` (skipping the invalid
     `darwin/386`),
@@ -170,6 +175,9 @@ Known cases:
   error): the GitHub Release exists without binaries. The Terraform Registry
   will not ingest an artifact-less version, so nothing broken is served —
   fix the cause and re-run the failed `release.yml` run for the tag.
+  Exception: if the `go mod tidy -diff` hook failed, the tagged commit
+  itself is untidy and a re-run fails the same way — merge a tidy
+  `go.mod`/`go.sum` as `fix(deps):` and ship it in the next release.
 
 ## Manual / emergency release
 

@@ -3,8 +3,12 @@
 version: 2
 before:
   hooks:
-    # this is just an example and not a requirement for provider building/publishing
-    - go mod tidy
+    # Fail instead of rewriting go.mod/go.sum. GoReleaser's dirty-tree check
+    # runs before these hooks, so a mutating `go mod tidy` would build from
+    # module files that differ from the tagged commit.
+    - go mod tidy -diff
+    # Check the module cache (populated by the step above) against go.sum.
+    - go mod verify
 builds:
 - env:
     # goreleaser does not work with CGO, it could also complicate
