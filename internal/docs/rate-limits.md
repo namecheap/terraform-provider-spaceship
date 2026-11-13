@@ -51,10 +51,10 @@ correct — but the next refresh re-reads the API with no memory of the write
 and reports drift the user never asked for.
 
 `updateAutoRenewWithRetry` therefore pauses for `autoRenewSettleWait` (2s)
-after a successful write, so every later read is correct by construction. It
-does not read anything back: domain info allows only 5–10 requests per domain
-per 300s, and a confirmation read would spend one of them to learn what the
-wait already guarantees.
+after a successful write, so a refresh soon after apply normally sees the new
+value. It does not read anything back: domain info allows only 5–10 requests
+per domain per 300s, and a confirmation read would spend one of them on every
+write to catch a lag that is rare.
 
 The pause is only paid when the value actually changes — callers skip the
 write entirely when plan and state agree.
@@ -63,8 +63,17 @@ An earlier implementation polled with backoff under a 30s budget. It always
 saw the new value on its first read after the 2s wait, which is what
 established that a plain pause is enough. Reverting the wait altogether was
 also tried, and acceptance failed immediately, so the pause is load-bearing
-rather than defensive. If drift ever reappears, raising `autoRenewSettleWait`
-is the single knob.
+rather than defensive.
+
+The pause is not a guarantee. In October 2026 a CI refresh issued about 2s
+after the write still read the old value. That refresh is
+terraform-plugin-testing's own post-apply check, which runs within a second of
+apply; a user's next plan is normally much later. The `auto_renew` acceptance
+steps therefore wait in `Check` until the API reads back the written value
+(`testAccCheckAutoRenewConverged`). They still fail if it never converges.
+As a result, acceptance no longer shows whether the pause alone covers an
+immediate refresh. If users report drift on a plan run straight after apply,
+raising `autoRenewSettleWait` is still the knob.
 
 ## Operation timeouts
 
