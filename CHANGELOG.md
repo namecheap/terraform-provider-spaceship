@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.5...v1.0.6) (2026-11-12)
+
+
+### Bug Fixes
+
+* **deps:** bump golang.org/x/sync from 0.24.0 to 0.25.0 in the go-deps group ([#157](https://github.com/namecheap/terraform-provider-spaceship/issues/157)) ([fdf323c](https://github.com/namecheap/terraform-provider-spaceship/commit/fdf323c13b9ed61170e59e897535016a9bd98b31))
+
 ## [1.0.5](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.4...v1.0.5) (2026-10-22)
 
 
