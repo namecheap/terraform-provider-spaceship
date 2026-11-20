@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.7](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.6...v1.0.7) (2026-11-20)
+
+
+### Bug Fixes
+
+* **provider:** stop SPACESHIP_BASE_URL from redirecting API credentials ([#155](https://github.com/namecheap/terraform-provider-spaceship/issues/155)) ([6ff2922](https://github.com/namecheap/terraform-provider-spaceship/commit/6ff29224509fdc82b1f22a15076478c2e54398b6))
+
 ## [1.0.6](https://github.com/namecheap/terraform-provider-spaceship/compare/v1.0.5...v1.0.6) (2026-11-12)
 
 
