@@ -24,8 +24,8 @@ const defaultBaseURL = "https://spaceship.dev/api/v1"
 // baseURL is the Spaceship API endpoint the provider sends credentials to.
 // Release builds always use defaultBaseURL; unit tests point it at an httptest
 // server via setTestBaseURL. It is deliberately not read from the environment,
-// so whoever can set the provider's environment cannot redirect the API key
-// and secret to another host.
+// so SPACESHIP_BASE_URL cannot redirect the API key and secret to another
+// host. Configure rejects that variable when it is set.
 var baseURL = defaultBaseURL
 
 // redactURL returns raw with any userinfo password masked, for logs and
@@ -97,6 +97,17 @@ func (p *spaceshipProvider) Configure(ctx context.Context, req provider.Configur
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Whoever set SPACESHIP_BASE_URL expected another endpoint. Ignoring it
+	// would run against the production API instead, so fail. The value is not
+	// echoed, as it may carry credentials.
+	if os.Getenv("SPACESHIP_BASE_URL") != "" {
+		resp.Diagnostics.AddError(
+			"SPACESHIP_BASE_URL is not supported",
+			"The SPACESHIP_BASE_URL environment variable is set, but the provider always uses "+defaultBaseURL+". "+
+				"Unset the variable and run again.",
+		)
 	}
 
 	// An unknown credential is set in config but resolved only during apply.

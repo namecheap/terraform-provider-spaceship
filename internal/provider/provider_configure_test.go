@@ -10,10 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-// The API key and secret must go only to the compiled-in endpoint. Someone who
-// can set the provider's environment but not read the secret must not be able
-// to redirect it with SPACESHIP_BASE_URL.
-func TestConfigure_IgnoresBaseURLEnv(t *testing.T) {
+// The API key and secret must go only to the compiled-in endpoint. Setting
+// SPACESHIP_BASE_URL fails the run, and no request reaches the URL it names.
+func TestConfigure_RejectsBaseURLEnv(t *testing.T) {
 	var redirected atomic.Int32
 	trap := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		redirected.Add(1)
@@ -36,12 +35,13 @@ resource "spaceship_domain" "test" {
   domain = "example.com"
 }
 `,
+				ExpectError: regexp.MustCompile("SPACESHIP_BASE_URL is not supported"),
 			},
 		},
 	})
 
 	if n := redirected.Load(); n != 0 {
-		t.Errorf("SPACESHIP_BASE_URL received %d request(s); the provider must ignore it", n)
+		t.Errorf("SPACESHIP_BASE_URL received %d request(s); the provider must not use it", n)
 	}
 }
 
