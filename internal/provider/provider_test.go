@@ -39,10 +39,19 @@ func testAccDomainValue() string {
 
 func testAccClient() (*client.Client, error) {
 	return client.NewClient(
-		baseURL(),
+		baseURL,
 		os.Getenv("SPACESHIP_API_KEY"),
 		os.Getenv("SPACESHIP_API_SECRET"),
 	)
+}
+
+// setTestBaseURL points the provider at a test server until t finishes. Tests
+// that call it must not run in parallel, as they share the package variable.
+func setTestBaseURL(t *testing.T, u string) {
+	t.Helper()
+	prev := baseURL
+	baseURL = u
+	t.Cleanup(func() { baseURL = prev })
 }
 
 func testAccCheckDNSRecordAbsent(domain, recordType, name string) resource.TestCheckFunc {
