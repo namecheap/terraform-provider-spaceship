@@ -10,7 +10,7 @@ the CI mechanics.
 | Workflow | File | Trigger | Purpose |
 |---|---|---|---|
 | CI | `.github/workflows/ci.yml` | PR, push to `master` | Lint, unit tests + coverage floor, docs drift/schema checks, Trivy and govulncheck security gates, acceptance tests |
-| CodeQL | `.github/workflows/codeql.yml` | PR, push to `master`, weekly cron | Static security analysis (Go) |
+| CodeQL | GitHub default setup (org security configuration, no workflow file) | PR, push to `master`, weekly | Static security analysis of the Go code and the GitHub Actions workflows |
 | PR Title Check | `.github/workflows/pr-title.yml` | PR | Enforces Conventional Commit PR titles (they become the squash-commit messages release-please reads) |
 | Versioning | `.github/workflows/versioning.yml` | After every CI run on `master` (`workflow_run`), manual | release-please: opens/updates the Release PR; creates the tag when it merges |
 | Release | `.github/workflows/release.yml` | Push of a `v*` tag | GoReleaser: builds, signs and publishes binaries |
@@ -122,9 +122,6 @@ repository **at that git tag** — `docs/index.md`, `docs/resources/*`,
 ## Editing the pipeline — invariants to keep
 
 - **Don't add `paths`/`paths-ignore` to `ci.yml` triggers** (see above).
-  `codeql.yml` still carries a `paths-ignore` today; that is tolerable only
-  while its check is not required by the ruleset — remove it before ever
-  making "Analyze" a required check.
 - **Keep `ci-ok` in `needs` sync**: every job added to `ci.yml` must also be
   added to the `ci-ok` `needs:` list — "CI OK" only guards the jobs it
   watches. This is enforced — `ci-ok`'s first step diffs its `needs:`

@@ -291,7 +291,7 @@ jobs:
                   merge-multiple: true
 
             - name: Fetch open CodeQL alerts (best effort)
-              # The CodeQL workflow (codeql.yml) runs separately; its open alerts
+              # CodeQL (GitHub default setup) runs separately; its open alerts
               # for this ref are pulled via the API only to enrich the summary.
               # Never fails the job — a not-yet-complete analysis just yields [].
               env:

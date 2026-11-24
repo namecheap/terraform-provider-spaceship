@@ -40,8 +40,8 @@ Every push and pull request runs a set of security gates in
   analysis against <https://vuln.go.dev> and the standard library. Fails the
   build only when a vulnerable symbol is actually reachable from the provider's
   code; imported-but-uncalled vulnerabilities are reported but do not gate.
-- **CodeQL** ([`codeql.yml`](.github/workflows/codeql.yml)) — static analysis
-  with the `security-and-quality` query suite.
+- **CodeQL** (GitHub default setup, configured for the organization) —
+  static analysis of the Go code and the GitHub Actions workflows.
 
 ### PR security summary
 
