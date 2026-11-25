@@ -1,7 +1,13 @@
 name: Versioning
 
+# Runs release-please after every successful CI run on master. The job, its
+# fork guard and the App token live in namecheap/terraform-provider-workflows,
+# pinned by commit SHA. See RELEASE.md.
 on:
-  workflow_run:
+  # workflow_run runs with secrets, so a run triggered from a fork could be
+  # dangerous. Here it checks out no code and runs only release-please, and
+  # the called workflow skips runs that did not succeed or came from a fork.
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows: ["CI"]
     types:
       - completed
@@ -15,35 +21,15 @@ concurrency:
   group: release-please
   cancel-in-progress: false
 
-# The default GITHUB_TOKEN needs nothing — every write goes through the App
-# token generated below.
+# The default GITHUB_TOKEN needs nothing: every write goes through the App
+# token.
 permissions: {}
 
 jobs:
-  release-please:
-    # The workflow_run branch filter matches the run's HEAD branch name, which
-    # a fork PR can spoof by naming its branch "master" — hence the
-    # head_repository guard. The conclusion guard is needed because
-    # workflow_run also fires for failed CI runs.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_repository.full_name == github.repository)
-    runs-on: ubuntu-latest
-    steps:
-      # Generate a token from GitHub App
-      - name: Generate GitHub App Token
-        id: generate-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.SPS_RELEASE_CLIENT_ID }}
-          private-key: ${{ secrets.SPS_RELEASE_PRIVATE_KEY }}
-
-      # Use the generated token in release-please
-      - name: Release Please
-        id: release
-        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
-        with:
-          config-file: .release-please-config.json
-          manifest-file: .release-please-manifest.json
-          token: ${{ steps.generate-token.outputs.token }}
+  versioning:
+    name: Versioning
+    uses: namecheap/terraform-provider-workflows/.github/workflows/versioning.yml@dd301c63e4d08c2b84a7512b2e618d49e6432c4e # v1.0.0
+    with:
+      app-client-id: ${{ vars.SPS_RELEASE_CLIENT_ID }}
+    secrets:
+      app-private-key: ${{ secrets.SPS_RELEASE_PRIVATE_KEY }}

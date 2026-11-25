@@ -11,9 +11,13 @@ the CI mechanics.
 |---|---|---|---|
 | CI | `.github/workflows/ci.yml` | PR, push to `master` | Lint, unit tests + coverage floor, docs drift/schema checks, Trivy and govulncheck security gates, acceptance tests |
 | CodeQL | GitHub default setup (org security configuration, no workflow file) | PR, push to `master`, weekly | Static security analysis of the Go code and the GitHub Actions workflows |
-| PR Title Check | `.github/workflows/pr-title.yml` | PR | Enforces Conventional Commit PR titles (they become the squash-commit messages release-please reads) |
-| Versioning | `.github/workflows/versioning.yml` | After every CI run on `master` (`workflow_run`), manual | release-please: opens/updates the Release PR; creates the tag when it merges |
-| Release | `.github/workflows/release.yml` | Push of a `v*` tag | GoReleaser: builds, signs and publishes binaries |
+| PR Title Check | `.github/workflows/pr-title.yml` (shared) | PR | Enforces Conventional Commit PR titles (they become the squash-commit messages release-please reads); reports as `PR Title / Conventional PR Title` |
+| Versioning | `.github/workflows/versioning.yml` (shared) | After every CI run on `master` (`workflow_run`), manual | release-please: opens/updates the Release PR; creates the tag when it merges |
+| Release | `.github/workflows/release.yml` (shared) | Push of a `v*` tag | GoReleaser: builds, signs and publishes binaries; attests build provenance |
+
+(shared): a thin caller of a reusable workflow in
+[`namecheap/terraform-provider-workflows`](https://github.com/namecheap/terraform-provider-workflows),
+pinned by commit SHA; see [RELEASE.md](RELEASE.md).
 
 (`.github/dco.yml` configures the DCO app; it is not a workflow.)
 

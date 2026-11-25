@@ -7,6 +7,14 @@ The intent is captured in the three workflows under
 [`.github/workflows/`](.github/workflows/); this file elaborates on the
 operator-facing pieces that are not obvious from the YAML alone.
 
+`versioning.yml`, `release.yml` and `pr-title.yml` are thin callers: they set
+the triggers, permissions and secrets, and run the reusable workflows from
+[`namecheap/terraform-provider-workflows`](https://github.com/namecheap/terraform-provider-workflows),
+which the Namecheap Terraform providers share. Each caller pins a release of
+that repository by full commit SHA with the version in a comment, and
+Dependabot bumps both. Action versions, the GoReleaser version and the
+release-please setup are changed there, not here.
+
 ## Overview
 
 The project uses a **semi-automated, maintainer-gated** release flow. Changes
@@ -20,7 +28,7 @@ Three workflows participate:
 |---|---|---|
 | [`ci.yml`](.github/workflows/ci.yml) | push to `master`, PRs | Lint, unit tests, coverage threshold, doc validation, security scans, optional acceptance tests — jobs are gated on changed paths, see [CI.md](CI.md) |
 | [`versioning.yml`](.github/workflows/versioning.yml) | `ci.yml` success on `master`, manual dispatch | Runs release-please to open/update the Release PR |
-| [`release.yml`](.github/workflows/release.yml) | push of a `v*` tag | Runs GoReleaser to build, sign, and publish artifacts |
+| [`release.yml`](.github/workflows/release.yml) | push of a `v*` tag | Runs GoReleaser to build, sign, and publish artifacts, and attests their build provenance |
 
 Supporting configuration:
 
@@ -97,8 +105,7 @@ new binary — a single critical `fix:`, a batch of `feat:` entries, etc.
 
 - `release.yml` triggers on the pushed `v*` tag.
 - It builds with a fresh Go module cache (no restore from CI caches) and a
-  pinned GoReleaser version (`version:` in `release.yml`, bumped by hand —
-  Dependabot only bumps the action SHA).
+  pinned GoReleaser version, both set in the shared `release.yml`.
 - It runs GoReleaser against `.goreleaser.yml`, which:
   - fails if `go.mod`/`go.sum` are not tidy (`go mod tidy -diff`) and runs
     `go mod verify`,
@@ -116,6 +123,18 @@ new binary — a single critical `fix:`, a batch of `feat:` entries, etc.
     published public key,
   - attaches archives, checksums, signatures, and the manifest to the
     GitHub Release for the tag.
+- It then attests build provenance (Sigstore, stored by GitHub) for every
+  file listed in `SHA256SUMS`. Verify a downloaded archive with:
+
+  ```bash
+  gh attestation verify terraform-provider-spaceship_<version>_<os>_<arch>.zip \
+    -R namecheap/terraform-provider-spaceship \
+    --signer-repo namecheap/terraform-provider-workflows
+  ```
+
+  The attestation is signed by the shared workflow, so `--signer-repo` names
+  `terraform-provider-workflows`. Releases made before the move to the
+  shared workflows have no attestation.
 
 `changelog.disable: true` in `.goreleaser.yml` is deliberate:
 release-please already wrote the CHANGELOG during the Release PR, so
