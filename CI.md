@@ -42,6 +42,33 @@ the already-merged code there added runner time and real API/rate-limit load
 (acceptance runs are serialized via the `acceptance-tests` concurrency group,
 so redundant runs also queue behind useful ones) but no signal.
 
+## The CI jobs
+
+`ci.yml` keeps only short comments; the reasons behind its jobs are here.
+
+- **`check`** runs golangci-lint, unit tests with a 35% coverage floor, and
+  the docs checks. The floor covers provider-only code: API logic is tested
+  in go-spaceship-sdk, and the record validator wrappers by acceptance tests.
+  The docs check regenerates `docs/` and fails on drift, then runs
+  `tfplugindocs validate` for structure; tfplugindocs has no single command
+  for both.
+- **`security` (Trivy)** gates on CRITICAL/HIGH fixable findings across
+  vulnerabilities, misconfigurations, secrets and licenses (denylist in
+  `trivy.yaml`). A second, non-gating pass writes every finding to JSON for
+  the summary, and a third writes the CI SBOM artifact. The Trivy version is
+  bumped by hand and kept equal to the one pinned in
+  [terraform-provider-workflows](https://github.com/namecheap/terraform-provider-workflows).
+- **`govulncheck`** complements Trivy with reachability: it fails only when
+  vulnerable code is actually called, and it covers standard-library
+  advisories for the Go toolchain in use.
+- **`security-report`** combines both scans, the SBOM and open CodeQL alerts
+  into one summary, posted as a sticky comment on same-repo PRs and to the
+  job summary. It never gates; it shows the gates' results as they are.
+- **`acceptance`** runs `make testacc` against the live Spaceship API, one
+  run at a time (`concurrency: acceptance-tests`). Secrets can't be read in
+  a job-level `if:`, so a first step checks for them; without them (fork and
+  Dependabot PRs) every later step skips and the job passes.
+
 ## The changes gate
 
 The first job in CI, `changes`, uses
