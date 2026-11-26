@@ -6,9 +6,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 
 	"github.com/namecheap/go-spaceship-sdk/client"
 )
@@ -122,6 +124,7 @@ resource "%s" "%s" {
 				Config: configAutoRenewTrue,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
+					testAccCheckAutoRenewConverged(true),
 				),
 			},
 			// auto_renew value false
@@ -129,6 +132,7 @@ resource "%s" "%s" {
 				Config: configAutoRenewFalse,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "false"),
+					testAccCheckAutoRenewConverged(false),
 				),
 			},
 		}})
@@ -150,6 +154,7 @@ func TestAccDomain_autoRenewalMismatchOnCreate(t *testing.T) {
 				Config:    configAutoRenewTrue,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "true"),
+					testAccCheckAutoRenewConverged(true),
 				),
 			},
 			// converged for real: refresh-backed empty plan
@@ -166,6 +171,7 @@ func TestAccDomain_autoRenewalMismatchOnCreate(t *testing.T) {
 				Config:    configAutoRenewFalse,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(domainResourceFullName, "auto_renew", "false"),
+					testAccCheckAutoRenewConverged(false),
 				),
 			},
 			// converged: re-plan is empty
@@ -180,6 +186,8 @@ func TestAccDomain_autoRenewalMismatchOnCreate(t *testing.T) {
 }
 
 // testAccSetAutoRenew sets the test domain's auto_renew out-of-band via the SDK.
+// It returns once reads see the new value, so the step's Create reads what was
+// set here rather than the value from before the write.
 func testAccSetAutoRenew(t *testing.T, value bool) {
 	t.Helper()
 
@@ -189,6 +197,53 @@ func testAccSetAutoRenew(t *testing.T, value bool) {
 	}
 	if _, err := testClient.UpdateAutoRenew(context.Background(), testAccDomainValue(), value); err != nil {
 		t.Fatalf("failed to set auto_renew=%v: %v", value, err)
+	}
+	if err := testAccWaitForAutoRenew(value); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// autoRenewConvergeInterval is the pause between reads while waiting for an
+// auto_renew write to become visible.
+const autoRenewConvergeInterval = 2 * time.Second
+
+// testAccCheckAutoRenewConverged waits until the API reads back want.
+//
+// A read shortly after an auto_renew write can still return the old value,
+// and autoRenewSettleWait does not always cover the lag. The framework's
+// post-apply refresh would report that stale read as drift. Check runs
+// between apply and that refresh, so waiting here keeps the refresh plan
+// meaningful. The check still fails if the API never converges.
+func testAccCheckAutoRenewConverged(want bool) resource.TestCheckFunc {
+	return func(_ *terraform.State) error {
+		return testAccWaitForAutoRenew(want)
+	}
+}
+
+// testAccWaitForAutoRenew polls the test domain until it reports want. The
+// deadline is the resource Read's default timeout, so the wait never gives up
+// on a throttled read that Read itself would have retried.
+func testAccWaitForAutoRenew(want bool) error {
+	testClient, err := testAccClient()
+	if err != nil {
+		return fmt.Errorf("failed to create test client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), domainReadTimeout)
+	defer cancel()
+
+	domain := testAccDomainValue()
+	for {
+		info, err := getDomainInfoWithRetry(ctx, testClient, domain)
+		if err != nil {
+			return fmt.Errorf("waiting for auto_renew=%v: %w", want, err)
+		}
+		if info.AutoRenew == want {
+			return nil
+		}
+		if err := sleepContext(ctx, autoRenewConvergeInterval); err != nil {
+			return fmt.Errorf("auto_renew still reads %v, want %v: %w", info.AutoRenew, want, err)
+		}
 	}
 }
 
