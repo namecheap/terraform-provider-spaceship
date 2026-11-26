@@ -95,8 +95,9 @@ when a maintainer:
 Merging the Release PR:
 
 - commits the version bump and regenerated CHANGELOG to `master`,
-- creates a `vX.Y.Z` git tag on that merge commit (release-please-action
-  creates both the tag and a GitHub Release draft).
+- creates a `vX.Y.Z` git tag on that merge commit (release-please creates
+  both the tag and a published GitHub Release; GoReleaser then attaches the
+  binaries to it).
 
 There is no fixed cadence. Merge when there is enough change to justify a
 new binary — a single critical `fix:`, a batch of `feat:` entries, etc.

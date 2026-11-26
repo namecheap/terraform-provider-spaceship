@@ -118,17 +118,18 @@ fork or Dependabot PRs. That probe is step-level and unchanged by the gate.
 
 ### The CI OK job
 
-`ci-ok` runs on every non-cancelled run (`if: ${{ !cancelled() }}` — a
-superseded PR run cancelled by the concurrency group skips it instead of
-posting a red check on a dead SHA), checks every other job's result, and
-fails if any of them failed or was cancelled ("skipped" is fine). It also
+`ci-ok` runs on every run that isn't cancelled (`if: ${{ !cancelled() }}`;
+in a cancelled run it reports "cancelled", which does not satisfy a required
+check), checks every other job's result, and fails if any of them failed or
+was cancelled ("skipped" is fine). It also
 asserts that its own `needs:` list matches the workflow's job list, so a
 newly added job can't silently escape its watch. It exists because:
 
 - a run whose jobs were **all** skipped needs at least one executed job for
   the run-level conclusion — which gates Versioning — to be a deterministic
   `success`;
-- **"CI OK" should be the required status check** in the master ruleset.
+- **"CI OK" is a required status check** in the master ruleset, together with
+  `PR Title / Conventional PR Title`.
   Individual job checks alone cannot be relied on: if the `changes` gate job
   itself *fails* (API flake, runner loss), every test job is `skipped`, and
   skipped checks satisfy branch protection — a failing "CI OK" is the only
