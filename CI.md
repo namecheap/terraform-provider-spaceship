@@ -10,6 +10,7 @@ the CI mechanics.
 | Workflow | File | Trigger | Purpose |
 |---|---|---|---|
 | CI | `.github/workflows/ci.yml` | PR, push to `master` | Lint, unit tests + coverage floor, docs drift/schema checks, Trivy and govulncheck security gates, acceptance tests |
+| Scheduled security scan | `.github/workflows/security-scheduled.yml` | Weekly (Mondays 06:17 UTC), manual | The same Trivy and govulncheck gates on `master`, without the summary, to catch advisories published since the last change; a failure emails whoever last edited the schedule |
 | CodeQL | GitHub default setup (org security configuration, no workflow file) | PR, push to `master`, weekly | Static security analysis of the Go code and the GitHub Actions workflows |
 | PR Title Check | `.github/workflows/pr-title.yml` (shared) | PR | Enforces Conventional Commit PR titles (they become the squash-commit messages release-please reads); reports as `PR Title / Conventional PR Title` |
 | Versioning | `.github/workflows/versioning.yml` (shared) | After every CI run on `master` (`workflow_run`), manual | release-please: opens/updates the Release PR; creates the tag when it merges |
@@ -52,18 +53,21 @@ so redundant runs also queue behind useful ones) but no signal.
   The docs check regenerates `docs/` and fails on drift, then runs
   `tfplugindocs validate` for structure; tfplugindocs has no single command
   for both.
-- **`security` (Trivy)** gates on CRITICAL/HIGH fixable findings across
-  vulnerabilities, misconfigurations, secrets and licenses (denylist in
-  `trivy.yaml`). A second, non-gating pass writes every finding to JSON for
-  the summary, and a third writes the CI SBOM artifact. The Trivy version is
-  bumped by hand and kept equal to the one pinned in
-  [terraform-provider-workflows](https://github.com/namecheap/terraform-provider-workflows).
-- **`govulncheck`** complements Trivy with reachability: it fails only when
-  vulnerable code is actually called, and it covers standard-library
-  advisories for the Go toolchain in use.
-- **`security-report`** combines both scans, the SBOM and open CodeQL alerts
-  into one summary, posted as a sticky comment on same-repo PRs and to the
-  job summary. It never gates; it shows the gates' results as they are.
+- **`security`** calls the shared `security-scan.yml` from
+  [terraform-provider-workflows](https://github.com/namecheap/terraform-provider-workflows) with `report: true`. It reports three checks:
+  - `Security / Security scan (Trivy)` gates on CRITICAL/HIGH fixable
+    findings across vulnerabilities, misconfigurations, secrets and licenses
+    (denylist in `trivy.yaml`).
+  - `Security / Security scan (govulncheck)` fails only when vulnerable code
+    is actually called. It uses the Go version from `go.mod`, the one
+    releases build with, so a standard-library CVE fails it until the
+    `toolchain` line is bumped.
+  - `Security / Security scan summary` combines both scans, a CycloneDX SBOM
+    and open CodeQL alerts into one summary, posted as a sticky comment on
+    same-repo PRs and to the job summary. It never gates.
+
+  Trivy and govulncheck versions are pinned in the shared repository;
+  Dependabot bumps the caller's SHA.
 - **`acceptance`** runs `make testacc` against the live Spaceship API, one
   run at a time (`concurrency: acceptance-tests`). Secrets can't be read in
   a job-level `if:`, so a first step checks for them; without them (fork and
@@ -86,7 +90,7 @@ closes that hole.)
 
 What runs for typical changes:
 
-| Change | Check / Security / govulncheck / Summary / Acceptance | CI OK |
+| Change | Check / Security / Acceptance | CI OK |
 |---|---|---|
 | Go code, workflows, examples, scripts | runs | ✅ |
 | `docs/**` or `templates/**` (registry-published docs) | runs | ✅ |

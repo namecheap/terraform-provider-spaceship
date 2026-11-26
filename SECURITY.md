@@ -28,15 +28,17 @@ using the most recent version of the provider.
 ## Automated Security Scanning
 
 Every push and pull request runs a set of security gates in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). Trivy, govulncheck and
+the summary come from the shared `security-scan.yml` in
+[terraform-provider-workflows](https://github.com/namecheap/terraform-provider-workflows), called as the `Security` job:
 
-- **Trivy** (`security` job) — vulnerability (SCA), IaC misconfiguration,
+- **Trivy** (`Security / Security scan (Trivy)`) — vulnerability (SCA), IaC misconfiguration,
   secret, and license scanning. The gate blocks merge on `CRITICAL,HIGH`
   findings with an available fix (`ignore-unfixed: true`). The license denylist
   lives in [`trivy.yaml`](trivy.yaml) (copyleft / source-available licenses we
   cannot ship). A CycloneDX SBOM is generated and uploaded as the
   `sbom-cyclonedx` artifact.
-- **govulncheck** (`govulncheck` job) — Go-native call-graph **reachability**
+- **govulncheck** (`Security / Security scan (govulncheck)`) — Go-native call-graph **reachability**
   analysis against <https://vuln.go.dev> and the standard library. Fails the
   build only when a vulnerable symbol is actually reachable from the provider's
   code; imported-but-uncalled vulnerabilities are reported but do not gate.
@@ -45,7 +47,7 @@ Every push and pull request runs a set of security gates in
 
 ### PR security summary
 
-The `security-report` job consolidates all of the above into a single Markdown
+The `Security / Security scan summary` job consolidates all of the above into a single Markdown
 report, surfaced three ways: a **sticky pull-request comment** (one comment,
 updated in place per push), the run's **job summary**, and the
 **`security-summary`** workflow artifact. It reports Trivy findings by severity,
@@ -56,5 +58,6 @@ breakdown).
 The summary is **reporting only and never gates** — the per-scan pass/fail it
 shows is taken verbatim from the gate jobs above, so a green comment can never
 mask a red gate. Secret findings list the rule and location only, never the
-matched value. The comment is skipped for pull requests from forks (whose token
-is read-only); the job summary and artifact are still produced.
+matched value. The comment is skipped for pull requests from forks and from
+Dependabot (whose token is read-only); the job summary and artifact are still
+produced.
